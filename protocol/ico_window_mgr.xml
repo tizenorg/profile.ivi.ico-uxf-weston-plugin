@@ -1,0 +1,91 @@
+<protocol name="ico_window_mgr">
+
+  <interface name="ico_window_mgr" version="1">
+    <description summary="interface for HomeScreen Window Management">
+      for IVI HomeScreen interface.
+    </description>
+
+    <request name="set_user">
+      <arg name="pid" type="int"/>
+      <arg name="appid" type="string"/>
+    </request>
+
+    <request name="set_eventcb">
+      <arg name="eventcb" type="int"/>
+    </request>
+
+    <request name="set_window_layer">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="layer" type="int"/>
+    </request>
+
+    <request name="set_positionsize">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+
+    <request name="set_visible">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="visible" type="int"/>
+      <arg name="raise" type="int"/>
+    </request>
+
+    <request name="set_transition">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="transition" type="int"/>
+    </request>
+
+    <request name="set_active">
+      <arg name="surfaceid" type="uint"/>
+    </request>
+
+    <request name="set_layer_visible">
+      <arg name="layer" type="int"/>
+      <arg name="visible" type="int"/>
+    </request>
+
+    <event name="window_created">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="pid" type="int"/>
+      <arg name="appid" type="string"/>
+    </event>
+
+    <event name="window_destroyed">
+      <arg name="surfaceid" type="uint"/>
+    </event>
+
+    <event name="window_visible">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="visible" type="int"/>
+      <arg name="raise" type="int"/>
+      <arg name="hint" type="int"/>
+    </event>
+
+    <event name="window_configure">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="appid" type="string"/>
+      <arg name="layer" type="int"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+      <arg name="hint" type="int"/>
+    </event>
+
+    <event name="window_active">
+      <arg name="surfaceid" type="uint"/>
+      <arg name="active" type="uint"/>
+    </event>
+
+    <enum name="active">
+      <entry name="inactive" value="0"/>
+      <entry name="active" value="1"/>
+      <entry name="select" value="2"/>
+    </enum>
+  </interface>
+
+</protocol>
+

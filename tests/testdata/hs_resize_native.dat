@@ -1,0 +1,16 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Resize bug test
+#
+#	1. Pure client
+launch ../tests/test-client < ../tests/testdata/cl_surface2.dat 2> ../tests/testlog/test-client2.log
+waitcreate 2
+show test-client
+sleep 2
+resize test-client 300 200
+sleep 2
+waitdestroy 60
+sleep 1
+#
+#	9. End of Test
+bye
+

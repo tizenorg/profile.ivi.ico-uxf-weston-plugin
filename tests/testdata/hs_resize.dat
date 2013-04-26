@@ -1,0 +1,109 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Resize bug test
+#
+#	1. Pure client
+launch ../tests/test-client < ../tests/testdata/cl_surface2.dat 2> ../tests/testlog/test-client2.log
+waitcreate 2
+resize test-client 150 100
+show test-client
+sleep 1
+resize test-client 300 200
+sleep 1
+resize test-client 450 300
+sleep 1
+resize test-client 600 400
+sleep 1
+resize test-client 400 250
+sleep 1
+resize test-client 200 150
+sleep 1
+resize test-client 100 50
+sleep 1
+waitdestroy 60
+sleep 1
+#
+#	2. Weston sample client
+launch /usr/bin/wayland-flower 2> ../tests/testlog/wayland-flower.log
+waitcreate 2
+move wayland-flower 200 100
+show wayland-flower
+sleep 1
+resize wayland-flower 500 400
+sleep 2
+kill wayland-flower
+sleep 1
+#
+launch /usr/bin/wayland-smoke 2> ../tests/testlog/wayland-smoke.log
+waitcreate 2
+move wayland-smoke 100 50
+show wayland-smoke
+sleep 0.3
+event XY=168,93
+event Button=Down
+sleep 0.1
+event XY=151,88
+event Button=Up
+sleep 1
+resize wayland-smoke 400 400
+sleep 0.3
+event XY=457,211
+event Button=Down
+sleep 0.1
+event XY=457,209
+event Button=Up
+sleep 1
+resize wayland-smoke 300 600
+sleep 0.4
+event XY=250,495
+event Button=Down
+sleep 0.2
+event XY=246,498
+event Button=Up
+sleep 0.8
+resize wayland-smoke 450 300
+sleep 0.3
+event XY=511,296
+event Button=Down
+sleep 0.1
+event XY=R508,300
+event Button=Up
+sleep 1
+kill wayland-smoke
+sleep 1
+#
+#	3. EFL client
+launch ../tests/test-eflapp @2 -color=0xc0ff2040 -resize 2> ../tests/testlog/test-eflapp2.log
+waitcreate 2
+layer test-eflapp@2 102
+move test-eflapp@2 20 80
+show test-eflapp@2
+sleep 0.5
+
+launch ../tests/test-eflapp @3 -color=0xb04080c0 -resize 2> ../tests/testlog/test-eflapp3.log
+waitcreate 2
+layer test-eflapp@3 102
+move test-eflapp@3 200 300
+show test-eflapp@3
+sleep 0.5
+resize test-eflapp@2 240 300
+sleep 2
+resize test-eflapp@2 100 100
+sleep 2
+resize test-eflapp@3 640 420
+sleep 2
+resize test-eflapp@3 720 520
+sleep 2
+resize test-eflapp@3 520 380
+sleep 2
+resize test-eflapp@2 520 380
+sleep 2
+#
+#	7. kill eflapp's
+kill test-eflapp@2
+sleep 0.5
+kill test-eflapp@3
+sleep 0.5
+#
+#	9. End of Test
+bye
+

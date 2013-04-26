@@ -1,0 +1,65 @@
+[16:40:48.819@28893] CLIENT: handle_global: interface=<wl_display> id=1
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_compositor> id=2
+[16:40:48.820@28893] CLIENT: handle_global: interface=<screenshooter> id=3
+[16:40:48.820@28893] CLIENT: handle_global: interface=<text_cursor_position> id=4
+[16:40:48.820@28893] CLIENT: handle_global: interface=<text_model_factory> id=5
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_data_device_manager> id=6
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_shm> id=7
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_output> id=8
+[16:40:48.820@28893] CLIENT: created output global 0x8960c28
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_drm> id=9
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_seat> id=10
+[16:40:48.820@28893] CLIENT: handle_global: interface=<input_method> id=11
+[16:40:48.820@28893] CLIENT: handle_global: interface=<wl_shell> id=12
+[16:40:48.820@28893] CLIENT: handle_global: interface=<ico_ivi_shell> id=13
+[16:40:48.820@28893] CLIENT: handle_global: interface=<ico_window_mgr> id=14
+[16:40:48.820@28893] CLIENT: created window_mgr global 0x8960d40
+[16:40:48.820@28893] CLIENT: handle_global: interface=<ico_input_mgr_control> id=15
+[16:40:48.820@28893] CLIENT: handle_global: interface=<ico_input_mgr_device> id=16
+[16:40:48.820@28893] CLIENT: handle_global: interface=<ico_exinput> id=17
+[16:40:48.820@28893] CLIENT: created exinput global 0x8960c70
+[16:40:48.840@28893] CLIENT: # Test for Weston IVI Plugin for Native Application
+[16:40:48.840@28893] CLIENT: Event[handle_geometry] x/y=0/0 p.w/h=340/270 trans=0
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1280/1024 flags=00000003 refresh=60020
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1280/1024 flags=00000000 refresh=75025
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1280/960 flags=00000000 refresh=75044
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1280/960 flags=00000000 refresh=60000
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1152/864 flags=00000000 refresh=75000
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1024/768 flags=00000000 refresh=75076
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1024/768 flags=00000000 refresh=70069
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=1024/768 flags=00000000 refresh=60004
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=832/624 flags=00000000 refresh=74551
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=800/600 flags=00000000 refresh=72188
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=800/600 flags=00000000 refresh=75000
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=800/600 flags=00000000 refresh=60317
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=800/600 flags=00000000 refresh=56250
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=640/480 flags=00000000 refresh=72809
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=640/480 flags=00000000 refresh=75000
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=640/480 flags=00000000 refresh=66667
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=640/480 flags=00000000 refresh=60000
+[16:40:48.840@28893] CLIENT: Event[handle_mode] x/y=720/400 flags=00000000 refresh=70082
+[16:40:48.860@28893] CLIENT: # Surface Create and Exit
+[16:40:48.881@28893] CLIENT: #
+[16:40:48.881@28893] CLIENT: got keyboard keymap
+[16:40:48.901@28893] CLIENT: # 1. Create Surface
+[16:40:48.921@28893] CLIENT: create-surface
+[16:40:48.921@28893] CLIENT: create surface 12 shell=089602b0
+[16:40:49.021@28893] CLIENT: got keyboard modifier
+[16:40:49.021@28893] CLIENT: got pointer enter (-16284,-16284), surface 0x8960288
+[16:40:49.054@28893] CLIENT: created egl_surface 08a088a0
+[16:40:49.074@28893] CLIENT: # 2. Sleep 2 sec with color change
+[16:40:49.074@28893] CLIENT: got pointer leave, surface 0x8960288
+[16:40:49.094@28893] CLIENT: sleep 0.4
+[16:40:49.395@28893] CLIENT: got surface enter, output 0x8960c28
+[16:40:49.395@28893] CLIENT: got keyboard modifier
+[16:40:49.395@28893] CLIENT: got pointer enter (100,100), surface 0x8960288
+[16:40:49.516@28893] CLIENT: clear-surface 0x80ff2020
+[16:40:49.536@28893] CLIENT: sleep 0.6
+[16:40:50.159@28893] CLIENT: clear-surface 0xb020ff20
+[16:40:50.180@28893] CLIENT: sleep 0.6
+[16:40:50.802@28893] CLIENT: clear-surface 0xe02020ff
+[16:40:50.823@28893] CLIENT: sleep 0.6
+[16:40:51.445@28893] CLIENT: clear-surface 0xff808080
+[16:40:51.466@28893] CLIENT: sleep 0.6
+[16:40:52.088@28893] CLIENT: # 3. End of this Application (exit)
+[16:40:52.108@28893] CLIENT: bye

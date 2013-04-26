@@ -1,0 +1,7 @@
+#	Test for Weston IVI Plugin for Native Application
+#	Surface Create and Exit
+#
+#	1. Create Surface
+create-surface
+#	2. End of this Application (exit)
+bye

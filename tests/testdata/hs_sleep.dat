@@ -1,0 +1,8 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Examination to operate only the program of the home screen.
+#
+#	1. Sleep 3600 sec
+sleep 3600
+#	2. End of Test
+bye
+

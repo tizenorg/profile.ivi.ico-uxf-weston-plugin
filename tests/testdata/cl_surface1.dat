@@ -1,0 +1,17 @@
+#	Test for Weston IVI Plugin for Native Application
+#	Surface Create and Exit
+#
+#	1. Create Surface
+create-surface
+#	2. Sleep 2 sec with color change
+sleep 0.4
+clear-surface 0x80ff2020
+sleep 0.6
+clear-surface 0xb020ff20
+sleep 0.6
+clear-surface 0xe02020ff
+sleep 0.6
+clear-surface 0xff808080
+sleep 0.6
+#	3. End of this Application (exit)
+bye

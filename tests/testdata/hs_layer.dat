@@ -1,0 +1,42 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Surface Layer Change
+#
+#	1. Set Layer
+launch ../tests/test-eflapp @1 -color=0xff2040ff > ../tests/testlog/test-eflapp1.log
+sleep 0.5
+layer test-eflapp@1 101
+move test-eflapp@1 100 200
+show test-eflapp@1
+sleep 0.5
+
+launch ../tests/test-eflapp @2 -color=0xff20ff40 > ../tests/testlog/test-eflapp2.log
+sleep 0.5
+layer test-eflapp@2 103
+move test-eflapp@2 200 300
+show test-eflapp@2
+sleep 0.5
+
+launch ../tests/test-eflapp @3 -color=0xffff2040 > ../tests/testlog/test-eflapp3.log
+sleep 0.5
+layer test-eflapp@3 102
+move test-eflapp@3 300 400
+show test-eflapp@3
+sleep 2
+
+#	2. Layer Change
+layer test-eflapp@1 105
+sleep 2
+layer test-eflapp@2 100
+sleep 2
+#
+#	3. kill eflapp's
+kill test-eflapp@1
+sleep 0.5
+kill test-eflapp@2
+sleep 0.5
+kill test-eflapp@3
+sleep 0.5
+#
+#	4. End of Test
+bye
+

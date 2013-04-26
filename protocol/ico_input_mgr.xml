@@ -1,0 +1,120 @@
+<protocol name="ico_input_mgr">
+
+  <interface name="ico_input_mgr_control" version="1">
+    <description summary="interface for manager(ex.HomeScreen)">
+      Order a correspondence charge account to the application of the input switch
+      to Multi Input Manager from HomeScreen.
+    </description>
+
+    <request name="add_input_app">
+      <description summary="assign input switch to application">
+        Assign input switch to application from HomeScreen.
+      </description>
+      <arg name="appid" type="string" summary="application Id for input switch"/>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="fix" type="uint" summary="fixed assign to application"/>
+    </request>
+
+    <request name="del_input_app">
+      <description summary="de-assign input switch to application">
+        De-assign input switch to application from HomeScreen.
+      </description>
+      <arg name="appid" type="string" summary="application Id for input switch, if NULL all applications with out fixed assign"/>
+      <arg name="device" type="string" summary="input device name, if NULL, all devices with out fixed assign"/>
+      <arg name="input" type="int" summary="input switch number, if -1, all input with out dixed assign"/>
+    </request>
+  </interface>
+
+  <interface name="ico_exinput" version="1">
+    <description summary="interface for application">
+      Inform the switch name and number which there is for application,
+      and notify application of ON/OFF of the switch.
+    </description>
+
+    <event name="capabilities">
+      <description summary="event to application for input switch information">
+        Send Input device and switch information to application
+      </description>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="type" type="int" summary="input device type (as enum type)"/>
+      <arg name="swname" type="string" summary="input switch name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="codename" type="string" summary="input code name"/>
+      <arg name="code" type="int" summary="input code number"/>
+    </event>
+
+    <event name="code">
+      <description summary="event to application for input code information">
+        Send Input code information to application
+      </description>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="codename" type="string" summary="input code name"/>
+      <arg name="code" type="int" summary="input code number"/>
+    </event>
+
+    <event name="input">
+      <description summary="event to application for switch input">
+        Send Input switch event to application
+      </description>
+      <arg name="time" type="uint" summary="input time of miri-sec"/>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="code" type="int" summary="input switch code"/>
+      <arg name="state" type="int" summary="Of/Off status"/>
+    </event>
+  </interface>
+
+  <interface name="ico_input_mgr_device" version="1">
+    <description summary="interface for input controller">
+      An input controller informs attribute of the device and ON/OFF of the switch
+      to Multi Input Manager.
+    </description>
+
+    <enum name="type">
+      <description summary="capability bitmask">
+       Input Controller type mask define.
+      </description>
+      <entry name="pointer" value="1" summary="wl_pointer"/>
+      <entry name="keyboard" value="2" summary="wl_keyboard"/>
+      <entry name="touch" value="4" summary="wl_touch"/>
+      <entry name="switch" value="8" summary="exinput switch"/>
+    </enum>
+
+    <request name="configure_input">
+      <description summary="input controller define input switch">
+        Define input switch from Input Controller
+      </description>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="type" type="int" summary="input device type (as enum type)"/>
+      <arg name="swname" type="string" summary="input switch name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="codename" type="string" summary="input code name"/>
+      <arg name="code" type="int" summary="input code number"/>
+    </request>
+
+    <request name="configure_code">
+      <description summary="input controller define input code">
+        Define input code from Input Controller
+      </description>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="codename" type="string" summary="input code name"/>
+      <arg name="code" type="int" summary="input code number"/>
+    </request>
+
+    <request name="input_event">
+      <description summary="input controller switch input event">
+        Event of switch input from Input Controller
+      </description>
+      <arg name="time" type="uint" summary="input time of day"/>
+      <arg name="device" type="string" summary="input device name"/>
+      <arg name="input" type="int" summary="input switch number"/>
+      <arg name="code" type="int" summary="input switch code"/>
+      <arg name="state" type="int" summary="Of/Off status"/>
+    </request>
+  </interface>
+
+</protocol>
+

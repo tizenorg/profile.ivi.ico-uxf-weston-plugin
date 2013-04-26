@@ -1,0 +1,129 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Input event test
+#
+#	1. Input test (touch each window)
+launch ../tests/test-client @1 -color=0xffff2020 -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client1.log
+sleep 0.5
+layer test-client@1 101
+move test-client@1 100 200
+show test-client@1
+
+launch ../tests/test-client @2 -color=0xff20ff20 -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client2.log
+sleep 0.5
+layer test-client@2 101
+move test-client@2 250 300
+show test-client@2
+
+launch ../tests/test-client @3 -color=0xff2020ff -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client3.log
+sleep 0.5
+layer test-client@3 101
+move test-client@3 400 400
+show test-client@3
+
+# Multi Input Manager test
+
+sleep 2
+# set input device
+input_conf InDev1 8 Sw1 0
+input_conf InDev1 8 Sw2 1 Up 10
+input_code InDev1 1 Down 11
+input_conf InDev1 8 Sw3 2 Left 20 Right 21
+input_code InDev1 2 Right 21
+input_conf InDev1 8 Sw4 3
+sleep 0.5
+input_conf InDev2 8 Sw0 0
+input_conf InDev2 8 Sw1 1
+sleep 0.5
+# input switch event
+input_sw InDev1 2 20 1
+sleep 0.1
+input_sw InDev1 2 20 0
+sleep 0.5
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 1
+sleep 0.5
+# assign input sw to application
+input_add InDev1 1 test-client@1
+input_add InDev1 2 test-client@2
+input_add InDev1 3 test-client@3
+input_add InDev2 0 test-client@1 1
+input_add InDev2 1 test-client@1
+sleep 0.5
+# input switch event
+input_sw InDev1 0 1 1
+sleep 0.1
+input_sw InDev1 0 1 0
+sleep 0.5
+input_sw InDev1 1 10 1
+sleep 0.1
+input_sw InDev1 1 10 0
+sleep 0.5
+input_sw InDev1 2 21 1
+sleep 0.1
+input_sw InDev1 2 21 0
+sleep 0.5
+input_sw InDev1 3 1 1
+sleep 0.1
+input_sw InDev1 3 1 0
+sleep 0.5
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 0
+sleep 0.5
+input_sw InDev2 1 1 1
+sleep 0.1
+input_sw InDev2 1 1 0
+sleep 0.5
+# delete and change assign
+## same assign (NOP, but change to general assign)
+input_add InDev2 0 test-client@1
+## same assign (NOP, but change to fixed assign)
+input_add InDev2 0 test-client@1 1
+## change assign
+input_add InDev2 1 test-client@2
+## delete assign
+input_del InDev1 1 test-client@1
+## delete but not assign
+input_del InDev2 1 test-client@1
+## switch input event
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 0
+sleep 0.1
+input_sw InDev2 1 1 1
+sleep 0.1
+input_sw InDev2 1 1 0
+sleep 0.1
+input_sw InDev1 3 1 1
+sleep 0.1
+input_sw InDev1 3 1 0
+sleep 1
+# delete all assign without fixed assign(fixed = InDev2.0)
+input_del @ -1 @
+sleep 2
+#
+kill test-client@1
+sleep 0.5
+#
+launch ../tests/test-client @1 -color=0xffff2020 -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client4.log
+sleep 0.5
+layer test-client@1 101
+move test-client@1 100 200
+show test-client@1
+#
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 0
+sleep 2
+#
+kill test-client@1
+sleep 0.5
+kill test-client@2
+sleep 0.5
+kill test-client@3
+sleep 0.5
+#
+#	2. End of Test
+bye
+

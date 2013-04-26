@@ -1,0 +1,25 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Resize bug test (only weston sample client 'flower')
+#
+sleep 1
+#
+#	1. Weston sample client
+launch /usr/bin/wayland-flower 2> ../tests/testlog/wayland-flower.log
+waitcreate 2
+move wayland-flower 50 100
+show wayland-flower
+sleep 2
+resize wayland-flower 400 400
+sleep 2
+resize wayland-flower 200 400
+sleep 2
+resize wayland-flower 400 200
+sleep 2
+resize wayland-flower 500 300
+sleep 2
+kill wayland-flower
+sleep 1
+#
+#	2. End of Test
+bye
+

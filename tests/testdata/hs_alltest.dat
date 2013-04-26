@@ -1,0 +1,342 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Surface Create and Destory
+#
+#	1. Launch Application (and app create surface)
+launch ../tests/test-client < ../tests/testdata/cl_surface1.dat 2> ../tests/testlog/test-client01.log
+waitcreate 2
+show test-client
+sleep 2
+waitdestroy 60
+sleep 1
+#
+#	2. Launch Application and resize/move/show
+launch ../tests/test-client < ../tests/testdata/cl_surface2.dat 2> ../tests/testlog/test-client02.log
+waitcreate 2
+resize test-client 600 400
+move test-client 300 100
+show test-client
+sleep 1
+move test-client 320 120
+sleep 0.5
+move test-client 340 140
+sleep 0.5
+move test-client 360 160
+sleep 0.5
+move test-client 380 180
+sleep 0.5
+hide test-client
+sleep 1
+move test-client 100 200
+resize test-client 150 100
+show test-client
+sleep 0.6
+resize test-client 300 200
+sleep 0.6
+resize test-client 450 300
+sleep 0.6
+resize test-client 600 400
+sleep 0.6
+resize test-client 400 250
+sleep 0.6
+resize test-client 200 150
+sleep 0.6
+resize test-client 100 50
+sleep 1
+waitdestroy 60
+sleep 1
+#
+#	3. Launch Weston sample client
+launch /usr/bin/wayland-flower 2> ../tests/testlog/wayland-flower.log
+waitcreate 2
+move wayland-flower 200 100
+show wayland-flower
+sleep 1
+resize wayland-flower 500 400
+sleep 2
+kill wayland-flower
+sleep 1
+#
+launch /usr/bin/wayland-smoke 2> ../tests/testlog/wayland-smoke.log
+waitcreate 2
+move wayland-smoke 100 50
+show wayland-smoke
+sleep 0.3
+event XY=168,93
+event Button=Down
+sleep 0.1
+event XY=151,88
+event Button=Up
+sleep 1
+resize wayland-smoke 400 400
+sleep 0.3
+event XY=457,211
+event Button=Down
+sleep 0.1
+event XY=457,209
+event Button=Up
+sleep 1
+resize wayland-smoke 300 600
+sleep 0.4
+event XY=250,495
+event Button=Down
+sleep 0.2
+event XY=246,498
+event Button=Up
+sleep 0.8
+resize wayland-smoke 450 300
+sleep 0.3
+event XY=511,296
+event Button=Down
+sleep 0.1
+event XY=R508,300
+event Button=Up
+sleep 1
+kill wayland-smoke
+sleep 1
+#
+#	4. Set Layer
+launch ../tests/test-eflapp @1 -color=0xe02040ff > ../tests/testlog/test-eflapp1.log
+waitcreate 2
+layer test-eflapp@1 101
+move test-eflapp@1 100 200
+show test-eflapp@1
+sleep 0.5
+
+launch ../tests/test-eflapp @2 -color=0xd020ff40 > ../tests/testlog/test-eflapp2.log
+waitcreate 2
+layer test-eflapp@2 103
+move test-eflapp@2 200 300
+show test-eflapp@2
+sleep 0.5
+
+launch ../tests/test-eflapp @3 -color=0xc0ff2040 > ../tests/testlog/test-eflapp3.log
+waitcreate 2
+layer test-eflapp@3 102
+move test-eflapp@3 300 400
+show test-eflapp@3
+sleep 0.5
+
+launch ../tests/test-eflapp @4 -color=0xb0808080 > ../tests/testlog/test-eflapp4.log
+waitcreate 2
+layer test-eflapp@4 102
+move test-eflapp@4 400 500
+show test-eflapp@4
+sleep 0.5
+
+launch ../tests/test-eflapp @5 -color=0xa040a060 > ../tests/testlog/test-eflapp5.log
+waitcreate 2
+layer test-eflapp@5 102
+move test-eflapp@5 500 600
+show test-eflapp@5
+sleep 1
+hide test-eflapp@2
+sleep 1
+show test-eflapp@2
+sleep 2
+#
+#	resize EFL application
+resize test-eflapp@2 200 300
+sleep 1
+resize test-eflapp@3 720 520
+sleep 1
+resize test-eflapp@3 520 380
+sleep 1
+resize test-eflapp@2 520 380
+sleep 1
+#
+#	5. Raise/Lower
+raise test-eflapp@3
+sleep 1
+raise test-eflapp@4
+sleep 1
+raise test-eflapp@5
+sleep 1
+lower test-eflapp@5
+sleep 1
+lower test-eflapp@4
+sleep 1
+lower test-eflapp@3
+sleep 2
+#
+#	6. Layer Change
+layer test-eflapp@1 100
+sleep 1
+layer test-eflapp@2 100
+sleep 2
+#
+#	7. layer visibility control
+layer_visible 102 0
+sleep 1
+layer_visible 102 1
+sleep 1
+#	8. kill eflapp's
+kill test-eflapp@1
+sleep 0.5
+kill test-eflapp@2
+sleep 0.5
+kill test-eflapp@3
+sleep 0.5
+kill test-eflapp@4
+sleep 0.5
+kill test-eflapp@5
+sleep 2
+#
+#	9. Input test
+launch ../tests/test-client @1 -color=0xe0ff2020 -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client11.log
+waitcreate 2
+sleep 0.3
+layer test-client@1 101
+move test-client@1 100 200
+show test-client@1
+sleep 0.5
+event XY=240,303
+event Button=Down
+sleep 0.1
+event XY=233,289
+event Button=Up
+sleep 0.2
+
+launch ../tests/test-client @2 -color=0xc020ff20 -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client12.log
+waitcreate 2
+sleep 0.3
+layer test-client@2 101
+move test-client@2 250 300
+show test-client@2
+sleep 0.5
+event XY=625,555
+event Button=Down
+sleep 0.1
+event XY=623,557
+event Button=Up
+sleep 0.2
+
+launch ../tests/test-client @3 -color=0xa02020ff -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client13.log
+waitcreate 2
+sleep 0.3
+layer test-client@3 101
+move test-client@3 400 400
+show test-client@3
+sleep 0.5
+event XY=848,663
+event Button=Down
+sleep 0.1
+event XY=845,669
+event Button=Up
+sleep 0.2
+
+hide test-client@2
+sleep 0.3
+event XY=719,643
+event Button=Down
+sleep 0.1
+event XY=720,644
+event Button=Up
+sleep 0.5
+
+lower test-client@3
+sleep 0.3
+event XY=858,555
+event Button=Down
+sleep 0.1
+event XY=R858,557
+event Button=Up
+sleep 0.5
+
+show test-client@2
+sleep 0.3
+event XY=765,644
+event Button=Down
+sleep 0.1
+event XY=762,645
+event Button=Up
+sleep 2
+# set input device
+input_conf InDev1 8 Sw1 0
+input_conf InDev1 8 Sw2 1 Up 10
+input_code InDev1 1 Down 11
+input_conf InDev1 8 Sw3 2 Left 20 Right 21
+input_code InDev1 2 Right 21
+input_conf InDev1 8 Sw4 3
+sleep 0.5
+input_conf InDev2 8 Sw0 0
+input_conf InDev2 8 Sw1 1
+sleep 0.5
+# input switch event
+input_sw InDev1 2 20 1
+sleep 0.1
+input_sw InDev1 2 20 0
+sleep 0.5
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 1
+sleep 0.5
+# assign input sw to application
+input_add InDev1 1 test-client@1
+input_add InDev1 2 test-client@2
+input_add InDev1 3 test-client@3
+input_add InDev2 0 test-client@1 1
+input_add InDev2 1 test-client@1
+sleep 0.5
+# input switch event
+input_sw InDev1 0 1 1
+sleep 0.1
+input_sw InDev1 0 1 0
+sleep 0.5
+input_sw InDev1 1 10 1
+sleep 0.1
+input_sw InDev1 1 10 0
+sleep 0.5 
+input_sw InDev1 2 21 1
+sleep 0.1 
+input_sw InDev1 2 21 0
+sleep 0.5 
+input_sw InDev1 3 1 1
+sleep 0.1 
+input_sw InDev1 3 1 0
+sleep 0.5 
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 0
+sleep 0.5
+input_sw InDev2 1 1 1
+sleep 0.1
+input_sw InDev2 1 1 0
+sleep 0.5
+# delete and change assign
+## same assign (NOP, but change to general assign)
+input_add InDev2 0 test-client@1
+## same assign (NOP, but change to fixed assign)
+input_add InDev2 0 test-client@1 1
+## change assign
+input_add InDev2 1 test-client@2
+## delete assign
+input_del InDev1 1 test-client@1
+## delete but not assign
+input_del InDev2 1 test-client@1
+## switch input event
+input_sw InDev2 0 1 1
+sleep 0.1
+input_sw InDev2 0 1 0
+sleep 0.1
+input_sw InDev2 1 1 1
+sleep 0.1
+input_sw InDev2 1 1 0
+sleep 0.1
+input_sw InDev1 3 1 1
+sleep 0.1
+input_sw InDev1 3 1 0
+sleep 1
+# delete all assign without fixed assign(fixed = InDev2.0)
+input_del @ -1 @
+sleep 2
+#
+kill test-client@1
+sleep 0.3
+kill test-client@2
+sleep 0.3
+kill test-client@3
+sleep 0.5
+#
+#	10. End of Test
+bye
+

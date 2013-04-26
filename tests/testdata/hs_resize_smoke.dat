@@ -1,0 +1,23 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Resize bug test(smoke)
+#
+launch /usr/bin/wayland-smoke 2> ../tests/testlog/wayland-smoke.log
+waitcreate 2
+move wayland-smoke 100 50
+show wayland-smoke
+sleep 1
+resize wayland-smoke 400 400
+sleep 2
+resize wayland-smoke 600 300
+sleep 2
+resize wayland-smoke 300 600
+sleep 2
+resize wayland-smoke 100 300
+sleep 2
+resize wayland-smoke 300 100
+sleep 2
+kill wayland-smoke
+sleep 1
+#
+bye
+
