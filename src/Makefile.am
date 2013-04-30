@@ -1,11 +1,9 @@
 lib_LTLIBRARIES = libico-uxf-weston-plugin.la
 
-include_HEADERS =               \
+pkginclude_HEADERS =               \
 	ico_ivi_shell-client-protocol.h		\
 	ico_window_mgr-client-protocol.h	\
 	ico_input_mgr-client-protocol.h
-
-includedir = /usr/include/ico-uxf-weston-plugin
 
 libico_uxf_weston_plugin_la_LIBADD = -lrt -lm
 libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:5:0
