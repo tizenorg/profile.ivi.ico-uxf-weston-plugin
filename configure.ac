@@ -32,17 +32,7 @@ AC_CHECK_HEADERS([execinfo.h])
 
 AC_CHECK_FUNCS([mkostemp strchrnul])
 
-PKG_CHECK_MODULES(COMPOSITOR,
-		  [wayland-server egl >= 7.10 glesv2 xkbcommon pixman-1])
-
-AC_ARG_ENABLE(setuid-install, [  --enable-setuid-install],,
-	      enable_setuid_install=yes)
-AM_CONDITIONAL(ENABLE_SETUID_INSTALL, test x$enable_setuid_install = xyes)
-
-COMPOSITOR_LIBS="$COMPOSITOR_LIBS $IMAGE_LIBS"
-COMPOSITOR_CFLAGS="$COMPOSITOR_CFLAGS $IMAGE_CFLAGS"
-
-AM_CONDITIONAL(ENABLE_DESKTOP_SHELL, true)
+PKG_CHECK_MODULES([PLUGIN], [weston >= 1.0.6 pixman-1 xkbcommon])
 
 if test "x$GCC" = "xyes"; then
 	my_common_gcc_flags="-Wall -Wextra -Wno-unused-parameter \

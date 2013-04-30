@@ -42,7 +42,7 @@
 #include <time.h>
 
 #include <wayland-server.h>
-#include "compositor.h"
+#include <weston/compositor.h>
 #include "ico_ivi_common.h"
 #include "ico_ivi_shell.h"
 #include "ico_ivi_shell-server-protocol.h"

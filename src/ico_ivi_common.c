@@ -36,7 +36,7 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
-#include "compositor.h"
+#include <weston/compositor.h>
 #include "ico_ivi_common.h"
 
 /* IVI Plugin Common Table                  */

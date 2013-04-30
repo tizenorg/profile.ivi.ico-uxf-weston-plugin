@@ -40,7 +40,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "compositor.h"
+#include <weston/compositor.h>
 #include "ico_ivi_common.h"
 
 /* This function is called from the main body of Weston and initializes this module.*/

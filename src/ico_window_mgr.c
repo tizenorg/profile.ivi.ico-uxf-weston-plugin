@@ -46,7 +46,7 @@
 #include <aul/aul.h>
 #include <bundle.h>
 
-#include "compositor.h"
+#include <weston/compositor.h>
 #include "ico_ivi_common.h"
 #include "ico_ivi_shell.h"
 #include "ico_window_mgr.h"

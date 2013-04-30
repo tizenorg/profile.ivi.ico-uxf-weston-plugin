@@ -7,13 +7,7 @@ License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(wayland-server) >= 1.0
-BuildRequires: pkgconfig(wayland-client) >= 1.0
-BuildRequires: pkgconfig(wayland-egl)
-BuildRequires: pkgconfig(egl)
-BuildRequires: pkgconfig(glesv2)
-BuildRequires: pkgconfig(xkbcommon)
-BuildRequires: pkgconfig(pixman-1)
+BuildRequires: pkgconfig(weston) >= 1.0.6
 BuildRequires: pkgconfig(eina)
 BuildRequires: pkgconfig(evas)
 BuildRequires: pkgconfig(eina)
@@ -21,7 +15,7 @@ BuildRequires: pkgconfig(elementary)
 BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: aul-devel
 BuildRequires: ecore-devel
-Requires: weston >= 1.0
+Requires: weston >= 1.0.6
 
 %description
 Weston Plugins for IVI
