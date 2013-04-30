@@ -53,9 +53,7 @@ install -m 0644 weston_ivi_plugin.ini %{buildroot}%{weston_conf}
 %defattr(-,root,root,-)
 %dir %{_libdir}/weston/
 %{_libdir}/weston/*.so
-%{_libdir}/libico-uxf-weston-plugin.so.0.0.5
-%{_libdir}/libico-uxf-weston-plugin.so.0
-%{_libdir}/libico-uxf-weston-plugin.so
+%{_libdir}/libico-uxf-weston-plugin.so.*
 %{weston_conf}/weston.ini.ico
 %{weston_conf}/weston_ivi_plugin.ini
 
@@ -64,4 +62,4 @@ install -m 0644 weston_ivi_plugin.ini %{buildroot}%{weston_conf}
 %{_includedir}/%{name}/ico_input_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_ivi_shell-client-protocol.h
 %{_includedir}/%{name}/ico_window_mgr-client-protocol.h
-
+%{_libdir}/libico-uxf-weston-plugin.so
