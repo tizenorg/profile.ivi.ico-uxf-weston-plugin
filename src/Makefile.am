@@ -42,7 +42,8 @@ ico_plugin_loader_la_LDFLAGS = -module -avoid-version
 ico_plugin_loader_la_LIBADD = $(PLUGIN_LIBS)
 ico_plugin_loader_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_plugin_loader_la_SOURCES =          \
-	ico_plugin_loader.c
+	ico_plugin_loader.c		\
+	config-parser.c  # Remove once Weston SDK exports config functions.
 
 # IVI Common Functions
 ico_ivi_common = ico_ivi_common.la
@@ -50,7 +51,8 @@ ico_ivi_common_la_LDFLAGS = -module -avoid-version
 ico_ivi_common_la_LIBADD = $(PLUGIN_LIBS)
 ico_ivi_common_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_ivi_common_la_SOURCES =          \
-	ico_ivi_common.c
+	ico_ivi_common.c	\
+	config-parser.c  # Remove once Weston SDK exports config functions.
 
 # IVI-Shell
 ico_ivi_shell = ico_ivi_shell.la
@@ -60,7 +62,8 @@ ico_ivi_shell_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_ivi_shell_la_SOURCES =			\
 	ico_ivi_shell.c				\
 	ico_ivi_shell-protocol.c		\
-	ico_ivi_shell-server-protocol.h
+	ico_ivi_shell-server-protocol.h		\
+	config-parser.c  # Remove once Weston SDK exports config functions.
 
 # Multi Window Manager
 ico_window_mgr = ico_window_mgr.la
