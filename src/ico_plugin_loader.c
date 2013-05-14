@@ -161,7 +161,7 @@ load_module(struct weston_compositor *ec, const char *path, const char *entry)
 WL_EXPORT int
 module_init(struct weston_compositor *ec)
 {
-    char    *config_file;
+    int     config_fd;
     char    *p;
     char    *end;
     char    buffer[256];
@@ -169,10 +169,10 @@ module_init(struct weston_compositor *ec)
     uifw_info("ico_plugin_loader: Enter(module_init)");
 
     /* get plugin module name from config file(weston_ivi_plugin.ini)   */
-    config_file = config_file_path(ICO_IVI_PLUGIN_CONFIG);
-    parse_config_file(config_file, conf_plugin, ARRAY_LENGTH(conf_plugin), NULL);
-    parse_config_file(config_file, conf_debug, ARRAY_LENGTH(conf_debug), NULL);
-    free(config_file);
+    config_fd = open_config_file(ICO_IVI_PLUGIN_CONFIG);
+    parse_config_file(config_fd, conf_plugin, ARRAY_LENGTH(conf_plugin), NULL);
+    parse_config_file(config_fd, conf_debug, ARRAY_LENGTH(conf_debug), NULL);
+    close(config_fd);
 
     if (modules == NULL)    {
         uifw_error("ico_plugin_loader: Leave(No Plugin in config)");

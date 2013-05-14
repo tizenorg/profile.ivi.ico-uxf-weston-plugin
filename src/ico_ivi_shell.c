@@ -183,7 +183,7 @@ get_animation_type(char *animation)
 static void
 shell_configuration(struct ivi_shell *shell)
 {
-    char    *config_file;
+    int     config_fd;
     char    *win_animation = NULL;
 
     struct config_key shell_keys[] = {
@@ -195,9 +195,9 @@ shell_configuration(struct ivi_shell *shell)
         { "shell", shell_keys, ARRAY_LENGTH(shell_keys), NULL },
     };
 
-    config_file = config_file_path(ICO_IVI_PLUGIN_CONFIG);
-    parse_config_file(config_file, cs, ARRAY_LENGTH(cs), shell);
-    free(config_file);
+    config_fd = open_config_file(ICO_IVI_PLUGIN_CONFIG);
+    parse_config_file(config_fd, cs, ARRAY_LENGTH(cs), shell);
+    close(config_fd);
 
     shell->win_animation_type = get_animation_type(win_animation);
 

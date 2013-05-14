@@ -44,9 +44,9 @@ rm -rf %{buildroot}
 %make_install
 
 # configurations
-%define weston_conf /root/.config
+%define weston_conf %{_sysconfdir}/xdg/weston
 mkdir -p %{buildroot}%{weston_conf}
-install -m 0644 weston.ini.ico %{buildroot}%{weston_conf}
+install -m 0644 weston.ini.ico %{buildroot}%{weston_conf}/weston.ini
 install -m 0644 weston_ivi_plugin.ini %{buildroot}%{weston_conf}
 
 %files
@@ -54,8 +54,8 @@ install -m 0644 weston_ivi_plugin.ini %{buildroot}%{weston_conf}
 %dir %{_libdir}/weston/
 %{_libdir}/weston/*.so
 %{_libdir}/libico-uxf-weston-plugin.so.*
-%{weston_conf}/weston.ini.ico
-%{weston_conf}/weston_ivi_plugin.ini
+%config(noreplace) %{weston_conf}/weston.ini
+%config(noreplace) %{weston_conf}/weston_ivi_plugin.ini
 
 %files devel
 %defattr(-,root,root,-)
