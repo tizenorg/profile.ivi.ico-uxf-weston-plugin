@@ -7,6 +7,16 @@
       background, panels and locking surfaces.
     </description>
 
+    <enum name="active">
+      <description summary="active window kind">
+        Select active target(pointer/keyboard).
+      </description>
+      <entry name="none" value="0" summary="no_active_window"/>
+      <entry name="pointer" value="1" summary="wl_pointer"/>
+      <entry name="keyboard" value="2" summary="wl_keyboard"/>
+      <entry name="selected" value="4" summary="selected_window_by_operation"/>
+    </enum>
+
     <!-- We'll fold most of wl_shell into this interface and then
          they'll share the configure event.  -->
     <event name="configure">

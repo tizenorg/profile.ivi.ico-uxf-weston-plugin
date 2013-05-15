@@ -72,7 +72,10 @@ struct ivi_shell {
     struct ivi_layer_list ivi_layer;        /* Layer list                   */
     enum animation_type win_animation_type; /* Default animetion            */
     int win_visible_on_create;              /* Visible on create surface    */
-    struct shell_surface *active_shsurf;    /* Active shell surface         */
+    struct shell_surface *active_pointer_shsurf;
+                                            /* Pointer active shell surface */
+    struct shell_surface *active_keyboard_shsurf;
+                                            /* Keyboard active shell surface*/
 };
 
 /* Surface type                     */
@@ -1017,7 +1020,7 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
         type_changed = 1;
     }
 
-    if (! weston_surface_is_mapped(es)) { 
+    if (! weston_surface_is_mapped(es)) {
         if ((es->geometry.width > 0) && (es->geometry.height >0))   {
             uifw_trace("shell_surface_configure: map Surface size(sx/sy=%d/%d w/h=%d/%d)",
                        sx, sy, es->buffer->width, es->buffer->height);
@@ -1301,6 +1304,102 @@ ivi_shell_restack_ivi_layer(struct ivi_shell *shell, struct shell_surface *shsur
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ivi_shell_set_active: surface active control
+ *
+ * @param[in]   shsurf      shell surface(if NULL, no active surface)
+ * @param[in]   target      target device
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ivi_shell_set_active(struct shell_surface *shsurf, const int target)
+{
+    struct ivi_shell *shell;
+    struct weston_seat *seat;
+    struct weston_surface *surface;
+    int object = target;
+    wl_fixed_t sx, sy;
+
+    uifw_trace("ivi_shell_set_active: Enter(%08x,%x)", (int)shsurf, target);
+
+    if (shsurf) {
+        shell = shell_surface_get_shell(shsurf);
+        surface = shsurf->surface;
+        if (object == 0)    {
+            surface = NULL;
+            if (shell->active_pointer_shsurf == shsurf) {
+                object |= ICO_IVI_SHELL_ACTIVE_POINTER;
+            }
+            if (shell->active_keyboard_shsurf == shsurf)    {
+                object |= ICO_IVI_SHELL_ACTIVE_KEYBOARD;
+            }
+        }
+        else    {
+            if (object & ICO_IVI_SHELL_ACTIVE_POINTER) {
+                shell->active_pointer_shsurf = shsurf;
+            }
+            if (object & ICO_IVI_SHELL_ACTIVE_KEYBOARD)    {
+                shell->active_keyboard_shsurf = shsurf;
+            }
+        }
+    }
+    else    {
+        shell = default_shell;
+        surface = NULL;
+        if (target == 0)    {
+            object = ICO_IVI_SHELL_ACTIVE_POINTER|ICO_IVI_SHELL_ACTIVE_KEYBOARD;
+        }
+        if (object & ICO_IVI_SHELL_ACTIVE_POINTER) {
+            shell->active_pointer_shsurf = NULL;
+        }
+        if (object & ICO_IVI_SHELL_ACTIVE_KEYBOARD)    {
+            shell->active_keyboard_shsurf = NULL;
+        }
+    }
+
+    wl_list_for_each(seat, &shell->compositor->seat_list, link) {
+        if ((object & ICO_IVI_SHELL_ACTIVE_POINTER) && (seat->seat.pointer))   {
+            if (surface)    {
+                uifw_trace("ivi_shell_set_active: pointer set surface(%08x=>%08x)",
+                           (int)seat->seat.pointer->focus, (int)&surface->surface);
+                if (seat->seat.pointer->focus != &surface->surface) {
+                    weston_surface_from_global_fixed(surface,
+                                                     seat->seat.pointer->x,
+                                                     seat->seat.pointer->y,
+                                                     &sx, &sy);
+                    wl_pointer_set_focus(seat->seat.pointer, &surface->surface, sx, sy);
+                }
+            }
+            else    {
+                uifw_trace("ivi_shell_set_active: pointer reset surface(%08x)",
+                           (int)seat->seat.pointer->focus);
+                wl_pointer_set_focus(seat->seat.pointer, NULL,
+                                     wl_fixed_from_int(0), wl_fixed_from_int(0));
+            }
+        }
+        if ((object & ICO_IVI_SHELL_ACTIVE_KEYBOARD) && (seat->has_keyboard))  {
+            if (surface)    {
+                uifw_trace("ivi_shell_set_active: keyboard set surface(%08x=>%08x)",
+                           (int)seat->seat.keyboard->focus, (int)&surface->surface);
+                if (seat->seat.keyboard->focus != &surface->surface)    {
+                    wl_keyboard_set_focus(seat->seat.keyboard, &surface->surface);
+                }
+            }
+            else    {
+                uifw_trace("ivi_shell_set_active: keyboard reset surface(%08x)",
+                           (int)seat->seat.keyboard);
+                wl_keyboard_set_focus(seat->seat.keyboard, NULL);
+            }
+        }
+        else    {
+            uifw_trace("ivi_shell_set_active: seat[%08x] has no keyboard", (int)seat);
+        }
+    }
+    uifw_trace("ivi_shell_set_active: Leave(%08x)", (int)shsurf);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   click_to_activate_binding: clieck and select surface
  *
  * @param[in]   seat        clicked target seat
@@ -1330,9 +1429,8 @@ click_to_activate_binding(struct wl_seat *seat, uint32_t time, uint32_t button, 
             uifw_trace("click_to_activate_binding: Surface[%08x] is not visible",
                        (int)shsurf);
         }
-        else if (shell_hook_select) {
-            if (shell->active_shsurf != shsurf) {
-                shell->active_shsurf = shsurf;
+        else if (shell->active_pointer_shsurf != shsurf)    {
+            if (shell_hook_select) {
                 /* surface select hook routine      */
                 uifw_trace("click_to_activate_binding: call ivi_shell_hook_select[%08x]",
                            (int)shsurf);
@@ -1340,12 +1438,15 @@ click_to_activate_binding(struct wl_seat *seat, uint32_t time, uint32_t button, 
                 uifw_trace("click_to_activate_binding: ret  ivi_shell_hook_select")
             }
             else    {
-                uifw_trace("click_to_activate_binding: ShellSurface[%08x] already active",
-                           (int)shsurf);
+                ivi_shell_set_active(shsurf,
+                                     ICO_IVI_SHELL_ACTIVE_POINTER |
+                                         ICO_IVI_SHELL_ACTIVE_KEYBOARD);
+                uifw_trace("click_to_activate_binding: no hook[%08x]", (int)shsurf);
             }
         }
         else    {
-            uifw_trace("click_to_activate_binding: no hook[%08x]", (int)shsurf);
+            uifw_trace("click_to_activate_binding: ShellSurface[%08x] already active",
+                       (int)shsurf);
         }
     }
 }
@@ -1353,7 +1454,6 @@ click_to_activate_binding(struct wl_seat *seat, uint32_t time, uint32_t button, 
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_visible: surface visible control
- *                                 API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @param[in]   visible     visibility(1=visible/0=unvisible)
@@ -1394,7 +1494,6 @@ ivi_shell_set_visible(struct shell_surface *shsurf, const int visible)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_is_visible: get surface visibility
- *                                API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @return      visibility
@@ -1411,7 +1510,6 @@ ivi_shell_is_visible(struct shell_surface *shsurf)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_layer: set(or change) surface layer
- *                               API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @param[in]   layer       layer id
@@ -1487,7 +1585,6 @@ ivi_shell_set_layer(struct shell_surface *shsurf, const int layer)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_raise: surface stack control
- *                               API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @param[in]   raise       raise/lower(1=raise/0=lower)
@@ -1521,7 +1618,6 @@ ivi_shell_set_raise(struct shell_surface *shsurf, const int raise)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_toplevel: set surface type toplevel
- *                                  API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @return      none
@@ -1537,7 +1633,6 @@ ivi_shell_set_toplevel(struct shell_surface *shsurf)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_surface_type: set surface type
- *                                      API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @return      none
@@ -1553,7 +1648,6 @@ ivi_shell_set_surface_type(struct shell_surface *shsurf)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_send_configure: send surface resize event
- *                                    API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @param[in]   id          client object id(unused)
@@ -1578,7 +1672,6 @@ ivi_shell_send_configure(struct shell_surface *shsurf, const int id,
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_positionsize: set surface position and size
- *                                      API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @param[in]   x           surface upper-left X position on screen
@@ -1603,7 +1696,6 @@ ivi_shell_set_positionsize(struct shell_surface *shsurf,
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_set_layer_visible: layer visible control
- *                                       API for other weston plugin
  *
  * @param[in]   layer       layer id
  * @param[in]   visible     visibility(1=visible/0=unvisible)
@@ -1692,7 +1784,6 @@ ivi_shell_set_layer_visible(const int layer, const int visible)
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_surface_configure: surface change
- *                                       API for other weston plugin
  *
  * @param[in]   shsurf      shell surface
  * @param[in]   x           surface upper-left X position on screen
@@ -1735,7 +1826,6 @@ ivi_shell_surface_configure(struct shell_surface *shsurf, const int x,
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_bind: regist hook function for shell bind
- *                               API for other weston plugin
  *
  * @param[in]   hook_bind       hook function(if NULL, reset hook function)
  * @return      none
@@ -1751,7 +1841,6 @@ ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client))
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_unbind: regist hook function for shell unbind
- *                                 API for other weston plugin
  *
  * @param[in]   hook_unbind     hook function(if NULL, reset hook function)
  * @return      none
@@ -1767,7 +1856,6 @@ ivi_shell_hook_unbind(void (*hook_unbind)(struct wl_client *client))
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_create: regist hook function for create shell surface
- *                                 API for other weston plugin
  *
  * @param[in]   hook_create     hook function(if NULL, reset hook function)
  * @return      none
@@ -1785,7 +1873,6 @@ ivi_shell_hook_create(void (*hook_create)(struct wl_client *client,
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_destroy: regist hook function for destroy shell surface
- *                                  API for other weston plugin
  *
  * @param[in]   hook_destroy    hook function(if NULL, reset hook function)
  * @return      none
@@ -1801,7 +1888,6 @@ ivi_shell_hook_destroy(void (*hook_destroy)(struct weston_surface *surface))
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_map: regist hook function for map shell surface
- *                              API for other weston plugin
  *
  * @param[in]   hook_map        hook function(if NULL, reset hook function)
  * @return      none
@@ -1818,7 +1904,6 @@ ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_change: regist hook function for change shell surface
- *                                 API for other weston plugin
  *
  * @param[in]   hook_change     hook function(if NULL, reset hook function)
  * @return      none
@@ -1835,7 +1920,6 @@ ivi_shell_hook_change(void (*hook_change)(struct weston_surface *surface,
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ivi_shell_hook_select: regist hook function for select(active) shell surface
- *                                 API for other weston plugin
  *
  * @param[in]   hook_select     hook function(if NULL, reset hook function)
  * @return      none

@@ -15,6 +15,7 @@ BuildRequires: pkgconfig(elementary)
 BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: aul-devel
 BuildRequires: ecore-devel
+BuildRequires: weston-devel
 Requires: weston >= 1.0.6
 
 %description
@@ -45,8 +46,8 @@ rm -rf %{buildroot}
 
 # configurations
 %define weston_conf %{_sysconfdir}/xdg/weston
-mkdir -p %{buildroot}%{weston_conf}
-install -m 0644 weston.ini.ico %{buildroot}%{weston_conf}/weston.ini
+mkdir -p %{buildroot}%{weston_conf} > /dev/null 2>&1
+install -m 0644 weston.ini %{buildroot}%{weston_conf}
 install -m 0644 weston_ivi_plugin.ini %{buildroot}%{weston_conf}
 
 %files

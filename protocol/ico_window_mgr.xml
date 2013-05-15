@@ -40,6 +40,7 @@
 
     <request name="set_active">
       <arg name="surfaceid" type="uint"/>
+      <arg name="target" type="uint"/>
     </request>
 
     <request name="set_layer_visible">
@@ -80,11 +81,6 @@
       <arg name="active" type="uint"/>
     </event>
 
-    <enum name="active">
-      <entry name="inactive" value="0"/>
-      <entry name="active" value="1"/>
-      <entry name="select" value="2"/>
-    </enum>
   </interface>
 
 </protocol>

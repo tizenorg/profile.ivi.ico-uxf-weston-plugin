@@ -307,7 +307,7 @@ ico_ivi_dispname_2_node(const char *dispname)
 WL_EXPORT int
 module_init(struct weston_compositor *ec)
 {
-    int config_fd;
+    int     config_fd;
 
     uifw_info("ico_ivi_common: Enter(module_init)");
 
@@ -315,7 +315,7 @@ module_init(struct weston_compositor *ec)
     config_fd = open_config_file(ICO_IVI_PLUGIN_CONFIG);
     parse_config_file(config_fd, conf_debug, ARRAY_LENGTH(conf_debug), NULL);
     close(config_fd);
-
+    
     uifw_info("ico_ivi_common: option flag=0x%08x debug=%d",
               ico_option_flag(), ico_ivi_debuglevel());
 

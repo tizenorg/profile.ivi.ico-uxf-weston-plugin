@@ -49,6 +49,7 @@ void ivi_shell_set_positionsize(struct shell_surface *shsurf, const int x,
 void ivi_shell_set_layer_visible(const int layer, const int visible);
 void ivi_shell_surface_configure(struct shell_surface *shsurf, const int x,
                                  const int y, const int width, const int height);
+void ivi_shell_set_active(struct shell_surface *shsurf, const int target);
 
 /* Prototypr for hook routine           */
 void ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client));

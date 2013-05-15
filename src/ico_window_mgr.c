@@ -103,7 +103,8 @@ struct ico_win_mgr {
     struct wl_list  manager_list;           /* Manager(ex.HomeScreen) list          */
     int             num_manager;            /* Number of managers                   */
     struct wl_list  surface_list;           /* Surface list                         */
-    struct uifw_win_surface *active_surface;/* Active Surface                       */
+    struct uifw_win_surface *active_pointer_surface;    /* Active Pointer Surface   */
+    struct uifw_win_surface *active_keyboard_surface;   /* Active Keyboard Surface  */
 
     struct uifw_win_surface *idhash[UIFW_HASH];  /* UIFW SerfaceID                  */
     struct uifw_win_surface *wshash[UIFW_HASH];  /* Weston Surface                  */
@@ -164,7 +165,7 @@ static void uifw_set_transition(struct wl_client *client, struct wl_resource *re
                                 uint32_t surfaceid, int32_t transition);
                                             /* set active surface (form HomeScreen) */
 static void uifw_set_active(struct wl_client *client, struct wl_resource *resource,
-                            uint32_t surfaceid);
+                            uint32_t surfaceid, uint32_t target);
                                             /* layer visibility control             */
 static void uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
                                    int32_t layer, int32_t visible);
@@ -1101,32 +1102,106 @@ uifw_set_transition(struct wl_client *client, struct wl_resource *resource,
  * @param[in]   client      Weyland client
  * @param[in]   resource    resource of request
  * @param[in]   surfaceid   UIFW surface id
+ * @param[in]   target      target device
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
-uifw_set_active(struct wl_client *client, struct wl_resource *resource, uint32_t surfaceid)
+uifw_set_active(struct wl_client *client, struct wl_resource *resource,
+                uint32_t surfaceid, uint32_t target)
 {
-    struct uifw_win_surface* usurf = find_uifw_win_surface_by_id(surfaceid);
+    struct uifw_win_surface* usurf;
 
-    uifw_trace("uifw_set_active: Enter(surf=%08x)", surfaceid);
+    uifw_trace("uifw_set_active: Enter(surf=%08x,target=%x)", surfaceid, target);
 
+    if ((surfaceid > 0) &&
+        ((target & (ICO_IVI_SHELL_ACTIVE_POINTER|ICO_IVI_SHELL_ACTIVE_KEYBOARD)) != 0)) {
+        usurf = find_uifw_win_surface_by_id(surfaceid);
+    }
+    else    {
+        usurf = NULL;
+    }
     if (usurf) {
-        if (usurf != _ico_win_mgr->active_surface)  {
-            if (_ico_win_mgr->active_surface)   {
+        switch (target & (ICO_IVI_SHELL_ACTIVE_POINTER|ICO_IVI_SHELL_ACTIVE_KEYBOARD)) {
+        case ICO_IVI_SHELL_ACTIVE_POINTER:
+            if (usurf != _ico_win_mgr->active_pointer_surface)  {
+                if (_ico_win_mgr->active_pointer_surface)   {
+                    ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
+                                            _ico_win_mgr->active_pointer_surface->id, NULL,
+                                            (_ico_win_mgr->active_keyboard_surface ==
+                                             _ico_win_mgr->active_pointer_surface) ?
+                                                ICO_IVI_SHELL_ACTIVE_KEYBOARD :
+                                                ICO_IVI_SHELL_ACTIVE_NONE,
+                                            0,0,0,0,0);
+                }
+                _ico_win_mgr->active_pointer_surface = usurf;
                 ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
-                                        surfaceid, NULL, ICO_WINDOW_MGR_ACTIVE_INACTIVE,
+                                        surfaceid, NULL,
+                                        ICO_IVI_SHELL_ACTIVE_POINTER |
+                                        (_ico_win_mgr->active_keyboard_surface == usurf) ?
+                                            ICO_IVI_SHELL_ACTIVE_KEYBOARD : 0,
                                         0,0,0,0,0);
+                ivi_shell_set_active(usurf->shsurf, ICO_IVI_SHELL_ACTIVE_POINTER);
             }
-            _ico_win_mgr->active_surface = usurf;
-            ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
-                                    surfaceid, NULL, ICO_WINDOW_MGR_ACTIVE_ACTIVE,
-                                    0,0,0,0,0);
+            break;
+        case ICO_IVI_SHELL_ACTIVE_KEYBOARD:
+            if (usurf != _ico_win_mgr->active_keyboard_surface) {
+                if (_ico_win_mgr->active_keyboard_surface)   {
+                    ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
+                                            _ico_win_mgr->active_keyboard_surface->id, NULL,
+                                            (_ico_win_mgr->active_keyboard_surface ==
+                                             _ico_win_mgr->active_pointer_surface) ?
+                                                ICO_IVI_SHELL_ACTIVE_POINTER :
+                                                ICO_IVI_SHELL_ACTIVE_NONE,
+                                            0,0,0,0,0);
+                }
+                _ico_win_mgr->active_keyboard_surface = usurf;
+                ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
+                                        surfaceid, NULL,
+                                        ICO_IVI_SHELL_ACTIVE_KEYBOARD |
+                                        (_ico_win_mgr->active_pointer_surface == usurf) ?
+                                            ICO_IVI_SHELL_ACTIVE_POINTER : 0,
+                                        0,0,0,0,0);
+                ivi_shell_set_active(usurf->shsurf, ICO_IVI_SHELL_ACTIVE_KEYBOARD);
+            }
+            break;
+        default:
+            if ((usurf != _ico_win_mgr->active_pointer_surface) ||
+                (usurf != _ico_win_mgr->active_keyboard_surface))   {
+                if (_ico_win_mgr->active_pointer_surface)   {
+                    ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
+                                            _ico_win_mgr->active_pointer_surface->id,
+                                            NULL, ICO_IVI_SHELL_ACTIVE_NONE,
+                                            0,0,0,0,0);
+                    if (_ico_win_mgr->active_keyboard_surface ==
+                        _ico_win_mgr->active_pointer_surface)   {
+                        _ico_win_mgr->active_keyboard_surface = NULL;
+                    }
+                }
+                if (_ico_win_mgr->active_keyboard_surface)   {
+                    ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
+                                            _ico_win_mgr->active_keyboard_surface->id,
+                                            NULL, ICO_IVI_SHELL_ACTIVE_NONE,
+                                            0,0,0,0,0);
+                }
+                _ico_win_mgr->active_pointer_surface = usurf;
+                _ico_win_mgr->active_keyboard_surface = usurf;
+                ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
+                                        surfaceid, NULL,
+                                        ICO_IVI_SHELL_ACTIVE_POINTER |
+                                            ICO_IVI_SHELL_ACTIVE_KEYBOARD,
+                                        0,0,0,0,0);
+                ivi_shell_set_active(usurf->shsurf,
+                                     ICO_IVI_SHELL_ACTIVE_POINTER |
+                                         ICO_IVI_SHELL_ACTIVE_KEYBOARD);
+            }
+            break;
         }
         uifw_trace("uifw_set_active: Leave(Change Active)");
     }
     else    {
-        uifw_trace("uifw_set_active: Leave(Surface(%08x) Not exist)", surfaceid);
+        ivi_shell_set_active(NULL, target);
+        uifw_trace("uifw_set_active: Leave(Reset active surface)");
     }
 }
 
@@ -1258,7 +1333,7 @@ win_mgr_surface_select(struct weston_surface *surface)
 
     /* send active event to manager     */
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_ACTIVE,
-                    usurf->id, NULL, ICO_WINDOW_MGR_ACTIVE_SELECT, 0,0,0,0,0);
+                            usurf->id, NULL, ICO_IVI_SHELL_ACTIVE_SELECTED, 0,0,0,0,0);
 
     uifw_trace("win_mgr_surface_select: Leave(OK)");
 }
