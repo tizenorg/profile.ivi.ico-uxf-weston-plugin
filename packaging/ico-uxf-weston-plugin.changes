@@ -1,21 +1,22 @@
-* Wed May 15 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp>
+* Wed May 22 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130520.093312@8ed2bc5
 - 0.5.02 release
 - Fix for TIVI-803 - Enable new UI in wayland build
 - Fix for TIVI-826 - weston-plugin should NOT create /root/
 - Fix for TIVI-827 - Create symbolic link for /etc/rc.d/init.d/ico_weston to /etc/rc.d/rc3.d/.
 - Fix for TIVI-829 - [WLD] Text input box fails to switch to Edit mode(via touch screen)
-* Tue May 14 2013 Ossama Othman <ossama.othman@intel.com>
-- Port to new Weston config parser. Install Weston config in /etc/xdg/weston.
-* Mon May 06 2013 Ossama Othman <ossama.othman@intel.com>
-- Removed generated source dependency files.
-- Removed checks for unused programs (C++ compiler and sed).
-- Removed log files, and add .gitignore file to prevent re-commit.
-- Do not hardcode package header install path. Use pkginclude_HEADERS instead.
-- Corrected packaging of lib*.so file. It belongs in the -devel package.
-- No longer need to set dist-check configure flags.
-- Port ico-uxf-weston-plugin to use Weston 1.0.6 plugin API.
-- Removed generated Makefile.
-- Added Weston config-parser.c again until Weston SDK exports config functions.
+
+* Mon May 13 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/2.0alpha-wayland/20130426.191944@273da16
+- Bug Fix.
+- I547bb4cd:Removed generated Makefile.
+- I7206280c:Port ico-uxf-weston-plugin to use Weston 1.0.6 plugin API.
+- I9154214b:Corrected packaging of lib*.so file. It belongs in the -devel package.
+- I281e9214:Do not hardcode package header install path. Use pkginclude_HEADERS instead.
+- I982a05ec:Removed checks for unused programs(C++ conpiler and sed).
+- I3292b6c1:Removed log files, and add .gitignore file to prevent re-commit.
+- I770d797c:Removed generated source dependency files.
+- I33ca73c9:No longer need to set dist-check configure flags.
+- I27ba7db2:Added Weston config-parser.c again until Weston SDK exports config functions.
+
 
 * Fri Apr 26 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> 3224fe9
 - Import initial.
