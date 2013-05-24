@@ -6,7 +6,8 @@
 #	  Remark: This examination premises that Weston does not run.
 
 # 1 Delete log file
-rm -fr ../tests/testlog/*
+rm -fr ../tests/testlog
+mkdir ../tests/testlog
 
 # 2 Weston/Wayland Envionment
 export XDG_RUNTIME_DIR=/tmp/run-root

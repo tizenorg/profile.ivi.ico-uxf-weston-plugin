@@ -1020,28 +1020,26 @@ raise_surface(struct display *display, char *buf, const int raise)
 }
 
 static void
-transition_surface(struct display *display, char *buf)
+animation_surface(struct display *display, char *buf)
 {
     char    *args[10];
     int     narg;
     int     surfaceid;
-    int     transition;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 2)  {
         surfaceid = search_surface(display, args[0]);
-        transition = strtol(args[1], (char **)0, 0);
-        if ((surfaceid >= 0) && (transition >=0))   {
-            print_log("HOMESCREEN: transition(%s,%08x,%d)", args[0], surfaceid, transition);
-            ico_window_mgr_set_transition(display->ico_window_mgr, surfaceid, transition);
+        if (surfaceid >= 0) {
+            print_log("HOMESCREEN: animation(%s,%08x,%d)", args[0], surfaceid, args[1]);
+            ico_window_mgr_set_animation(display->ico_window_mgr, surfaceid, args[1]);
         }
         else    {
-            print_log("HOMESCREEN: Unknown surface(%s) at transition command", args[0]);
+            print_log("HOMESCREEN: Unknown surface(%s) at animation command", args[0]);
         }
     }
     else    {
-        print_log("HOMESCREEN: transition command"
-                  "[transition appid transition] has no argument");
+        print_log("HOMESCREEN: animation command"
+                  "[animation appid animation] has no argument");
     }
 }
 
@@ -1410,9 +1408,9 @@ int main(int argc, char *argv[])
             /* Raise/Lower surface window   */
             raise_surface(display, &buf[5], 0);
         }
-        else if (strncasecmp(buf, "transition", 10) == 0) {
-            /* Set transition surface window*/
-            transition_surface(display, &buf[10]);
+        else if (strncasecmp(buf, "animation", 9) == 0) {
+            /* Set animation surface window*/
+            animation_surface(display, &buf[9]);
         }
         else if (strncasecmp(buf, "input_add", 9) == 0) {
             /* Set input switch to application */

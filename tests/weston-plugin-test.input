@@ -5,7 +5,8 @@
 #	  Remark: This examination premises that Weston does not run.
 
 # 1 Delete log file
-rm -fr ../tests/testlog/*
+rm -fr ../tests/testlog
+mkdir ../tests/testlog
 
 # 2 Start Pseudo event device (for Touch Panel)
 ../tests/test-send_event -d -mq=5551 2> ../tests/testlog/event_log.log &
