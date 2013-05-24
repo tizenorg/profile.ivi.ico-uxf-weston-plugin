@@ -81,7 +81,8 @@ struct uifw_win_surface {
     int     y;                              /* Y-axis                               */
     int     width;                          /* Width                                */
     int     height;                         /* Height                               */
-    int     transition;                     /* Transition                           */
+    char    animation[ICO_WINDOW_ANIMATION_LEN];
+                                            /* Animation name                       */
     struct wl_list link;                    /*                                      */
     struct uifw_win_surface *next_idhash;   /* UIFW SurfaceId hash list             */
     struct uifw_win_surface *next_wshash;   /* Weston SurfaceId hash list           */
@@ -160,9 +161,9 @@ static void uifw_set_positionsize(struct wl_client *client,
                                             /* show/hide and raise/lower surface    */
 static void uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
                              uint32_t surfaceid, int32_t visible, int32_t raise);
-                                            /* set surface transition               */
-static void uifw_set_transition(struct wl_client *client, struct wl_resource *resource,
-                                uint32_t surfaceid, int32_t transition);
+                                            /* set surface animation                */
+static void uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
+                               uint32_t surfaceid, const char *animation);
                                             /* set active surface (form HomeScreen) */
 static void uifw_set_active(struct wl_client *client, struct wl_resource *resource,
                             uint32_t surfaceid, uint32_t target);
@@ -207,7 +208,7 @@ static const struct ico_window_mgr_interface ico_window_mgr_implementation = {
     uifw_set_window_layer,
     uifw_set_positionsize,
     uifw_set_visible,
-    uifw_set_transition,
+    uifw_set_animation,
     uifw_set_active,
     uifw_set_layer_visible
 };
@@ -562,6 +563,8 @@ client_register_surface(struct wl_client *client, struct wl_resource *resource,
     us->id = generate_id();
     us->surface = surface;
     us->shsurf = shsurf;
+    strncpy(us->animation, ivi_shell_default_animation(), sizeof(us->animation)-1);
+
     if (_ico_win_mgr->num_manager <= 0) {
         uifw_trace("client_register_surface: No Manager, Force visible");
         ivi_shell_set_visible(shsurf, 1);   /* NOT exist HomeScreen     */
@@ -1029,6 +1032,21 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
             uifw_trace("uifw_set_visible: Leave(No Change)");
             return;
         }
+#if 0   /* the animation function does not yet support it   */
+        if (strcasecmp(usurf->animation, "fade") == 0)  {
+            uifw_trace("uifw_set_visible: start animation fade(%08x)", (int)usurf->surface);
+            weston_fade_run(usurf->surface, NULL, NULL);
+        }
+        else if (strcasecmp(usurf->animation, "zoom") == 0) {
+            uifw_trace("uifw_set_visible: start animation zoom(%08x)", (int)usurf->surface);
+            weston_zoom_run(usurf->surface, 0.8, 1.0, NULL, NULL);
+        }
+        else if (strcasecmp(usurf->animation, "slide") == 0)    {
+            uifw_trace("uifw_set_visible: start animation slide(%08x)", (int)usurf->surface);
+            weston_slide_run(usurf->surface, (float)usurf->surface->geometry.height,
+                             0.0, NULL, NULL);
+        }
+#endif  /* the animation function does not yet support it   */
     }
     else if (visible == 0)  {
 
@@ -1068,30 +1086,31 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   uifw_set_transition: set transition of surface visible/unvisible
+ * @brief   uifw_set_animation: set animation of surface visible/unvisible
  *
  * @param[in]   client      Weyland client
  * @param[in]   resource    resource of request
  * @param[in]   surfaceid   UIFW surface id
- * @param[in]   transition  transiton id
+ * @param[in]   animation   animation name
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
-uifw_set_transition(struct wl_client *client, struct wl_resource *resource,
-                    uint32_t surfaceid, int32_t transition)
+uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
+                   uint32_t surfaceid, const char *animation)
 {
     struct uifw_win_surface* usurf = find_uifw_win_surface_by_id(surfaceid);
 
-    uifw_trace("uifw_set_transition: Enter(surf=%08x, transition=%d)",
-                surfaceid, transition);
+    uifw_trace("uifw_set_transition: Enter(surf=%08x, animation=%s)",
+               surfaceid, animation);
 
     if (usurf) {
-        usurf->transition = transition;
-        uifw_trace("uifw_set_transition: Leave(OK)");
+        memset(usurf->animation, 0, sizeof(usurf->animation));
+        strncpy(usurf->animation, animation, sizeof(usurf->animation)-1);
+        uifw_trace("uifw_set_animation: Leave(OK)");
     }
     else    {
-        uifw_trace("uifw_set_transition: Leave(Surface(%08x) Not exist)", surfaceid);
+        uifw_trace("uifw_set_animation: Leave(Surface(%08x) Not exist)", surfaceid);
     }
 }
 

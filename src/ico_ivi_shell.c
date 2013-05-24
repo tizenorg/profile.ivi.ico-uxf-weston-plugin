@@ -47,14 +47,6 @@
 #include "ico_ivi_shell.h"
 #include "ico_ivi_shell-server-protocol.h"
 
-/* Animation to apply at the time of indication start of the screen */
-enum animation_type {
-    ANIMATION_NONE,                 /* No animation                         */
-    ANIMATION_ZOOM,                 /* Zoom In                              */
-    ANIMATION_FADE,                 /* Fade In                              */
-    ANIMATION_SLIDE                 /* Slide In                             */
-};
-
 /* Layer management                 */
 struct  ivi_layer_list  {
     int     layer;                  /* Layer.ID                             */
@@ -70,7 +62,8 @@ struct ivi_shell {
     struct wl_listener destroy_listener;
     struct weston_layer surface;            /* Surface list                 */
     struct ivi_layer_list ivi_layer;        /* Layer list                   */
-    enum animation_type win_animation_type; /* Default animetion            */
+    char win_animation[ICO_WINDOW_ANIMATION_LEN];
+                                            /* Default animation name       */
     int win_visible_on_create;              /* Visible on create surface    */
     struct shell_surface *active_pointer_shsurf;
                                             /* Pointer active shell surface */
@@ -149,34 +142,6 @@ static void (*shell_hook_select)(struct weston_surface *surface) = NULL;
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   get_animation_type: animetion type convert name to enumeration value.
- *
- * @param[in]   animation   animation name
- * @return      animetion enumeration value
- * @retval      ANIMATION_NONE  no animetion
- * @retval      ANIMATION_ZOOM  zoom animetion
- * @retval      ANIMATION_FADE  fade animetion
- * @retval      ANIMATION_SLIDE slide animetion
- */
-/*--------------------------------------------------------------------------*/
-static enum animation_type
-get_animation_type(char *animation)
-{
-    if (!animation)
-        return ANIMATION_NONE;
-
-    if (!strcmp("zoom", animation))
-        return ANIMATION_ZOOM;
-    else if (!strcmp("fade", animation))
-        return ANIMATION_FADE;
-    else if (!strcmp("slide", animation))
-        return ANIMATION_SLIDE;
-    else
-        return ANIMATION_NONE;
-}
-
-/*--------------------------------------------------------------------------*/
-/**
  * @brief   shell_configuration: initiale configuration ico_ivi_shell
  *
  * @param[in]   shell   ico_ivi_shell static table area
@@ -202,10 +167,10 @@ shell_configuration(struct ivi_shell *shell)
     parse_config_file(config_fd, cs, ARRAY_LENGTH(cs), shell);
     close(config_fd);
 
-    shell->win_animation_type = get_animation_type(win_animation);
+    strncpy(shell->win_animation, win_animation, sizeof(shell->win_animation)-1);
 
-    uifw_info("shell_configuration: Anima=%d Visible=%d Debug=%d",
-              shell->win_animation_type, shell->win_visible_on_create,
+    uifw_info("shell_configuration: Anima=%s Visible=%d Debug=%d",
+              shell->win_animation, shell->win_visible_on_create,
               ico_ivi_debuglevel());
 }
 
@@ -715,6 +680,9 @@ create_shell_surface(void *shell, struct weston_surface *surface,
     shsurf->surface = surface;
     shsurf->visible = shsurf->shell->win_visible_on_create;
 
+    /* set default color and shader */
+    weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1);
+
     wl_signal_init(&shsurf->resource.destroy_signal);
     shsurf->surface_destroy_listener.notify = shell_handle_surface_destroy;
     wl_signal_add(&surface->surface.resource.destroy_signal,
@@ -909,22 +877,6 @@ map(struct ivi_shell *shell, struct weston_surface *surface,
     if (surface_type != SHELL_SURFACE_NONE) {
         weston_surface_update_transform(surface);
         ivi_shell_restack_ivi_layer(shell, shsurf);
-    }
-
-    if (surface_type == SHELL_SURFACE_TOPLEVEL) {
-        switch (shell->win_animation_type) {
-        case ANIMATION_FADE:
-            weston_fade_run(surface, NULL, NULL);
-            break;
-        case ANIMATION_ZOOM:
-            weston_zoom_run(surface, 0.8, 1.0, NULL, NULL);
-            break;
-        case ANIMATION_SLIDE:
-            weston_slide_run(surface, (float)surface->geometry.height, 0.0, NULL, NULL);
-            break;
-        default:
-            break;
-        }
     }
 
     if (shell_hook_map) {
@@ -1396,6 +1348,20 @@ ivi_shell_set_active(struct shell_surface *shsurf, const int target)
         }
     }
     uifw_trace("ivi_shell_set_active: Leave(%08x)", (int)shsurf);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ivi_shell_default_animation: window default animation
+ *
+ * @param       none
+ * @return      default animation name
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT const char *
+ivi_shell_default_animation(void)
+{
+    return default_shell->win_animation;
 }
 
 /*--------------------------------------------------------------------------*/

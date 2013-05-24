@@ -32,11 +32,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if 1   /* Build in old Weston(1.0.6)   */
-#include "config-parser.h"
-#else   /* Build on new Weston          */
 #include <weston/config-parser.h>
-#endif
 
 static int
 handle_key(const struct config_key *key, const char *value)
@@ -107,9 +103,10 @@ parse_config_file(int fd,
 
     if (fd == -1)
         return -1;
+
     fp = fdopen(dup(fd), "r");
     if (fp == NULL) {
-        perror("couldn't open config flle");
+            perror("couldn't open config file");
         return -1;
     }
 
@@ -165,43 +162,6 @@ parse_config_file(int fd,
     return 0;
 }
 
-#if 0
-char *
-config_file_path(const char *name)
-{
-    const char dotconf[] = "/.config/";
-    const char *config_dir;
-    const char *home_dir;
-    char *path;
-    size_t size;
-
-    config_dir = getenv("XDG_CONFIG_HOME");
-    if (!config_dir) {
-        home_dir = getenv("HOME");
-        if (!home_dir) {
-            fprintf(stderr, "HOME is not set, using cwd.\n");
-            return strdup(name);
-        }
-
-        size = strlen(home_dir) + sizeof dotconf + strlen(name);
-        path = malloc(size);
-        if (!path)
-            return NULL;
-
-        snprintf(path, size, "%s%s%s", home_dir, dotconf, name);
-        return path;
-    }
-
-    size = strlen(config_dir) + 1 + strlen(name) + 1;
-    path = malloc(size);
-    if (!path)
-        return NULL;
-
-    snprintf(path, size, "%s/%s", config_dir, name);
-    return path;
-}
-#endif
-
 int
 open_config_file(const char *name)
 {
@@ -230,8 +190,6 @@ open_config_file(const char *name)
         fd = open(path, O_RDONLY | O_CLOEXEC);
         if (fd >= 0)
             return fd;
-        if (fd >= 0)
-            return fd;
     }
 
     /* For each $XDG_CONFIG_DIRS: weston/<config_file> */
@@ -241,7 +199,7 @@ open_config_file(const char *name)
     for (p = config_dirs; *p != '\0'; p = next) {
         next = strchrnul(p, ':');
         snprintf(path, sizeof path,
-                 "%.*s/weston/%s", (int)(next - p), p, name);
+             "%.*s/weston/%s", (int)(next - p), p, name);
         fd = open(path, O_RDONLY | O_CLOEXEC);
         if (fd >= 0)
             return fd;
@@ -256,11 +214,10 @@ open_config_file(const char *name)
 
     if (fd >= 0)
         fprintf(stderr,
-                "using config in current working directory: %s\n",
-                 path);
+            "using config in current working directory: %s\n",
+            path);
     else
         fprintf(stderr, "config file \"%s\" not found.\n", name);
 
     return fd;
 }
-

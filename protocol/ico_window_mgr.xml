@@ -33,9 +33,9 @@
       <arg name="raise" type="int"/>
     </request>
 
-    <request name="set_transition">
+    <request name="set_animation">
       <arg name="surfaceid" type="uint"/>
-      <arg name="transition" type="int"/>
+      <arg name="animation" type="string"/>
     </request>
 
     <request name="set_active">

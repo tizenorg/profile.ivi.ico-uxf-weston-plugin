@@ -1,3 +1,12 @@
+* Fri May 24 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130520.093312@6f0a9e8
+- 0.5.03 release
+- Fix for TIVI-976 - Sometimes weston failed to be startup with 10% possibility.
+  When there is operation of surface(resize, change of the position, etc) just after surface creation from HomeScreen,
+  Weston falls in segmentation fault.
+- Fix for TIVI-974 - [WLD]Failed to execute Ico-uxf-weston-plugin test script with error "No testlog directory".
+  Create testlog directory in an examination script
+- Work around - Addition of the window animation interface.
+
 * Wed May 22 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130520.093312@8ed2bc5
 - 0.5.02 release
 - Fix for TIVI-803 - Enable new UI in wayland build
