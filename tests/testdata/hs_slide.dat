@@ -1,0 +1,18 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Slide test
+#
+#	1. Pure client
+launch ../tests/test-client < ../tests/testdata/cl_surface2.dat 2> ../tests/testlog/test-client2.log
+waitcreate 2
+hide test-client
+animation test-client Slide.toRight
+sleep 1
+show test-client
+sleep 3
+hide test-client
+sleep 3
+kill test-client
+#
+#	9. End of Test
+bye
+

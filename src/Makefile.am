@@ -32,9 +32,8 @@ module_LTLIBRARIES =		\
 	$(ico_ivi_common)		\
 	$(ico_ivi_shell)		\
 	$(ico_window_mgr)		\
+	$(ico_window_animation)	\
 	$(ico_input_mgr)
-
-#	$(ico_input_mgr)
 
 # Weston Plugin Loader
 ico_plugin_loader = ico_plugin_loader.la
@@ -74,6 +73,14 @@ ico_window_mgr_la_SOURCES =			\
 	ico_window_mgr.c			\
 	ico_window_mgr-protocol.c		\
 	ico_window_mgr-server-protocol.h
+#
+# Window Animation
+ico_window_animation = ico_window_animation.la
+ico_window_animation_la_LDFLAGS = -module -avoid-version
+ico_window_animation_la_LIBADD = $(PLUGIN_LIBS) $(AUL_LIBS)
+ico_window_animation_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
+ico_window_animation_la_SOURCES =			\
+	ico_window_animation.c
 
 # Multi Input Manager
 ico_input_mgr = ico_input_mgr.la

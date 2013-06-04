@@ -64,6 +64,8 @@ struct ivi_shell {
     struct ivi_layer_list ivi_layer;        /* Layer list                   */
     char win_animation[ICO_WINDOW_ANIMATION_LEN];
                                             /* Default animation name       */
+    int win_animation_time;                 /* animation time(ms)           */
+    int win_animation_fps;                  /* animation frame rate(fps)    */
     int win_visible_on_create;              /* Visible on create surface    */
     struct shell_surface *active_pointer_shsurf;
                                             /* Pointer active shell surface */
@@ -75,7 +77,10 @@ struct ivi_shell {
 enum shell_surface_type {
     SHELL_SURFACE_NONE,             /* Surface type undefine                */
     SHELL_SURFACE_TOPLEVEL,         /* Top level surface for application    */
-    SHELL_SURFACE_CHILD             /* Child surface                        */
+    SHELL_SURFACE_TRANSIENT,        /* Child surface                        */
+    SHELL_SURFACE_FULLSCREEN,       /* Full screen surface                  */
+    SHELL_SURFACE_MAXIMIZED,        /* maximum screen                       */
+    SHELL_SURFACE_POPUP             /* pop up screen                        */
 };
 
 /* Shell surface table              */
@@ -96,10 +101,19 @@ struct shell_surface {
     int     geometry_y;
     int     geometry_width;
     int     geometry_height;
-    short   visible;
-    short   mapped;
+    char    visible;
+    char    mapped;
+    char    noconfigure;
+    char    restrain;
     struct ivi_layer_list *layer_list;
     struct wl_list        ivi_layer;
+
+    struct {
+        unsigned short  x;
+        unsigned short  y;
+        unsigned short  width;
+        unsigned short  height;
+    }       configure_app;
 
     struct {
         struct weston_transform transform;
@@ -113,6 +127,7 @@ struct shell_surface {
     } transient;
 
     struct wl_list link;
+    struct wl_client    *wclient;
     const struct weston_shell_client *client;
 };
 
@@ -153,9 +168,13 @@ shell_configuration(struct ivi_shell *shell)
 {
     int     config_fd;
     char    *win_animation = NULL;
+    int     win_animation_time = 800;
+    int     win_animation_fps = 15;
 
     struct config_key shell_keys[] = {
         { "animation",          CONFIG_KEY_STRING, &win_animation },
+        { "animation_time",     CONFIG_KEY_INTEGER, &win_animation_time },
+        { "animation_fps",      CONFIG_KEY_INTEGER, &win_animation_fps },
         { "visible_on_create",  CONFIG_KEY_INTEGER, &shell->win_visible_on_create },
     };
 
@@ -167,11 +186,17 @@ shell_configuration(struct ivi_shell *shell)
     parse_config_file(config_fd, cs, ARRAY_LENGTH(cs), shell);
     close(config_fd);
 
-    strncpy(shell->win_animation, win_animation, sizeof(shell->win_animation)-1);
-
-    uifw_info("shell_configuration: Anima=%s Visible=%d Debug=%d",
-              shell->win_animation, shell->win_visible_on_create,
-              ico_ivi_debuglevel());
+    if (win_animation)  {
+        strncpy(shell->win_animation, win_animation, sizeof(shell->win_animation)-1);
+    }
+    if (win_animation_time < 100)   win_animation_time = 100;
+    shell->win_animation_time = win_animation_time;
+    if (win_animation_fps > 30)     win_animation_fps = 30;
+    if (win_animation_fps < 5)      win_animation_fps = 5;
+    shell->win_animation_fps = win_animation_fps;
+    uifw_info("shell_configuration: Anima=%s,%dms,%dfps Visible=%d Debug=%d",
+              shell->win_animation, shell->win_animation_time, shell->win_animation_fps,
+              shell->win_visible_on_create, ico_ivi_debuglevel());
 }
 
 /*--------------------------------------------------------------------------*/
@@ -191,6 +216,12 @@ send_configure(struct weston_surface *surface,
 {
     struct shell_surface *shsurf = get_shell_surface(surface);
 
+    uifw_trace("send_configure: %08x edges=%x w/h=%d/%d map=%d",
+               (int)shsurf->surface, edges, width, height, shsurf->mapped);
+    if (shsurf->mapped == 0)    return;
+
+    shsurf->configure_app.width = width;
+    shsurf->configure_app.height = height;
     wl_shell_surface_send_configure(&shsurf->resource,
                                     edges, width, height);
 }
@@ -241,7 +272,7 @@ set_surface_type(struct shell_surface *shsurf)
     switch (shsurf->type) {
     case SHELL_SURFACE_TOPLEVEL:
         break;
-    case SHELL_SURFACE_CHILD:
+    case SHELL_SURFACE_TRANSIENT:
         psh = get_shell_surface(pes);
         if (psh)    {
             shsurf->geometry_x = psh->geometry_x + shsurf->transient.x;
@@ -288,7 +319,7 @@ static void
 shell_surface_move(struct wl_client *client, struct wl_resource *resource,
                    struct wl_resource *seat_resource, uint32_t serial)
 {
-    uifw_trace("shell_surface_move: NOP[%08x]", (int)resource->data);
+    uifw_trace("shell_surface_move: [%08x] NOP", (int)resource->data);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -308,7 +339,7 @@ shell_surface_resize(struct wl_client *client, struct wl_resource *resource,
                      struct wl_resource *seat_resource, uint32_t serial,
                      uint32_t edges)
 {
-    uifw_trace("shell_surface_resize: NOP[%08x]", (int)resource->data);
+    uifw_trace("shell_surface_resize: [%08x] NOP", (int)resource->data);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -366,7 +397,7 @@ set_transient(struct shell_surface *shsurf,
     shsurf->transient.x = x;
     shsurf->transient.y = y;
     shsurf->transient.flags = flags;
-    shsurf->next_type = SHELL_SURFACE_CHILD;
+    shsurf->next_type = SHELL_SURFACE_TRANSIENT;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -390,6 +421,8 @@ shell_surface_set_transient(struct wl_client *client, struct wl_resource *resour
     struct shell_surface *shsurf = resource->data;
     struct weston_surface *parent = parent_resource->data;
 
+    uifw_trace("shell_surface_set_transient: Set Transient[%08x] surf=%08x",
+               (int)shsurf, (int)shsurf->surface);
     set_transient(shsurf, parent, x, y, flags);
 }
 
@@ -413,7 +446,7 @@ shell_surface_set_fullscreen(struct wl_client *client, struct wl_resource *resou
     struct shell_surface *shsurf = resource->data;
     uifw_trace("shell_surface_set_fullscreen: "
                "NOP(same as set_toplevel)[%08x]", (int)shsurf);
-    set_toplevel(shsurf);
+    shsurf->next_type = SHELL_SURFACE_FULLSCREEN;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -439,7 +472,7 @@ shell_surface_set_popup(struct wl_client *client, struct wl_resource *resource,
 {
     struct shell_surface *shsurf = resource->data;
     uifw_trace("shell_surface_set_popup: NOP(same as set_toplevel)[%08x]", (int)shsurf);
-    set_toplevel(shsurf);
+    shsurf->next_type = SHELL_SURFACE_POPUP;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -458,7 +491,7 @@ shell_surface_set_maximized(struct wl_client *client, struct wl_resource *resour
 {
     struct shell_surface *shsurf = resource->data;
     uifw_trace("shell_surface_set_maximized: NOP(same as set_toplevel)[%08x]", (int)shsurf);
-    set_toplevel(shsurf);
+    shsurf->next_type = SHELL_SURFACE_MAXIMIZED;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -509,6 +542,25 @@ shell_surface_set_class(struct wl_client *client,
     shsurf->class = strdup(class);
 }
 
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   shell_surface_raise: raise surface
+ *
+ * @param[in]   client      wayland client
+ * @param[in]   resource    set class request resource
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+shell_surface_raise(struct wl_client *client, struct wl_resource *resource)
+{
+    struct shell_surface *shsurf = resource->data;
+
+    uifw_trace("shell_surface_raise: [%08x]", (int)shsurf);
+
+    ivi_shell_set_raise(shsurf, 1);
+}
+
 static const struct wl_shell_surface_interface shell_surface_implementation = {
     shell_surface_pong,
     shell_surface_move,
@@ -519,7 +571,8 @@ static const struct wl_shell_surface_interface shell_surface_implementation = {
     shell_surface_set_popup,
     shell_surface_set_maximized,
     shell_surface_set_title,
-    shell_surface_set_class
+    shell_surface_set_class,
+    shell_surface_raise
 };
 
 /*--------------------------------------------------------------------------*/
@@ -701,6 +754,7 @@ create_shell_surface(void *shell, struct weston_surface *surface,
     shsurf->client = client;
 
     wl_list_init(&shsurf->ivi_layer);
+
     return shsurf;
 }
 
@@ -741,6 +795,7 @@ shell_get_shell_surface(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
+    shsurf->wclient = client;
     shsurf->resource.destroy = shell_destroy_shell_surface;
     shsurf->resource.object.id = id;
     shsurf->resource.object.interface = &wl_shell_surface_interface;
@@ -861,7 +916,7 @@ map(struct ivi_shell *shell, struct weston_surface *surface,
     }
 
     switch (surface_type) {
-    case SHELL_SURFACE_CHILD:
+    case SHELL_SURFACE_TRANSIENT:
         parent = shsurf->parent;
         wl_list_insert(parent->layer_link.prev, &surface->layer_link);
         break;
@@ -965,6 +1020,11 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
 
     uifw_trace("shell_surface_configure: Enter(surf=%08x out=%08x buf=%08x)",
                (int)es, (int)es->output, (int)es->buffer);
+
+    if (shsurf->restrain)   {
+        uifw_trace("shell_surface_configure: Leave(restrain)");
+        return;
+    }
 
     if (shsurf->next_type != SHELL_SURFACE_NONE &&
         shsurf->type != shsurf->next_type) {
@@ -1352,15 +1412,78 @@ ivi_shell_set_active(struct shell_surface *shsurf, const int target)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ivi_shell_set_client_attr : set client ttribute
+ *
+ * @param[in]   client      target client
+ * @param[in]   attr        attribute
+ * @param[in]   value       attribute value
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ivi_shell_set_client_attr(struct wl_client *client, const int attr, const int value)
+{
+    struct shell_surface  *es;
+    struct ivi_layer_list *el;
+
+    uifw_trace("ivi_shell_set_client_attr: Enter(%08x,%d,%d)", (int)client, attr, value);
+
+    wl_list_for_each (el, &default_shell->ivi_layer.link, link) {
+        wl_list_for_each (es, &el->surface_list, ivi_layer) {
+            if (es->wclient == client)   {
+                switch(attr)    {
+                case ICO_CLEINT_ATTR_NOCONFIGURE:
+                    es->noconfigure = value;
+                    uifw_trace("ivi_shell_set_client_attr: set surface %08x", (int)es);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+    uifw_trace("ivi_shell_set_client_attr: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ivi_shell_set_active: surface active control
+ *
+ * @param[in]   shsurf      shell surface(if NULL, no active surface)
+ * @param[in]   restrain    restrain(1)/not restrain(0)
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ivi_shell_restrain_configure(struct shell_surface *shsurf, const int restrain)
+{
+    uifw_trace("ivi_shell_restrain_configure: set %08x to %d",
+               (int)shsurf, restrain);
+    shsurf->restrain = restrain;
+
+    if (restrain == 0)  {
+        ivi_shell_restack_ivi_layer(shell_surface_get_shell(shsurf), shsurf);
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   ivi_shell_default_animation: window default animation
  *
- * @param       none
+ * @param[out]  msec    animation time(ms)
+ * @param[out]  fps     animation frame rate(fps)
  * @return      default animation name
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT const char *
-ivi_shell_default_animation(void)
+ivi_shell_default_animation(int *msec, int *fps)
 {
+    if (msec)   {
+        *msec = default_shell->win_animation_time;
+    }
+    if (fps)   {
+        *fps = default_shell->win_animation_fps;
+    }
     return default_shell->win_animation;
 }
 
@@ -1628,11 +1751,27 @@ ivi_shell_send_configure(struct shell_surface *shsurf, const int id,
                          const int edges, const int width, const int height)
 {
     /* send cgange event to manager     */
-    uifw_trace("ivi_shell_send_configure: (%08x) edges=%x w/h=%d/%d",
-               (int)shsurf->surface, edges, width, height);
+    uifw_trace("ivi_shell_send_configure: (%08x) edges=%x w/h=%d/%d map=%d",
+               (int)shsurf->surface, edges, width, height, shsurf->mapped);
+
     shsurf->geometry_width = width;
     shsurf->geometry_height = height;
-    wl_shell_surface_send_configure(&shsurf->resource, edges, width, height);
+
+    if ((shsurf->mapped == 0) || (shsurf->noconfigure != 0) ||
+        (width == 0) || (height == 0))  {
+        return;
+    }
+
+    /* send cgange event to application */
+    uifw_trace("ivi_shell_send_configure: Send (%08x) w/h=%d/%d(old=%d/%d)",
+               (int)shsurf->surface, width, height,
+               shsurf->configure_app.width, shsurf->configure_app.height);
+    shsurf->configure_app.width = width;
+    shsurf->configure_app.height = height;
+
+    wl_shell_surface_send_configure(&shsurf->resource,
+                                    WL_SHELL_SURFACE_RESIZE_BOTTOM_RIGHT,
+                                    width, height);
 }
 
 /*--------------------------------------------------------------------------*/
