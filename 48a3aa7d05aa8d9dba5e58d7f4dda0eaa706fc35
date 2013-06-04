@@ -1,0 +1,9 @@
+Code-Review+1: Mikko Ylinen <mikko.ylinen@intel.com>
+Verified+1: Nakamura, Hayato <hayato.nakamura@mail.toyota-td.jp>
+Code-Review+2: Ryota Okubi <ryota.okubi@mail.toyota-td.jp>
+Verified+1: Ryota Okubi <ryota.okubi@mail.toyota-td.jp>
+Submitted-by: Mikko Ylinen <mikko.ylinen@intel.com>
+Submitted-at: Tue, 04 Jun 2013 07:18:14 -0700
+Reviewed-on: https://review.tizen.org/gerrit/3791
+Project: profile/ivi/ico-uxf-weston-plugin
+Branch: refs/heads/2.0alpha-wayland
