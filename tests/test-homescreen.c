@@ -1031,7 +1031,12 @@ animation_surface(struct display *display, char *buf)
         surfaceid = search_surface(display, args[0]);
         if (surfaceid >= 0) {
             print_log("HOMESCREEN: animation(%s,%08x,%d)", args[0], surfaceid, args[1]);
+<<<<<<< HEAD
             ico_window_mgr_set_animation(display->ico_window_mgr, surfaceid, args[1]);
+=======
+            ico_window_mgr_set_animation(display->ico_window_mgr, surfaceid,
+										 ICO_WINDOW_MGR_ANIMATION_CHANGE_VISIBLE, args[1]);
+>>>>>>> master
         }
         else    {
             print_log("HOMESCREEN: Unknown surface(%s) at animation command", args[0]);

@@ -36,6 +36,11 @@ struct shell_surface;
 #define ICO_WINDOW_ANIMATION_LEN    20          /* length of window animation name  */
 /* option flag                          */
 #define ICO_OPTION_FLAG_UNVISIBLE   0x00000001  /* unvisible control    */
+<<<<<<< HEAD
+=======
+/* client attribute                     */
+#define ICO_CLEINT_ATTR_NOCONFIGURE 0           /* client no need configure event   */
+>>>>>>> master
 
 /* Prototype for get/set function       */
 void ivi_shell_set_layer(struct shell_surface *shsurf, const int layer);
@@ -52,7 +57,13 @@ void ivi_shell_set_layer_visible(const int layer, const int visible);
 void ivi_shell_surface_configure(struct shell_surface *shsurf, const int x,
                                  const int y, const int width, const int height);
 void ivi_shell_set_active(struct shell_surface *shsurf, const int target);
+<<<<<<< HEAD
 const char *ivi_shell_default_animation(void);
+=======
+void ivi_shell_set_client_attr(struct wl_client *client, const int attr, const int value);
+void ivi_shell_restrain_configure(struct shell_surface *shsurf, const int restrain);
+const char *ivi_shell_default_animation(int *msec, int *fps);
+>>>>>>> master
 
 /* Prototypr for hook routine           */
 void ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client));

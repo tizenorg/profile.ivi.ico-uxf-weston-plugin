@@ -1,3 +1,7 @@
+* Tue Jun 04 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130603.172729@fc46616
+- 0.5.04 release
+- Work around - Addition of the window animation interface and window animation plugin(ico_window_animation).
+
 * Fri May 24 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130520.093312@6f0a9e8
 - 0.5.03 release
 - Fix for TIVI-976 - Sometimes weston failed to be startup with 10% possibility.

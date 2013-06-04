@@ -59,6 +59,7 @@
 #define SURCAFE_ID_MASK     0x0ffff         /* SurfaceId bit mask pattern           */
 #define UIFW_HASH    64                     /* Hash value (2's compliment)          */
 
+<<<<<<< HEAD
 /* Cleint management table          */
 struct uifw_client  {
     struct wl_client *client;               /* Wayland client                       */
@@ -88,6 +89,20 @@ struct uifw_win_surface {
     struct uifw_win_surface *next_wshash;   /* Weston SurfaceId hash list           */
 };
 
+=======
+/* Client attribute table           */
+#define MAX_CLIENT_ATTR     4
+struct uifw_client_attr {
+    char    appid[ICO_IVI_APPID_LENGTH];    /* ApplicationId                        */
+    struct _uifw_client_attr_value {
+        short   attr;
+        short   res;
+        int     value;
+    }       attrs[MAX_CLIENT_ATTR];
+    struct wl_list  link;
+};
+
+>>>>>>> master
 /* Manager table                    */
 struct uifw_manager {
     struct wl_resource *resource;           /* Manager resource                     */
@@ -104,6 +119,10 @@ struct ico_win_mgr {
     struct wl_list  manager_list;           /* Manager(ex.HomeScreen) list          */
     int             num_manager;            /* Number of managers                   */
     struct wl_list  surface_list;           /* Surface list                         */
+<<<<<<< HEAD
+=======
+    struct wl_list  client_attr_list;       /* Client attribute list                */
+>>>>>>> master
     struct uifw_win_surface *active_pointer_surface;    /* Active Pointer Surface   */
     struct uifw_win_surface *active_keyboard_surface;   /* Active Keyboard Surface  */
 
@@ -163,7 +182,11 @@ static void uifw_set_visible(struct wl_client *client, struct wl_resource *resou
                              uint32_t surfaceid, int32_t visible, int32_t raise);
                                             /* set surface animation                */
 static void uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
+<<<<<<< HEAD
                                uint32_t surfaceid, const char *animation);
+=======
+                               uint32_t surfaceid, int32_t change, const char *animation);
+>>>>>>> master
                                             /* set active surface (form HomeScreen) */
 static void uifw_set_active(struct wl_client *client, struct wl_resource *resource,
                             uint32_t surfaceid, uint32_t target);
@@ -171,6 +194,12 @@ static void uifw_set_active(struct wl_client *client, struct wl_resource *resour
 static void uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
                                    int32_t layer, int32_t visible);
                                             /* send surface change event to manager */
+<<<<<<< HEAD
+=======
+static void uifw_set_client_attr(struct wl_client *client, struct wl_resource *resource,
+                                 const char *appid, int32_t attr, int32_t value);
+                                            /* set client application attribute     */
+>>>>>>> master
 static void win_mgr_surface_change(struct weston_surface *surface,
                                    const int to, const int manager);
                                             /* surface change from manager          */
@@ -190,6 +219,11 @@ static int ico_win_mgr_send_to_mgr(const int event, const int surfaceid,
                                    const char *appid, const int param1,
                                    const int param2, const int param3, const int param4,
                                    const int param5, const int param6);
+<<<<<<< HEAD
+=======
+                                            /* convert animation name to type value */
+static int ico_get_animation_type(const char *animation);
+>>>>>>> master
                                             /* hook for set user                    */
 static void (*win_mgr_hook_set_user)
                 (struct wl_client *client, const char *appid) = NULL;
@@ -199,6 +233,11 @@ static void (*win_mgr_hook_create)
                  int surfaceId, const char *appid) = NULL;
                                             /* hook for surface destory             */
 static void (*win_mgr_hook_destroy)(struct weston_surface *surface) = NULL;
+<<<<<<< HEAD
+=======
+                                            /* hook for animation                   */
+static int  (*win_mgr_hook_animation)(const int op, void *data) = NULL;
+>>>>>>> master
 
 /* static tables                        */
 /* Multi Window Manager interface       */
@@ -210,7 +249,12 @@ static const struct ico_window_mgr_interface ico_window_mgr_implementation = {
     uifw_set_visible,
     uifw_set_animation,
     uifw_set_active,
+<<<<<<< HEAD
     uifw_set_layer_visible
+=======
+    uifw_set_layer_visible,
+    uifw_set_client_attr
+>>>>>>> master
 };
 
 /* static management table              */
@@ -404,6 +448,10 @@ static void
 bind_shell_client(struct wl_client *client)
 {
     struct uifw_client  *uclient;
+<<<<<<< HEAD
+=======
+    struct uifw_client_attr *lattr;
+>>>>>>> master
     pid_t   pid;
     uid_t   uid;
     gid_t   gid;
@@ -490,6 +538,28 @@ bind_shell_client(struct wl_client *client)
                 sprintf(uclient->appid, "?%d?", uclient->pid);
             }
         }
+<<<<<<< HEAD
+=======
+
+        wl_list_for_each (lattr, &_ico_win_mgr->client_attr_list, link)    {
+            if (strcmp(lattr->appid, uclient->appid) == 0)  {
+                for (i = 0; i < MAX_CLIENT_ATTR; i++)   {
+                    switch (lattr->attrs[i].attr)   {
+                    case ICO_WINDOW_MGR_CLIENT_ATTR_NOCONFIGURE:
+                        uclient->noconfigure = lattr->attrs[i].value;
+                        ivi_shell_set_client_attr(uclient->client,
+                                                  ICO_CLEINT_ATTR_NOCONFIGURE,
+                                                  lattr->attrs[i].value);
+                        uifw_trace("bind_shell_client: set to ivi-shell");
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+>>>>>>> master
     }
     else    {
         uifw_trace("bind_shell_client: client=%08x pid dose not exist", (int)client);
@@ -523,6 +593,35 @@ unbind_shell_client(struct wl_client *client)
 
 /*--------------------------------------------------------------------------*/
 /**
+<<<<<<< HEAD
+=======
+ * @brief   ico_get_animation_type: convert animation name to type value
+ *
+ * @param[in]   animation       animation name
+ * @return      animation type value
+ */
+/*--------------------------------------------------------------------------*/
+static int
+ico_get_animation_type(const char *animation)
+{
+    int anima = ICO_WINDOW_MGR_ANIMATION_NONE;
+
+    if (strcasecmp(animation, "none") == 0) {
+        return ICO_WINDOW_MGR_ANIMATION_NONE;
+    }
+
+    if (win_mgr_hook_animation) {
+        anima = (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_TYPE, (void *)animation);
+    }
+    if (anima <= 0) {
+        anima = ICO_WINDOW_MGR_ANIMATION_NONE;
+    }
+    return anima;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+>>>>>>> master
  * @brief   client_register_surface: create UIFW surface
  *
  * @param[in]   client          Wayland client
@@ -539,7 +638,13 @@ client_register_surface(struct wl_client *client, struct wl_resource *resource,
     struct uifw_win_surface *us;
     struct uifw_win_surface *phash;
     struct uifw_win_surface *bhash;
+<<<<<<< HEAD
     uint32_t    hash;
+=======
+    struct uifw_client_attr *lattr;
+    uint32_t    hash;
+    int         i;
+>>>>>>> master
 
     uifw_trace("client_register_surface: Enter(surf=%08x,client=%08x,res=%08x)",
                (int)surface, (int)client, (int)resource);
@@ -563,7 +668,13 @@ client_register_surface(struct wl_client *client, struct wl_resource *resource,
     us->id = generate_id();
     us->surface = surface;
     us->shsurf = shsurf;
+<<<<<<< HEAD
     strncpy(us->animation, ivi_shell_default_animation(), sizeof(us->animation)-1);
+=======
+    wl_list_init(&us->animation.animation.link);
+    us->animation.type = ico_get_animation_type(ivi_shell_default_animation(NULL, NULL));
+    us->animation.type_next = us->animation.type;
+>>>>>>> master
 
     if (_ico_win_mgr->num_manager <= 0) {
         uifw_trace("client_register_surface: No Manager, Force visible");
@@ -620,12 +731,40 @@ client_register_surface(struct wl_client *client, struct wl_resource *resource,
     /* set default layer id             */
     ivi_shell_set_layer(shsurf, 0);
 
+<<<<<<< HEAD
+=======
+    /* set client attribute             */
+    wl_list_for_each (lattr, &_ico_win_mgr->client_attr_list, link)    {
+        if (strcmp(lattr->appid, us->uclient->appid) == 0)  {
+            for (i = 0; i < MAX_CLIENT_ATTR; i++)   {
+                switch (lattr->attrs[i].attr)   {
+                case ICO_WINDOW_MGR_CLIENT_ATTR_NOCONFIGURE:
+                    us->uclient->noconfigure = lattr->attrs[i].value;
+                    ivi_shell_set_client_attr(us->uclient->client,
+                                              ICO_CLEINT_ATTR_NOCONFIGURE,
+                                              lattr->attrs[i].value);
+                    uifw_trace("client_register_surface: set attr(%d=%d) to %08x",
+                               lattr->attrs[i].attr, lattr->attrs[i].value, us->id);
+                    break;
+                default:
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+>>>>>>> master
     /* send event to manager            */
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_CREATED,
                             us->id, us->uclient->appid, us->uclient->pid, 0,0,0,0,0);
 
     if (win_mgr_hook_create) {
+<<<<<<< HEAD
         /* call surface create hook for ico_window_mgr  */
+=======
+        /* call surface create hook for other plugin  */
+>>>>>>> master
         (void) (*win_mgr_hook_create)(client, surface, us->id, us->uclient->appid);
     }
     uifw_trace("client_register_surface: Leave(surfaceId=%08x)", us->id);
@@ -912,6 +1051,19 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
         if (width > ICO_IVI_MAX_COORDINATE)     width = usurf->width;
         if (height > ICO_IVI_MAX_COORDINATE)    height = usurf->height;
 
+<<<<<<< HEAD
+=======
+        /* check animation                  */
+        if ((usurf->animation.type != ICO_WINDOW_MGR_ANIMATION_NONE) &&
+            (usurf->animation.state != ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
+            (win_mgr_hook_animation != NULL) &&
+            (x == usurf->x) && (y == usurf->y) &&
+            (width == usurf->width) && (height == usurf->height))   {
+            uifw_trace("uifw_set_positionsize: Leave(same position size at animation)");
+            return;
+        }
+
+>>>>>>> master
         uclient = find_client_from_client(client);
         if (uclient)    {
             if (! uclient->manager) uclient = NULL;
@@ -980,6 +1132,10 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
 {
     struct uifw_win_surface* usurf;
     struct uifw_client *uclient;
+<<<<<<< HEAD
+=======
+    int         animation;
+>>>>>>> master
 
     uifw_trace("uifw_set_visible: Enter(surf=%08x,%d,%d)", surfaceid, visible, raise);
 
@@ -1005,7 +1161,12 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
+<<<<<<< HEAD
     if (visible == 1) {
+=======
+    if ((visible == ICO_WINDOW_MGR_VISIBLE_SHOW) ||
+        (visible == ICO_WINDOW_MGR_VISIBLE_SHOW_WO_ANIMATION))  {
+>>>>>>> master
         if ((usurf->width <= 0) || (usurf->height <= 0))    {
             /* not declare surface geometry, initialize     */
             usurf->width = usurf->surface->geometry.width;
@@ -1027,6 +1188,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
                        usurf->width, usurf->height);
             uifw_set_weston_surface(usurf);
             ivi_shell_set_surface_type(usurf->shsurf);
+<<<<<<< HEAD
         }
         else if ((raise != 0) && (raise != 1))  {
             uifw_trace("uifw_set_visible: Leave(No Change)");
@@ -1058,17 +1220,67 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
             uifw_set_weston_surface(usurf);
         }
         else if ((raise != 0) && (raise != 1))  {
+=======
+
+            if ((visible == ICO_WINDOW_MGR_VISIBLE_SHOW) &&
+                (usurf->animation.type != ICO_WINDOW_MGR_ANIMATION_NONE) &&
+                (win_mgr_hook_animation != NULL))   {
+                animation = (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPIN,
+                                                      (void *)usurf);
+            }
+        }
+        else if ((raise != ICO_WINDOW_MGR_RAISE_LOWER) &&
+                 (raise != ICO_WINDOW_MGR_RAISE_RAISE))  {
             uifw_trace("uifw_set_visible: Leave(No Change)");
             return;
         }
     }
+    else if ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE) ||
+             (visible == ICO_WINDOW_MGR_VISIBLE_HIDE_WO_ANIMATION)) {
+
+        if (ivi_shell_is_visible(usurf->shsurf))    {
+
+            /* Weston surface configure                     */
+            uifw_set_weston_surface(usurf);
+
+            animation = ICO_WINDOW_MGR_ANIMATION_RET_ANIMA;
+            if ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE) &&
+                (usurf->animation.type > 0) &&
+                (win_mgr_hook_animation != NULL))   {
+                animation = (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPOUT,
+                                                      (void *)usurf);
+            }
+            if (animation != ICO_WINDOW_MGR_ANIMATION_RET_ANIMASHOW)    {
+                ivi_shell_set_visible(usurf->shsurf, 0);
+                uifw_trace("uifw_set_visible: Change to UnVisible");
+            }
+            else    {
+                uifw_trace("uifw_set_visible: UnVisible but animation");
+            }
+        }
+        else if ((raise != ICO_WINDOW_MGR_RAISE_LOWER) &&
+                 (raise != ICO_WINDOW_MGR_RAISE_RAISE))  {
+>>>>>>> master
+            uifw_trace("uifw_set_visible: Leave(No Change)");
+            return;
+        }
+    }
+<<<<<<< HEAD
     else if ((raise != 0) && (raise != 1))  {
+=======
+    else if ((raise != ICO_WINDOW_MGR_RAISE_LOWER) &&
+             (raise != ICO_WINDOW_MGR_RAISE_RAISE))  {
+>>>>>>> master
         uifw_trace("uifw_set_visible: Leave(No Change)");
         return;
     }
 
     /* raise/lower                              */
+<<<<<<< HEAD
     if ((raise == 1) || (raise == 0))   {
+=======
+    if ((raise == ICO_WINDOW_MGR_RAISE_LOWER) || (raise != ICO_WINDOW_MGR_RAISE_RAISE))  {
+>>>>>>> master
         ivi_shell_set_raise(usurf->shsurf, raise);
     }
 
@@ -1079,7 +1291,17 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
     }
     /* send event(VISIBLE) to manager           */
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_VISIBLE,
+<<<<<<< HEAD
                             surfaceid, NULL, visible, raise, uclient ? 0 : 1, 0,0,0);
+=======
+                            surfaceid, NULL,
+                            (visible == ICO_WINDOW_MGR_VISIBLE_SHOW) ||
+                              (visible == ICO_WINDOW_MGR_VISIBLE_SHOW_WO_ANIMATION) ? 1 :
+                                ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE) ||
+                                   (visible == ICO_WINDOW_MGR_VISIBLE_HIDE_WO_ANIMATION) ? 0 :
+                                     ICO_WINDOW_MGR_VISIBLE_NOCHANGE),
+                            raise, uclient ? 0 : 1, 0,0,0);
+>>>>>>> master
 
     uifw_trace("uifw_set_visible: Leave(OK)");
 }
@@ -1091,12 +1313,18 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
  * @param[in]   client      Weyland client
  * @param[in]   resource    resource of request
  * @param[in]   surfaceid   UIFW surface id
+<<<<<<< HEAD
  * @param[in]   animation   animation name
+=======
+ * @param[in]   change      change type(show/hide,reeize,move)
+ * @param[in]   anmation    animation name
+>>>>>>> master
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
 uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
+<<<<<<< HEAD
                    uint32_t surfaceid, const char *animation)
 {
     struct uifw_win_surface* usurf = find_uifw_win_surface_by_id(surfaceid);
@@ -1108,6 +1336,26 @@ uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
         memset(usurf->animation, 0, sizeof(usurf->animation));
         strncpy(usurf->animation, animation, sizeof(usurf->animation)-1);
         uifw_trace("uifw_set_animation: Leave(OK)");
+=======
+                   uint32_t surfaceid, int32_t change, const char *animation)
+{
+    struct uifw_win_surface* usurf = find_uifw_win_surface_by_id(surfaceid);
+
+    uifw_trace("uifw_set_transition: Enter(surf=%08x, change=%d, animation=%s)",
+               surfaceid, change, animation);
+
+    if (usurf) {
+        if (change != ICO_WINDOW_MGR_ANIMATION_CHANGE_VISIBLE)  {
+            uifw_trace("uifw_set_animation: Leave(change type(%d9 not support)", change);
+        }
+        else    {
+            usurf->animation.type_next = ico_get_animation_type(animation);
+            uifw_trace("uifw_set_animation: Leave(OK) type=%d", usurf->animation.type_next);
+            if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE)  {
+                usurf->animation.type = usurf->animation.type_next;
+            }
+        }
+>>>>>>> master
     }
     else    {
         uifw_trace("uifw_set_animation: Leave(Surface(%08x) Not exist)", surfaceid);
@@ -1248,6 +1496,88 @@ uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
 
 /*--------------------------------------------------------------------------*/
 /**
+<<<<<<< HEAD
+=======
+ * @brief   uifw_set_client_attr: set client application attribute
+ *
+ * @param[in]   client      Weyland client
+ * @param[in]   resource    resource of request
+ * @param[in]   appid       client application name
+ * @param[in]   attr        attribute
+ * @param[in]   value       attribute value
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+uifw_set_client_attr(struct wl_client *client, struct wl_resource *resource,
+                     const char *appid, int32_t attr, int32_t value)
+{
+    struct uifw_client_attr *lattr;
+    struct uifw_client  *uclient;
+    int     idx, freeidx;
+
+    uifw_trace("uifw_set_client_attr: Enter(appid=%s, attr=%d, value=%d)",
+               appid, attr, value);
+
+    freeidx = -1;
+    wl_list_for_each (lattr, &_ico_win_mgr->client_attr_list, link)    {
+        if (strcmp(lattr->appid, appid) == 0)   {
+            for (idx = 0; idx < MAX_CLIENT_ATTR; idx++) {
+                if (lattr->attrs[idx].attr == attr) {
+                    lattr->attrs[idx].value = value;
+                    freeidx = 999;
+                    break;
+                }
+                if ((freeidx < 0) && (lattr->attrs[idx].attr < 0))  {
+                    freeidx = idx;
+                }
+            }
+            if ((idx >= MAX_CLIENT_ATTR) && (freeidx >= 0)) {
+                lattr->attrs[freeidx].attr = attr;
+                lattr->attrs[freeidx].value = value;
+            }
+            else    {
+                freeidx = 998;
+            }
+            break;
+        }
+    }
+    if (freeidx < 0)    {
+        lattr = malloc(sizeof(struct uifw_client_attr));
+        if (lattr)  {
+            memset(lattr, 0, sizeof(struct uifw_client_attr));
+            strncpy(lattr->appid, appid, ICO_IVI_APPID_LENGTH-1);
+            for (idx = 1; idx < MAX_CLIENT_ATTR; idx++) {
+                lattr->attrs[idx].attr = -1;
+            }
+            lattr->attrs[0].attr = attr;
+            lattr->attrs[0].value = value;
+            wl_list_insert(&_ico_win_mgr->client_attr_list, &lattr->link);
+        }
+    }
+
+    wl_list_for_each (uclient, &_ico_win_mgr->client_list, link)    {
+        if (strcmp(uclient->appid, appid) == 0) {
+            switch(attr)    {
+            case ICO_WINDOW_MGR_CLIENT_ATTR_NOCONFIGURE:
+                uclient->noconfigure = value;
+                ivi_shell_set_client_attr(uclient->client,
+                                          ICO_CLEINT_ATTR_NOCONFIGURE, value);
+                uifw_trace("uifw_set_client_attr: set to ivi-shell");
+                break;
+            default:
+                uifw_trace("uifw_set_client_attr: Unknown attr(%d)", attr);
+                break;
+            }
+            break;
+        }
+    }
+    uifw_trace("uifw_set_client_attr: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+>>>>>>> master
  * @brief   win_mgr_surface_change_mgr: surface chagen from manager(HomeScreen)
  *
  * @param[in]   surface     Weston surface
@@ -1381,6 +1711,13 @@ win_mgr_surface_destroy(struct weston_surface *surface)
         return;
     }
 
+<<<<<<< HEAD
+=======
+    /* destory animation extenson   */
+    if (win_mgr_hook_animation) {
+        (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_DESTROY, (void *)usurf);
+    }
+>>>>>>> master
     hash = MAKE_IDHASH(usurf->id);
     phash = _ico_win_mgr->idhash[hash];
     bhash = NULL;
@@ -1439,7 +1776,11 @@ win_mgr_surface_destroy(struct weston_surface *surface)
 /*--------------------------------------------------------------------------*/
 static void
 bind_ico_win_mgr(struct wl_client *client,
+<<<<<<< HEAD
                void *data, uint32_t version, uint32_t id)
+=======
+                 void *data, uint32_t version, uint32_t id)
+>>>>>>> master
 {
     struct wl_resource *add_resource;
     struct uifw_manager *nm;
@@ -1630,6 +1971,22 @@ ico_win_mgr_hook_destroy(void (*hook_destroy)(struct weston_surface *surface))
     win_mgr_hook_destroy = hook_destroy;
 }
 
+<<<<<<< HEAD
+=======
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_window_mgr_set_animation: set animation hook routine
+ *
+ * @param[in]   hook_animation  hook routine
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ico_window_mgr_set_animation(int (*hook_animation)(const int op, void *data))
+{
+    win_mgr_hook_animation = hook_animation;
+}
+>>>>>>> master
 
 /*--------------------------------------------------------------------------*/
 /**
@@ -1679,6 +2036,10 @@ module_init(struct weston_compositor *ec)
     wl_list_init(&_ico_win_mgr->surface_list);
     wl_list_init(&_ico_win_mgr->client_list);
     wl_list_init(&_ico_win_mgr->manager_list);
+<<<<<<< HEAD
+=======
+    wl_list_init(&_ico_win_mgr->client_attr_list);
+>>>>>>> master
 
     nodeId = ico_ivi_get_mynode();
     _ico_win_mgr->surface_head = ICO_IVI_SURFACEID_BASE(nodeId);
