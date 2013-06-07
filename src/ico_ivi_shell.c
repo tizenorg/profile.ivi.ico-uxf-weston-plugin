@@ -913,6 +913,7 @@ map(struct ivi_shell *shell, struct weston_surface *surface,
     if ((ico_option_flag() & ICO_OPTION_FLAG_UNVISIBLE) && (shsurf->visible == FALSE))   {
         surface->geometry.x = (float)(ICO_IVI_MAX_COORDINATE+1);
         surface->geometry.y = (float)(ICO_IVI_MAX_COORDINATE+1);
+        surface->geometry.dirty = 1;
     }
 
     switch (surface_type) {
@@ -986,11 +987,7 @@ configure(struct ivi_shell *shell, struct weston_surface *surface,
         ivi_shell_surface_configure(shsurf, x, y, width, height);
     }
     else    {
-        surface->geometry.x = x;
-        surface->geometry.y = y;
-        surface->geometry.width = width;
-        surface->geometry.height = height;
-        surface->geometry.dirty = 1;
+        weston_surface_configure(surface, x, y, width, height);
     }
 
     if (surface->output) {
@@ -1017,6 +1014,7 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
     struct ivi_shell *shell = shsurf->shell;
     int     type_changed = 0;
     int     num_mgr;
+    int     dx, dy, dw, dh;
 
     uifw_trace("shell_surface_configure: Enter(surf=%08x out=%08x buf=%08x)",
                (int)es, (int)es->output, (int)es->buffer);
@@ -1071,20 +1069,19 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
             /* Surface change request from App  */
             uifw_trace("shell_surface_configure: App request change(sx/sy=%d/%d w/h=%d/%d)",
                        sx, sy, es->buffer->width, es->buffer->height);
-            es->geometry.width = shsurf->geometry_width;
-            es->geometry.height = shsurf->geometry_height;
-            es->geometry.x = shsurf->geometry_x;
-            es->geometry.y = shsurf->geometry_y;
-            if (es->geometry.width > es->buffer->width) {
-                es->geometry.width = es->buffer->width;
-                es->geometry.x = shsurf->geometry_x +
-                                 (shsurf->geometry_width - es->geometry.width)/2;
+            dx = shsurf->geometry_x;
+            dy = shsurf->geometry_y;
+            dw = shsurf->geometry_width;
+            dh = shsurf->geometry_height;
+            if (dw > es->buffer->width) {
+                dw = es->buffer->width;
+                dx = shsurf->geometry_x + (shsurf->geometry_width - dw)/2;
             }
-            if (es->geometry.height > es->buffer->height)   {
-                es->geometry.height = es->buffer->height;
-                es->geometry.y = shsurf->geometry_y +
-                                 (shsurf->geometry_height - es->geometry.height)/2;
+            if (dh > es->buffer->height)   {
+                dh = es->buffer->height;
+                dy = shsurf->geometry_y + (shsurf->geometry_height - dh)/2;
             }
+            weston_surface_configure(es, dx, dy, dw, dh);
             ivi_shell_surface_configure(shsurf, es->geometry.x, es->geometry.y,
                                         es->geometry.width, es->geometry.height);
             uifw_trace("shell_surface_configure: w/h=%d/%d->%d/%d x/y=%d/%d->%d/%d",
@@ -1109,6 +1106,7 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
                 (shsurf->visible))  {
                 es->geometry.x = 0;
                 es->geometry.y = 0;
+                es->geometry.dirty = 1;
             }
             configure(shell, es,
                       es->geometry.x + to_x - from_x,
@@ -1284,6 +1282,7 @@ ivi_shell_restack_ivi_layer(struct ivi_shell *shell, struct shell_surface *shsur
                         weston_surface_damage_below(es->surface);
                         es->surface->geometry.x = new_x;
                         es->surface->geometry.y = new_y;
+                        es->surface->geometry.dirty = 1;
                         weston_surface_damage_below(es->surface);
                     }
                 }
@@ -1462,8 +1461,24 @@ ivi_shell_restrain_configure(struct shell_surface *shsurf, const int restrain)
     shsurf->restrain = restrain;
 
     if (restrain == 0)  {
+        shell_surface_configure(shsurf->surface, shsurf->geometry_x, shsurf->geometry_y);
         ivi_shell_restack_ivi_layer(shell_surface_get_shell(shsurf), shsurf);
     }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ivi_shell_set_active: surface active control
+ *
+ * @param[in]   shsurf      shell surface(if NULL, no active surface)
+ * @param[in]   restrain    restrain(1)/not restrain(0)
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT int
+ivi_shell_is_restrain(struct shell_surface *shsurf)
+{
+    return shsurf->restrain;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1545,7 +1560,7 @@ click_to_activate_binding(struct wl_seat *seat, uint32_t time, uint32_t button, 
  * @brief   ivi_shell_set_visible: surface visible control
  *
  * @param[in]   shsurf      shell surface
- * @param[in]   visible     visibility(1=visible/0=unvisible)
+ * @param[in]   visible     visibility(1=visible/0=unvisible/-1=system default)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
@@ -1772,6 +1787,28 @@ ivi_shell_send_configure(struct shell_surface *shsurf, const int id,
     wl_shell_surface_send_configure(&shsurf->resource,
                                     WL_SHELL_SURFACE_RESIZE_BOTTOM_RIGHT,
                                     width, height);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ivi_shell_get_positionsize: get surface position and size
+ *
+ * @param[in]   shsurf      shell surface
+ * @param[out]  x           surface upper-left X position on screen
+ * @param[out]  y           surface upper-left Y position on screen
+ * @param[out]  width       surface width
+ * @param[out]  height      surface height
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ivi_shell_get_positionsize(struct shell_surface *shsurf,
+                           int *x, int *y, int *width, int *height)
+{
+    *x = shsurf->geometry_x;
+    *y = shsurf->geometry_y;
+    *width = shsurf->geometry_width;
+    *height = shsurf->geometry_height;
 }
 
 /*--------------------------------------------------------------------------*/

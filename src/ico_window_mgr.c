@@ -147,7 +147,7 @@ static void uifw_set_visible(struct wl_client *client, struct wl_resource *resou
                              uint32_t surfaceid, int32_t visible, int32_t raise);
                                             /* set surface animation                */
 static void uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
-                               uint32_t surfaceid, int32_t change, const char *animation);
+                               uint32_t surfaceid, const char *animation, int32_t time);
                                             /* set active surface (form HomeScreen) */
 static void uifw_set_active(struct wl_client *client, struct wl_resource *resource,
                             uint32_t surfaceid, uint32_t target);
@@ -731,6 +731,7 @@ win_mgr_map_surface(struct weston_surface *surface, int32_t *width, int32_t *hei
             *height = usurf->height;
             surface->geometry.x = usurf->x;
             surface->geometry.y = usurf->y;
+            surface->geometry.dirty = 1;
         }
         else    {
             uifw_trace("win_mgr_map_surface: HomeScreen not regist Surface, "
@@ -747,10 +748,6 @@ win_mgr_map_surface(struct weston_surface *surface, int32_t *width, int32_t *hei
                 /* HomeScreen exist, coodinate set by HomeScreen                */
                 surface->geometry.x = 0;
                 surface->geometry.y = 0;
-
-                /* change surface size, because HomeScreen change surface size  */
-                *width = 1;
-                *height = 1;
                 uifw_trace("win_mgr_map_surface: Change size and position");
             }
             else    {
@@ -959,6 +956,7 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
                       int32_t x, int32_t y, int32_t width, int32_t height)
 {
     struct uifw_client *uclient;
+    int     cx, cy, cwidth, cheight;
 
     uifw_trace("uifw_set_positionsize: Enter res=%08x surf=%08x x/y/w/h=%d/%d/%d/%d",
                (int)resource, surfaceid, x, y, width, height);
@@ -970,15 +968,14 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
         struct weston_surface *es = usurf->surface;
 
         /* if x,y,width,height bigger then ICO_IVI_MAX_COORDINATE, no change    */
-        if (x > ICO_IVI_MAX_COORDINATE)         x = usurf->x;
-        if (y > ICO_IVI_MAX_COORDINATE)         y = usurf->y;
-        if (width > ICO_IVI_MAX_COORDINATE)     width = usurf->width;
-        if (height > ICO_IVI_MAX_COORDINATE)    height = usurf->height;
+        ivi_shell_get_positionsize(usurf->shsurf, &cx, &cy, &cwidth, &cheight);
+        if (x > ICO_IVI_MAX_COORDINATE)         x = cx;
+        if (y > ICO_IVI_MAX_COORDINATE)         y = cy;
+        if (width > ICO_IVI_MAX_COORDINATE)     width = cwidth;
+        if (height > ICO_IVI_MAX_COORDINATE)    height = cheight;
 
         /* check animation                  */
-        if ((usurf->animation.type != ICO_WINDOW_MGR_ANIMATION_NONE) &&
-            (usurf->animation.state != ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
-            (win_mgr_hook_animation != NULL) &&
+        if ((ivi_shell_is_restrain(usurf->shsurf)) &&
             (x == usurf->x) && (y == usurf->y) &&
             (width == usurf->width) && (height == usurf->height))   {
             uifw_trace("uifw_set_positionsize: Leave(same position size at animation)");
@@ -1080,7 +1077,8 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
     }
 
     if ((visible == ICO_WINDOW_MGR_VISIBLE_SHOW) ||
-        (visible == ICO_WINDOW_MGR_VISIBLE_SHOW_WO_ANIMATION))  {
+        (visible == ICO_WINDOW_MGR_VISIBLE_SHOW_ANIMATION))  {
+
         if ((usurf->width <= 0) || (usurf->height <= 0))    {
             /* not declare surface geometry, initialize     */
             usurf->width = usurf->surface->geometry.width;
@@ -1103,7 +1101,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
             uifw_set_weston_surface(usurf);
             ivi_shell_set_surface_type(usurf->shsurf);
 
-            if ((visible == ICO_WINDOW_MGR_VISIBLE_SHOW) &&
+            if ((visible == ICO_WINDOW_MGR_VISIBLE_SHOW_ANIMATION) &&
                 (usurf->animation.type != ICO_WINDOW_MGR_ANIMATION_NONE) &&
                 (win_mgr_hook_animation != NULL))   {
                 animation = (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPIN,
@@ -1117,7 +1115,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
         }
     }
     else if ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE) ||
-             (visible == ICO_WINDOW_MGR_VISIBLE_HIDE_WO_ANIMATION)) {
+             (visible == ICO_WINDOW_MGR_VISIBLE_HIDE_ANIMATION)) {
 
         if (ivi_shell_is_visible(usurf->shsurf))    {
 
@@ -1125,7 +1123,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
             uifw_set_weston_surface(usurf);
 
             animation = ICO_WINDOW_MGR_ANIMATION_RET_ANIMA;
-            if ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE) &&
+            if ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE_ANIMATION) &&
                 (usurf->animation.type > 0) &&
                 (win_mgr_hook_animation != NULL))   {
                 animation = (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPOUT,
@@ -1165,9 +1163,9 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_VISIBLE,
                             surfaceid, NULL,
                             (visible == ICO_WINDOW_MGR_VISIBLE_SHOW) ||
-                              (visible == ICO_WINDOW_MGR_VISIBLE_SHOW_WO_ANIMATION) ? 1 :
+                              (visible == ICO_WINDOW_MGR_VISIBLE_SHOW_ANIMATION) ? 1 :
                                 ((visible == ICO_WINDOW_MGR_VISIBLE_HIDE) ||
-                                   (visible == ICO_WINDOW_MGR_VISIBLE_HIDE_WO_ANIMATION) ? 0 :
+                                   (visible == ICO_WINDOW_MGR_VISIBLE_HIDE_ANIMATION) ? 0 :
                                      ICO_WINDOW_MGR_VISIBLE_NOCHANGE),
                             raise, uclient ? 0 : 1, 0,0,0);
 
@@ -1181,30 +1179,30 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
  * @param[in]   client      Weyland client
  * @param[in]   resource    resource of request
  * @param[in]   surfaceid   UIFW surface id
- * @param[in]   change      change type(show/hide,reeize,move)
  * @param[in]   anmation    animation name
+ * @param[in]   time        animation time(ms), if 0, default time
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
 uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
-                   uint32_t surfaceid, int32_t change, const char *animation)
+                   uint32_t surfaceid, const char *animation, int time)
 {
     struct uifw_win_surface* usurf = find_uifw_win_surface_by_id(surfaceid);
 
-    uifw_trace("uifw_set_transition: Enter(surf=%08x, change=%d, animation=%s)",
-               surfaceid, change, animation);
+    uifw_trace("uifw_set_transition: Enter(surf=%08x, animation=%s, time=%d)",
+               surfaceid, animation, time);
 
     if (usurf) {
-        if (change != ICO_WINDOW_MGR_ANIMATION_CHANGE_VISIBLE)  {
-            uifw_trace("uifw_set_animation: Leave(change type(%d9 not support)", change);
-        }
-        else    {
+        if ((*animation != 0) && (*animation != ' '))   {
             usurf->animation.type_next = ico_get_animation_type(animation);
             uifw_trace("uifw_set_animation: Leave(OK) type=%d", usurf->animation.type_next);
             if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE)  {
                 usurf->animation.type = usurf->animation.type_next;
             }
+        }
+        if (time > 0)   {
+            usurf->animation.time = time;
         }
     }
     else    {

@@ -108,6 +108,7 @@ ico_window_animation(const int op, void *data)
     int         ret;
     uint32_t    nowsec;
     struct timeval  nowtv;
+    int         time;
 
     if (op == ICO_WINDOW_MGR_ANIMATION_TYPE)    {
         /* convert animation name to animation type value   */
@@ -166,10 +167,13 @@ ico_window_animation(const int op, void *data)
             (usurf->animation.current > 95))    {
             usurf->animation.animation.frame_counter = 1;
             usurf->animation.current = 0;
-            wl_list_init(&usurf->animation.animation.link);
-            output = container_of(weston_ec->output_list.next,
-                                  struct weston_output, link);
-            wl_list_insert(output->animation_list.prev, &usurf->animation.animation.link);
+            if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE)  {
+                wl_list_init(&usurf->animation.animation.link);
+                output = container_of(weston_ec->output_list.next,
+                                      struct weston_output, link);
+                wl_list_insert(output->animation_list.prev,
+                               &usurf->animation.animation.link);
+            }
         }
         else if (((usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_IN) &&
                   (op == ICO_WINDOW_MGR_ANIMATION_OPOUT)) ||
@@ -179,7 +183,8 @@ ico_window_animation(const int op, void *data)
             nowsec = (uint32_t)(((long long)nowtv.tv_sec) * 1000L +
                                 ((long long)nowtv.tv_usec) / 1000L);
             usurf->animation.current = 100 - usurf->animation.current;
-            ret = ((usurf->animation.current) * animation_time) / 100;
+            time = (usurf->animation.time > 0) ? usurf->animation.time : animation_time;
+            ret = ((usurf->animation.current) * time) / 100;
             if (nowsec >= (uint32_t)ret)    {
                 usurf->animation.starttime = nowsec - ret;
             }
@@ -213,7 +218,6 @@ ico_window_animation(const int op, void *data)
         }
         else if (usurf->animation.type == ANIMA_FADE)   {
             usurf->animation.animation.frame = animation_fade;
-            ivi_shell_restrain_configure(usurf->shsurf, 1);
             (*usurf->animation.animation.frame)(&usurf->animation.animation, NULL, 1);
         }
         else    {
@@ -256,6 +260,7 @@ animation_cont(struct weston_animation *animation, struct weston_output *output,
     int         par;
     uint32_t    nowsec;
     struct timeval  nowtv;
+    int         time;
 
     gettimeofday(&nowtv, NULL);
     nowsec = (uint32_t)(((long long)nowtv.tv_sec) * 1000L +
@@ -299,11 +304,12 @@ animation_cont(struct weston_animation *animation, struct weston_output *output,
         nowsec = (uint32_t)(((long long)0x100000000L) +
                             ((long long)nowsec) - ((long long)usurf->animation.starttime));
     }
-    if (((output == NULL) && (msecs == 0)) || (nowsec >= ((uint32_t)animation_time))) {
+    time = (usurf->animation.time > 0) ? usurf->animation.time : animation_time;
+    if (((output == NULL) && (msecs == 0)) || (nowsec >= ((uint32_t)time))) {
         par = 100;
     }
     else    {
-        par = (nowsec * 100 + animation_time / 2) / animation_time;
+        par = (nowsec * 100 + time / 2) / time;
         if (par < 2)    par = 2;
     }
     if ((par >= 100) ||

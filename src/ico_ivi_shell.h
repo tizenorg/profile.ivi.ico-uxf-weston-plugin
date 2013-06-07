@@ -48,6 +48,8 @@ void ivi_shell_set_toplevel(struct shell_surface *shsurf);
 void ivi_shell_set_surface_type(struct shell_surface *shsurf);
 void ivi_shell_send_configure(struct shell_surface *shsurf, const int id,
                               const int edges, const int width, const int height);
+void ivi_shell_get_positionsize(struct shell_surface *shsurf, int *x,
+                                int *y, int *width, int *height);
 void ivi_shell_set_positionsize(struct shell_surface *shsurf, const int x,
                                 const int y, const int width, const int height);
 void ivi_shell_set_layer_visible(const int layer, const int visible);
@@ -56,6 +58,7 @@ void ivi_shell_surface_configure(struct shell_surface *shsurf, const int x,
 void ivi_shell_set_active(struct shell_surface *shsurf, const int target);
 void ivi_shell_set_client_attr(struct wl_client *client, const int attr, const int value);
 void ivi_shell_restrain_configure(struct shell_surface *shsurf, const int restrain);
+int ivi_shell_is_restrain(struct shell_surface *shsurf);
 const char *ivi_shell_default_animation(int *msec, int *fps);
 
 /* Prototypr for hook routine           */
