@@ -11,8 +11,8 @@
       </description>
       <entry name="hide" value="0" summary="surface hide"/>
       <entry name="show" value="1" summary="surface show"/>
-      <entry name="hide_wo_animation" value="2" summary="hide without animation"/>
-      <entry name="show_wo_animation" value="3" summary="show without animation"/>
+      <entry name="hide_animation" value="2" summary="hide with animation"/>
+      <entry name="show_animation" value="3" summary="show with animation"/>
       <entry name="nochange" value="9" summary="show/hide no change"/>
     </enum>
 
@@ -30,15 +30,6 @@
        Set client application attribute.
       </description>
       <entry name="noconfigure" value="0" summary="configure event"/>
-    </enum>
-
-    <enum name="animation_change">
-      <description summary="animation change type">
-       Set animation for surface change.
-      </description>
-      <entry name="visible" value="0" summary="show/hide change"/>
-      <entry name="resize" value="1" summary="surface size change"/>
-      <entry name="move" value="2" summary="surface position change"/>
     </enum>
 
     <request name="set_user">
@@ -71,8 +62,8 @@
 
     <request name="set_animation">
       <arg name="surfaceid" type="uint"/>
-      <arg name="change" type="int"/>
       <arg name="animation" type="string"/>
+      <arg name="time" type="int"/>
     </request>
 
     <request name="set_active">

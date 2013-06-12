@@ -58,9 +58,11 @@ struct uifw_win_surface {
         struct weston_animation animation;  /* animation control                    */
         short   type;                       /* animation type                       */
         short   type_next;                  /* next animation type                  */
+        short   time;                       /* animation time                       */
         short   current;                    /* animation current percentage         */
         char    state;                      /* animation state                      */
         char    visible;                    /* need visible(1)/hide(2) at end of animation*/
+        char    res[2];                     /* (unused)                             */
         uint32_t starttime;                 /* start time(ms)                       */
     }       animation;
     void    *animadata;                     /* animation data                       */

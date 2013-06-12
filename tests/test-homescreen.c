@@ -1025,14 +1025,22 @@ animation_surface(struct display *display, char *buf)
     char    *args[10];
     int     narg;
     int     surfaceid;
+    int     time;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 2)  {
         surfaceid = search_surface(display, args[0]);
         if (surfaceid >= 0) {
-            print_log("HOMESCREEN: animation(%s,%08x,%d)", args[0], surfaceid, args[1]);
+            if (narg >= 3)  {
+                time = strtol(args[2], (char **)0, 0);
+            }
+            else    {
+                time = 0;
+            }
+            print_log("HOMESCREEN: animation(%s,%08x,%s,%d)",
+                      args[0], surfaceid, args[1], time);
             ico_window_mgr_set_animation(display->ico_window_mgr, surfaceid,
-										 ICO_WINDOW_MGR_ANIMATION_CHANGE_VISIBLE, args[1]);
+                                         args[1], time);
         }
         else    {
             print_log("HOMESCREEN: Unknown surface(%s) at animation command", args[0]);
@@ -1040,7 +1048,7 @@ animation_surface(struct display *display, char *buf)
     }
     else    {
         print_log("HOMESCREEN: animation command"
-                  "[animation appid animation] has no argument");
+                  "[animation appid animation time] has no argument");
     }
 }
 
