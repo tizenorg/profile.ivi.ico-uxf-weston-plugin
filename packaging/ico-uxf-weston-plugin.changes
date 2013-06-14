@@ -1,3 +1,8 @@
+* Wed Jun 12 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/2.0alpha-wayland/20130612.051916@5247a37
+- 0.5.06 release
+- fixed for - weston loop forever when a fading animation is required in an animation of the fading again by same surface.
+- changed the animation of a default defined from "none" to "fade" in configuration file(weston_ivi_plugin.ini), and changed animation time in 500ms from 600ms.
+
 * Wed Jun 12 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130606.173106@48a3aa7
 - 0.5.05 release
 - fixed for - During operation, a menu thumbnail may be non-displayed.

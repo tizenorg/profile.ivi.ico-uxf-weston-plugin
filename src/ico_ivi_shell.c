@@ -1019,6 +1019,10 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
     uifw_trace("shell_surface_configure: Enter(surf=%08x out=%08x buf=%08x)",
                (int)es, (int)es->output, (int)es->buffer);
 
+    if (! es->buffer)   {
+        uifw_trace("shell_surface_configure: Leave(no buffer)");
+        return;
+    }
     if (shsurf->restrain)   {
         uifw_trace("shell_surface_configure: Leave(restrain)");
         return;
@@ -1043,7 +1047,7 @@ shell_surface_configure(struct weston_surface *es, int32_t sx, int32_t sy)
         }
     }
     else    {
-        if ((shsurf->mapped == 0) && (es->buffer != NULL))  {
+        if (shsurf->mapped == 0)    {
             if ((es->geometry.width > 0) && (es->geometry.height >0))   {
                 uifw_trace("shell_surface_configure: map Surface size(sx/sy=%d/%d w/h=%d/%d)",
                            sx, sy, es->buffer->width, es->buffer->height);
@@ -1468,11 +1472,12 @@ ivi_shell_restrain_configure(struct shell_surface *shsurf, const int restrain)
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   ivi_shell_set_active: surface active control
+ * @brief   ivi_shell_is_restrain: check surface restrain
  *
  * @param[in]   shsurf      shell surface(if NULL, no active surface)
- * @param[in]   restrain    restrain(1)/not restrain(0)
- * @return      none
+ * @return      restrain
+ * @retval      =1          surface currently restrain
+ * @retval      =0          not restrain
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT int
@@ -1570,7 +1575,8 @@ ivi_shell_set_visible(struct shell_surface *shsurf, const int visible)
     struct ivi_shell *shell = shell_surface_get_shell(shsurf);
     int next;
 
-    uifw_trace("ivi_shell_set_visible: [%08x] visible=%d", (int)shsurf, (int)visible);
+    uifw_trace("ivi_shell_set_visible: [%08x] (%08x) visible=%d",
+               (int)shsurf, (int)shsurf->surface, (int)visible);
 
     if (visible < 0)    {
         next = shell->win_visible_on_create;
@@ -1640,7 +1646,6 @@ ivi_shell_set_layer(struct shell_surface *shsurf, const int layer)
 
     /* search existing layer                    */
     wl_list_for_each (el, &shell->ivi_layer.link, link) {
-        uifw_trace("ivi_shell_set_layer: el=%08x(%d)", (int)el, el->layer);
         if (el->layer == layer) break;
     }
 

@@ -64,8 +64,11 @@ struct animation_data   {
     int     width;                          /* original width                       */
     int     height;                         /* original height                      */
     char    geometry_saved;                 /* need geometry restor at end          */
-    char    res[3];                         /* (unused)                             */
+    char    transform_set;                  /* need transform reset at end          */
+    char    res[2];                         /* (unused)                             */
     struct weston_transform transform;      /* transform matrix                     */
+    void    (*end_function)(struct weston_animation *animation);
+                                            /* animation end function               */
 };
 
 /* static valiables             */
@@ -82,6 +85,8 @@ static void animation_slide(struct weston_animation *animation,
                                             /* fade animation                       */
 static void animation_fade(struct weston_animation *animation,
                            struct weston_output *output, uint32_t msecs);
+                                            /* fade animation end                   */
+static void animation_fade_end(struct weston_animation *animation);
                                             /* continue animation                   */
 static int animation_cont(struct weston_animation *animation,
                           struct weston_output *output, uint32_t msecs);
@@ -289,8 +294,6 @@ animation_cont(struct weston_animation *animation, struct weston_output *output,
         animadata->width = usurf->width;
         animadata->height = usurf->height;
         animadata->geometry_saved = 1;
-        weston_matrix_init(&animadata->transform.matrix);
-        wl_list_init(&animadata->transform.link);
     }
     else if (! usurf->animadata)    {
         animation_end(usurf, 0);
@@ -338,6 +341,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
     animadata = (struct animation_data *)usurf->animadata;
 
     if (animadata)  {
+        if (animadata->end_function)    {
+            (*animadata->end_function)(&usurf->animation.animation);
+        }
         if (animadata->geometry_saved > 1)  {
             usurf->x = animadata->x;
             usurf->y = animadata->y;
@@ -346,7 +352,11 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             animadata->geometry_saved = 0;
         }
         wl_list_remove(&usurf->animation.animation.link);
-        wl_list_init(&usurf->animation.animation.link);
+        if (animadata->transform_set)   {
+            wl_list_remove(&animadata->transform.link);
+            animadata->transform_set = 0;
+        }
+        usurf->surface->geometry.dirty = 1;
     }
     if (disp)   {
         if ((usurf->animation.visible == ANIMA_HIDE_AT_END) &&
@@ -361,9 +371,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             ivi_shell_set_visible(usurf->shsurf, 1);
             weston_surface_damage_below(usurf->surface);
             weston_surface_damage(usurf->surface);
-            weston_compositor_schedule_repaint(weston_ec);
         }
         ivi_shell_restrain_configure(usurf->shsurf, 0);
+        weston_compositor_schedule_repaint(weston_ec);
     }
     usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
     usurf->animation.type = usurf->animation.type_next;
@@ -519,14 +529,19 @@ animation_fade(struct weston_animation *animation,
     es = usurf->surface;
     par = usurf->animation.current;
     if (animation->frame_counter == 1)  {
-        wl_list_insert(&es->geometry.transformation_list,
-                       &animadata->transform.link);
+        if (animadata->transform_set == 0)  {
+            animadata->transform_set = 1;
+            weston_matrix_init(&animadata->transform.matrix);
+            wl_list_init(&animadata->transform.link);
+            wl_list_insert(&es->geometry.transformation_list,
+                           &animadata->transform.link);
+        }
+        animadata->end_function = animation_fade_end;
     }
 
     uifw_trace("animation_fade: usurf=%08x count=%d %d%% type=%d state=%d",
                (int)usurf, animation->frame_counter, par,
                usurf->animation.type, usurf->animation.state);
-
 
     if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_IN)    {
         /* fade in                  */
@@ -546,13 +561,37 @@ animation_fade(struct weston_animation *animation,
     }
     if (par >= 100) {
         /* end of animation     */
-        wl_list_remove(&animadata->transform.link);
         animation_end(usurf, 1);
         uifw_trace("animation_fade: End of animation");
     }
     else    {
         /* continue animation   */
         weston_compositor_schedule_repaint(weston_ec);
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   animation_fade_end: fade animation end
+ *
+ * @param[in]   animation   weston animation table
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+animation_fade_end(struct weston_animation *animation)
+{
+    struct uifw_win_surface *usurf;
+    struct weston_surface   *es;
+
+    usurf = container_of(animation, struct uifw_win_surface, animation.animation);
+    es = usurf->surface;
+    es->alpha = 1.0;
+
+    if ((es->output) && (es->buffer) &&
+        (es->geometry.width > 0) && (es->geometry.height > 0)) {
+        weston_surface_damage_below(es);
+        weston_surface_damage(es);
     }
 }
 
