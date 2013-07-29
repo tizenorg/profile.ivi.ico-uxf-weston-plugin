@@ -214,15 +214,16 @@ wait_with_wayland(struct wl_display *display, int msec, int *endflag)
     fd = wl_display_get_fd(display);
 
     do  {
-        /* Flush send data          */
-        wl_display_flush(display);
-
         /* Check wayland input      */
-        nread = 0;
-        if (ioctl(fd, FIONREAD, &nread) < 0)    {
+        while(1)    {
+            /* Flush send data          */
+            wl_display_flush(display);
+
             nread = 0;
-        }
-        if (nread >= 8) {
+            if (ioctl(fd, FIONREAD, &nread) < 0)    {
+                nread = 0;
+            }
+            if (nread < 8)  break;
             /* Read event from wayland  */
             wl_display_dispatch(display);
         }

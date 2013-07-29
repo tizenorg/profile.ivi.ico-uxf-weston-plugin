@@ -13,7 +13,8 @@
       <arg name="appid" type="string" summary="application Id for input switch"/>
       <arg name="device" type="string" summary="input device name"/>
       <arg name="input" type="int" summary="input switch number"/>
-      <arg name="fix" type="uint" summary="fixed assign to application"/>
+      <arg name="fix" type="int" summary="fixed assign to application"/>
+      <arg name="keycode" type="int" summary="switch map to keyboard event"/>
     </request>
 
     <request name="del_input_app">
@@ -24,6 +25,17 @@
       <arg name="device" type="string" summary="input device name, if NULL, all devices with out fixed assign"/>
       <arg name="input" type="int" summary="input switch number, if -1, all input with out dixed assign"/>
     </request>
+
+    <request name="send_input_event">
+      <description summary="send input event to application">
+        Mouse, Touch or Keyboard event sent to application.
+      </description>
+      <arg name="appid" type="string" summary="application Id for input switch"/>
+      <arg name="surfaceid" type="uint" summary="event surface Id"/>
+      <arg name="type" type="int" summary="event device type"/>
+      <arg name="code" type="int" summary="event code"/>
+      <arg name="value" type="int" summary="event value"/>
+    </request>
   </interface>
 
   <interface name="ico_exinput" version="1">
@@ -31,6 +43,23 @@
       Inform the switch name and number which there is for application,
       and notify application of ON/OFF of the switch.
     </description>
+
+    <request name="set_input_region">
+      <arg name="surfaceid" type="uint" summary="target surface"/>
+      <arg name="x" type="int" summary="input region X coordinate"/>
+      <arg name="y" type="int" summary="input region Y coordinate"/>
+      <arg name="width" type="int" summary="input region width"/>
+      <arg name="height" type="int" summary="input region height"/>
+      <arg name="attr" type="int"/>
+    </request>
+
+    <request name="reset_input_region">
+      <arg name="surfaceid" type="uint" summary="target surface"/>
+      <arg name="x" type="int" summary="input region X coordinate"/>
+      <arg name="y" type="int" summary="input region Y coordinate"/>
+      <arg name="width" type="int" summary="input region width"/>
+      <arg name="height" type="int" summary="input region height"/>
+    </request>
 
     <event name="capabilities">
       <description summary="event to application for input switch information">
@@ -80,6 +109,7 @@
       <entry name="keyboard" value="2" summary="wl_keyboard"/>
       <entry name="touch" value="4" summary="wl_touch"/>
       <entry name="switch" value="8" summary="exinput switch"/>
+      <entry name="haptic" value="16" summary="haptic"/>
     </enum>
 
     <request name="configure_input">
@@ -114,6 +144,13 @@
       <arg name="code" type="int" summary="input switch code"/>
       <arg name="state" type="int" summary="Of/Off status"/>
     </request>
+
+    <event name="input_region">
+      <description summary="event to application for change input region">
+        Send input region to haptic controller.
+      </description>
+      <arg name="region" type="array" summary="input regions"/>
+    </event>
   </interface>
 
 </protocol>

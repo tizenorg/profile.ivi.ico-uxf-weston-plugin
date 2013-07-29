@@ -21,7 +21,7 @@
  * OF THIS SOFTWARE.
  */
 /**
- * @brief   HomeScreen for uint test of Weston(Wayland) IVI plugins
+ * @brief   HomeScreen for unit test of Weston(Wayland) IVI plugins
  *
  * @date    Feb-08-2013
  */
@@ -42,19 +42,18 @@
 #include <signal.h>
 #include <linux/input.h>
 #include <wayland-client.h>
-#include "ico_ivi_shell-client-protocol.h"
 #include "ico_window_mgr-client-protocol.h"
 #include "ico_input_mgr-client-protocol.h"
 #include "test-common.h"
 
 #define MAX_APPID   128
-#define ICO_IVI_MAX_COORDINATE  16383
 
 struct surface_name {
     struct surface_name *next;
     int     surfaceid;
     int     pid;
     char    appid[MAX_APPID];
+    int     node;
     int     x;
     int     y;
     int     width;
@@ -69,7 +68,6 @@ struct display {
     struct wl_registry *registry;
     struct wl_compositor *compositor;
     struct wl_shell *shell;
-    struct ico_ivi_shell *ico_ivi_shell;
     struct ico_window_mgr *ico_window_mgr;
     struct ico_input_mgr_control *ico_input_mgr;
     struct ico_input_mgr_device *ico_input_device;
@@ -304,7 +302,7 @@ static const struct wl_surface_listener surface_listener = {
 };
 
 static void
-create_surface(struct display *display)
+create_surface(struct display *display, const char *title)
 {
     struct surface *surface;
     int id;
@@ -321,6 +319,7 @@ create_surface(struct display *display)
             wl_shell_get_shell_surface(display->shell, surface->surface);
         if (surface->shell_surface) {
             wl_shell_surface_set_toplevel(surface->shell_surface);
+            wl_shell_surface_set_title(surface->shell_surface, title);
         }
     }
     wl_display_flush(display->display);
@@ -348,7 +347,7 @@ static void
 clear_surface(struct display *display)
 {
     if (! display->surface) {
-        create_surface(display);
+        create_surface(display, "HomeScreen-BG");
     }
     else    {
         opengl_clear_window(display->init_color);
@@ -364,8 +363,8 @@ output_handle_geometry(void *data, struct wl_output *wl_output, int x, int y,
 {
     struct output *output = data;
 
-    print_log("HOMESCREEN: Event[handle_geometry] x/y=%d/%d p.w/h=%d/%d trans=%d",
-              x, y, physical_width, physical_height, transform);
+    print_log("HOMESCREEN: Event[handle_geometry] %08x x/y=%d/%d p.w/h=%d/%d trans=%d",
+              (int)wl_output, x, y, physical_width, physical_height, transform);
 
     output->x = x;
     output->y = y;
@@ -377,8 +376,8 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
 {
     struct output *output = data;
 
-    print_log("HOMESCREEN: Event[handle_mode] x/y=%d/%d flags=%08x refresh=%d",
-              width, height, flags, refresh);
+    print_log("HOMESCREEN: Event[handle_mode] %08x x/y=%d/%d flags=%08x refresh=%d",
+              (int)wl_output, width, height, flags, refresh);
 
     if (flags & WL_OUTPUT_MODE_CURRENT) {
         struct display  *display = output->display;
@@ -392,11 +391,11 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
         if (display->bgsurface_name)    {
             ico_window_mgr_set_positionsize(display->ico_window_mgr,
                                             display->bgsurface_name->surfaceid,
-                                            0, 0, width, height);
+                                            0, 0, 0, 0, width, height);
         }
         else if (display->bg_created == 0)  {
             display->bg_created = 9;
-            create_surface(output->display);
+            create_surface(display, "HomeScreen-BG");
         }
     }
 }
@@ -435,6 +434,9 @@ search_surfacename(struct display *display, const char *surfname)
         if (strcmp(p->appid, surfname) == 0)    break;
         p = p->next;
     }
+    if (! p)    {
+        print_log("HOMESCREEN: app(%s) dose not exist", surfname);
+    }
     return(p);
 }
 
@@ -455,7 +457,7 @@ search_surfaceid(struct display *display, const int surfaceid)
 
 static void
 window_created(void *data, struct ico_window_mgr *ico_window_mgr,
-               uint32_t surfaceid, int32_t pid, const char *appid)
+               uint32_t surfaceid, const char *winname, int32_t pid, const char *appid)
 {
     struct display *display = data;
     struct surface_name     *p;
@@ -470,12 +472,12 @@ window_created(void *data, struct ico_window_mgr *ico_window_mgr,
         p = p->next;
     }
     if (p)  {
-        print_log("HOMESCREEN: Event[window_created] surface=%08x(app=%s) exist",
-                  (int)surfaceid, appid);
+        print_log("HOMESCREEN: Event[window_created] surface=%08x(app=%s,name=%s) exist",
+                  (int)surfaceid, appid, winname);
     }
     else    {
-        print_log("HOMESCREEN: Event[window_created] new surface=%08x(app=%s)",
-                  (int)surfaceid, appid);
+        print_log("HOMESCREEN: Event[window_created] new surface=%08x(app=%s) winname=%s",
+                  (int)surfaceid, appid, winname);
         p = malloc(sizeof(struct surface_name));
         if (! p)    {
             return;
@@ -495,7 +497,7 @@ window_created(void *data, struct ico_window_mgr *ico_window_mgr,
     /* Set default size and show        */
     if (p->width > 0)   {
         ico_window_mgr_set_positionsize(display->ico_window_mgr, surfaceid,
-                                        p->x, p->y, p->width, p->height);
+                                        0, p->x, p->y, p->width, p->height, 0);
     }
 
     print_log("HOMESCREEN: Created window[%08x] (app=%s)", (int)surfaceid, appid);
@@ -505,13 +507,21 @@ window_created(void *data, struct ico_window_mgr *ico_window_mgr,
         if (display->bg_created == 1)   {
             display->bg_created = 9;
             ico_window_mgr_set_positionsize(display->ico_window_mgr, surfaceid,
-                                            0, 0, display->init_width, display->init_height);
+                                            0, 0, 0,
+                                            display->init_width, display->init_height, 0);
         }
-        ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, 1, 0);
+        ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, 1, 0, 0);
         print_log("HOMESCREEN: Created window[%08x] (app=%s) Visible",
                   (int)surfaceid, appid);
         p->visible = 1;
     }
+}
+
+static void
+window_name(void *data, struct ico_window_mgr *ico_window_mgr,
+            uint32_t surfaceid, const char *winname)
+{
+    print_log("HOMESCREEN: Window Name[%08x] (name=%s)", (int)surfaceid, winname);
 }
 
 static void
@@ -562,51 +572,77 @@ window_visible(void *data, struct ico_window_mgr *ico_window_mgr,
         print_log("HOMESCREEN: Event[window_visible] surface=%08x "
                   "visible=%d raise=%d hint=%d", (int)surfaceid, visible, raise, hint);
         p->visible = visible;
-        if (hint == 0)  {
-            ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, visible, 9);
+        if (hint == 1)  {
+            ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                       visible, ICO_WINDOW_MGR_V_NOCHANGE, 0);
         }
     }
 }
 
 static void
 window_configure(void *data, struct ico_window_mgr *ico_window_mgr,
-                 uint32_t surfaceid, const char *appid, int32_t layer,
+                 uint32_t surfaceid, uint32_t node, uint32_t layer,
                  int32_t x, int32_t y, int32_t width, int32_t height, int32_t hint)
 {
     struct display *display = data;
     struct surface_name     *p;
 
     print_log("HOMESCREEN: Event[window_configure] surface=%08x "
-              "app=%s x/y=%d/%d w/h=%d/%d hint=%d",
-              (int)surfaceid, appid, x, y, width, height, hint);
+              "node=%x x/y=%d/%d w/h=%d/%d hint=%d",
+              (int)surfaceid, node, x, y, width, height, hint);
 
     p = search_surfaceid(display, (int)surfaceid);
     if (! p)    {
-        print_log("HOMESCREEN: Event[window_configure] surface=%08x(app=%s) new create",
-                  (int)surfaceid, appid);
-        window_created(data, ico_window_mgr, surfaceid, 0, appid);
-        p = search_surfaceid(display, (int)surfaceid);
-        if (! p)    {
-            print_log("HOMESCREEN: Event[window_configure] can not make table");
-            return;
-        }
+        print_log("HOMESCREEN: Event[window_configure] surface=%08x dose not exist",
+                  (int)surfaceid);
+    }
+    else    {
+        p->node = node;
     }
 }
 
 static void
+window_layer_visible(void *data, struct ico_window_mgr *ico_window_mgr,
+                     uint32_t layer, int32_t visible)
+{
+    print_log("HOMESCREEN: Event[layer_visible]layer=%x visible=%d",
+              (int)layer, visible);
+}
+
+static void
 window_active(void *data, struct ico_window_mgr *ico_window_mgr,
-              uint32_t surfaceid, const uint32_t active)
+              uint32_t surfaceid, const int32_t active)
 {
     print_log("HOMESCREEN: Event[window_active] surface=%08x acive=%d",
               (int)surfaceid, (int)active);
 }
 
+static void
+window_surfaces(void *data, struct ico_window_mgr *ico_window_mgr,
+                const char *appid, struct wl_array *surfaces)
+{
+    print_log("HOMESCREEN: Event[app_surfaces] app=%s", appid);
+}
+
+static void
+window_map(void *data, struct ico_window_mgr *ico_window_mgr,
+            int32_t event, uint32_t surfaceid,
+            int32_t width, int32_t height, int32_t stride, int32_t format)
+{
+    print_log("HOMESCREEN: Event[map_surface] ev=%d surf=%08x w/h/s/f=%d/%d/%d/%x",
+              event, (int)surfaceid, width, height, stride, format);
+}
+
 static const struct ico_window_mgr_listener window_mgr_listener = {
     window_created,
+    window_name,
     window_destroyed,
     window_visible,
     window_configure,
-    window_active
+    window_active,
+    window_layer_visible,
+    window_surfaces,
+    window_map
 };
 
 static void
@@ -677,17 +713,13 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
         display->shell =
             wl_registry_bind(display->registry, id, &wl_shell_interface, 1);
     }
-    else if (strcmp(interface, "ico_ivi_shell") == 0)   {
-        display->ico_ivi_shell =
-            wl_registry_bind(display->registry, id, &ico_ivi_shell_interface, 1);
-    }
     else if (strcmp(interface, "ico_window_mgr") == 0)  {
         display->ico_window_mgr =
             wl_registry_bind(display->registry, id, &ico_window_mgr_interface, 1);
         ico_window_mgr_add_listener(display->ico_window_mgr, &window_mgr_listener, display);
         print_log("HOMESCREEN: created window_mgr global %p", display->ico_window_mgr);
 
-        ico_window_mgr_set_eventcb(display->ico_window_mgr, 1);
+        ico_window_mgr_declare_manager(display->ico_window_mgr, 1);
     }
     else if (strcmp(interface, "ico_input_mgr_control") == 0)   {
         display->ico_input_mgr = wl_registry_bind(display->registry, id,
@@ -705,10 +737,10 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
         ico_exinput_add_listener(display->ico_exinput, &exinput_listener, display);
         print_log("HOMESCREEN: created exinput global %p", display->ico_exinput);
 
-        ico_window_mgr_set_eventcb(display->ico_window_mgr, 1);
+        ico_window_mgr_declare_manager(display->ico_window_mgr, 1);
 
         display->bg_created = 1;
-        create_surface(display);
+        create_surface(display, "HomeScreen-BG");
     }
 }
 
@@ -778,7 +810,10 @@ kill_app(struct display *display, char *buf)
     narg = pars_command(buf, args, 10);
     if (narg >= 1)  {
         p = search_surfacename(display, args[0]);
-        if (kill(p->pid, SIGINT) < 0)   {
+        if (! p)    {
+            print_log("HOMESCREEN: kill[%s] Application dose not exist", args[0]);
+        }
+        else if (kill(p->pid, SIGINT) < 0)   {
             print_log("HOMESCREEN: kill[%s.%d] Application dose not exist",
                       p->appid, p->pid);
         }
@@ -846,22 +881,38 @@ static void
 positionsize_surface(struct display *display, char *buf)
 {
     char    *args[10];
+    struct surface_name     *p;
     int     narg;
     int     surfaceid;
     int     x, y, width, height;
+    int     anima = 0;
+    int     node = 0;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 5)  {
         surfaceid = search_surface(display, args[0]);
+        p = search_surfacename(display, args[0]);
         x = strtol(args[1], (char **)0, 0);
         y = strtol(args[2], (char **)0, 0);
         width = strtol(args[3], (char **)0, 0);
         height = strtol(args[4], (char **)0, 0);
+        if (narg >= 6)  {
+            node = strtol(args[5], (char **)0, 0);
+            if (p)  {
+                p->node = node;
+            }
+        }
+        else if (p) {
+            node = p->node;
+        }
+        if (narg >= 7)  {
+            anima = strtol(args[6], (char **)0, 0);
+        }
         if ((surfaceid >= 0) && (x >= 0) && (y >=0) && (width >= 0) && (height >=0))    {
-            print_log("HOMESCREEN: set_positionsize(%s,%08x,%d,%d,%d,%d)",
-                      args[0], surfaceid, x, y, width, height);
+            print_log("HOMESCREEN: set_positionsize(%s,%08x,%d,%d,%d,%d,%d)",
+                      args[0], surfaceid, node, x, y, width, height);
             ico_window_mgr_set_positionsize(display->ico_window_mgr, surfaceid,
-                                            x, y, width, height);
+                                            node, x, y, width, height, anima);
         }
         else    {
             print_log("HOMESCREEN: Unknown surface(%s) at positionsize command", args[0]);
@@ -869,7 +920,7 @@ positionsize_surface(struct display *display, char *buf)
     }
     else    {
         print_log("HOMESCREEN: positionsize command"
-                  "[positionsize appid x y width heigh] has no argument");
+                  "[positionsize appid x y width heigh node anima] has no argument");
     }
 }
 
@@ -877,28 +928,46 @@ static void
 move_surface(struct display *display, char *buf)
 {
     char    *args[10];
+    struct surface_name     *p;
     int     narg;
     int     surfaceid;
     int     x, y;
+    int     anima = 0;
+    int     node = 0;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 3)  {
         surfaceid = search_surface(display, args[0]);
+        p = search_surfacename(display, args[0]);
         x = strtol(args[1], (char **)0, 0);
         y = strtol(args[2], (char **)0, 0);
+        if (narg >= 4)  {
+            node = strtol(args[3], (char **)0, 0);
+            if (p)  {
+                p->node = node;
+            }
+        }
+        else if (p) {
+            node = p->node;
+        }
+        if (narg >= 5)  {
+            anima = strtol(args[4], (char **)0, 0);
+        }
+
         if ((surfaceid >= 0) && (x >= 0) && (y >=0))    {
-            print_log("HOMESCREEN: move(%s,%08x,%d,%d)", args[0], surfaceid, x, y);
+            print_log("HOMESCREEN: move(%s,%08x,%d.%d,%d anima=%d)", args[0], surfaceid,
+                      node, x, y, anima);
             ico_window_mgr_set_positionsize(display->ico_window_mgr, surfaceid,
-                                            x, y,
-                                            ICO_IVI_MAX_COORDINATE+1,
-                                            ICO_IVI_MAX_COORDINATE+1);
+                                            node, x, y,
+                                            ICO_WINDOW_MGR_V_NOCHANGE,
+                                            ICO_WINDOW_MGR_V_NOCHANGE, anima);
         }
         else    {
             print_log("HOMESCREEN: Unknown surface(%s) at move command", args[0]);
         }
     }
     else    {
-        print_log("HOMESCREEN: move command[positionsize appid x y] has no argument");
+        print_log("HOMESCREEN: move command[positionsize appid x y node anima] has no argument");
     }
 }
 
@@ -906,21 +975,32 @@ static void
 resize_surface(struct display *display, char *buf)
 {
     char    *args[10];
+    struct surface_name     *p;
     int     narg;
     int     surfaceid;
     int     width, height;
+    int     anima = 0;
+    int     node = 0;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 3)  {
         surfaceid = search_surface(display, args[0]);
+        p = search_surfacename(display, args[0]);
+        if (p)  {
+            node = p->node;
+        }
         width = strtol(args[1], (char **)0, 0);
         height = strtol(args[2], (char **)0, 0);
+        if (narg >= 4)  {
+            anima = strtol(args[3], (char **)0, 0);
+        }
+
         if ((surfaceid >= 0) && (width >= 0) && (height >=0))   {
-            print_log("HOMESCREEN: resize(%s,%08x,%d,%d)",
-                      args[0], surfaceid, width, height);
+            print_log("HOMESCREEN: resize(%s,%08x,%d.%d,%d,anima=%d)",
+                      args[0], surfaceid, node, width, height, anima);
             ico_window_mgr_set_positionsize(display->ico_window_mgr, surfaceid,
-                                            ICO_IVI_MAX_COORDINATE+1,
-                                            ICO_IVI_MAX_COORDINATE+1, width, height);
+                                            node, ICO_WINDOW_MGR_V_NOCHANGE,
+                                            ICO_WINDOW_MGR_V_NOCHANGE, width, height, anima);
         }
         else    {
             print_log("HOMESCREEN: Unknown surface(%s) at resize command", args[0]);
@@ -928,7 +1008,7 @@ resize_surface(struct display *display, char *buf)
     }
     else    {
         print_log("HOMESCREEN: positionsize command"
-                  "[resize appid width heigh] has no argument");
+                  "[resize appid width heigh anima] has no argument");
     }
 }
 
@@ -940,16 +1020,21 @@ visible_surface(struct display *display, char *buf)
     int     surfaceid;
     int     visible;
     int     raise;
+    int     anima = 0;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 3)  {
         surfaceid = search_surface(display, args[0]);
         visible = strtol(args[1], (char **)0, 0);
         raise = strtol(args[2], (char **)0, 0);
+        if (narg >= 4)  {
+            anima = strtol(args[3], (char **)0, 0);
+        }
         if ((surfaceid >= 0) && (visible >= 0) && (raise >=0))  {
-            print_log("HOMESCREEN: visible(%s,%08x,%d,%d)",
-                      args[0], surfaceid, visible, raise);
-            ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, visible, raise);
+            print_log("HOMESCREEN: visible(%s,%08x,%d,%d,%d)",
+                      args[0], surfaceid, visible, raise, anima);
+            ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                       visible, raise, anima);
         }
         else    {
             print_log("HOMESCREEN: Unknown surface(%s) at visible command", args[0]);
@@ -967,18 +1052,24 @@ show_surface(struct display *display, char *buf, const int show)
     char    *args[10];
     int     narg;
     int     surfaceid;
+    int     anima = 0;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 1)  {
         surfaceid = search_surface(display, args[0]);
+        if (narg >= 2)  {
+            anima = strtol(args[1], (char **)0, 0);
+        }
         if (surfaceid >= 0) {
             if (show)   {
-                print_log("HOMESCREEN: show(%s,%08x)", args[0], surfaceid);
-                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, 1, 9);
+                print_log("HOMESCREEN: show(%s,%08x,anima=%d)", args[0], surfaceid, anima);
+                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                           1, ICO_WINDOW_MGR_V_NOCHANGE, anima);
             }
             else    {
-                print_log("HOMESCREEN: hide(%s,%08x)", args[0], surfaceid);
-                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, 0, 9);
+                print_log("HOMESCREEN: hide(%s,%08x,anima=%d)", args[0], surfaceid, anima);
+                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                           0, ICO_WINDOW_MGR_V_NOCHANGE, anima);
             }
         }
         else    {
@@ -986,7 +1077,7 @@ show_surface(struct display *display, char *buf, const int show)
         }
     }
     else    {
-        print_log("HOMESCREEN: show command[show/hide appid] has no argument");
+        print_log("HOMESCREEN: show command[show/hide appid anima] has no argument");
     }
 }
 
@@ -996,18 +1087,24 @@ raise_surface(struct display *display, char *buf, const int raise)
     char    *args[10];
     int     narg;
     int     surfaceid;
+    int     anima = 0;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 1)  {
         surfaceid = search_surface(display, args[0]);
+        if (narg >= 2)  {
+            anima = strtol(args[1], (char **)0, 0);
+        }
         if (surfaceid >= 0) {
             if (raise)  {
-                print_log("HOMESCREEN: raise(%s,%08x)", args[0], surfaceid);
-                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, 9, 1);
+                print_log("HOMESCREEN: raise(%s,%08x,anima=%d)", args[0], surfaceid, anima);
+                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                           ICO_WINDOW_MGR_V_NOCHANGE, 1, anima);
             }
             else    {
-                print_log("HOMESCREEN: lower(%s,%08x)", args[0], surfaceid);
-                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid, 9, 0);
+                print_log("HOMESCREEN: lower(%s,%08x,anima=%d)", args[0], surfaceid, anima);
+                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                           ICO_WINDOW_MGR_V_NOCHANGE, 0, anima);
             }
         }
         else    {
@@ -1015,7 +1112,7 @@ raise_surface(struct display *display, char *buf, const int raise)
         }
     }
     else    {
-        print_log("HOMESCREEN: show command[raise/lower appid] has no argument");
+        print_log("HOMESCREEN: show command[raise/lower appid anima] has no argument");
     }
 }
 
@@ -1039,7 +1136,7 @@ animation_surface(struct display *display, char *buf)
             }
             print_log("HOMESCREEN: animation(%s,%08x,%s,%d)",
                       args[0], surfaceid, args[1], time);
-            ico_window_mgr_set_animation(display->ico_window_mgr, surfaceid,
+            ico_window_mgr_set_animation(display->ico_window_mgr, surfaceid, 0x7fffffff,
                                          args[1], time);
         }
         else    {
@@ -1093,7 +1190,7 @@ input_add(struct display *display, char *buf)
             print_log("HOMESCREEN: input_add(%s.%d to %s[%d])",
                       args[0], input, args[2], fix);
             ico_input_mgr_control_add_input_app(display->ico_input_mgr,
-                                                args[2], args[0], input, fix);
+                                                args[2], args[0], input, fix, 0);
         }
         else    {
             print_log("HOMESCREEN: Unknown input(%s) at input_add command", args[1]);

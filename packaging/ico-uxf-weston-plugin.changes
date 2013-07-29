@@ -1,3 +1,13 @@
+* Mon Jul 29 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130612.174820@2b428f3
+- 0.7.01 release
+- Following corrections for TizenIVI 3.0M1.
+-- Correspondence to version up of Wayland/Weston(1.1.x => 1.2.0).
+-- A change and the addition of the Wayland expansion protocol for referencePF version 0.9.
+-- Correspondence to start method of TizenIVI 3.0(system V => systemd).
+
+- 0.5.07 release
+- fix for - When application generated Surface, ico_ivi_shell may not notify application of configure event.
+
 * Wed Jun 12 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/2.0alpha-wayland/20130612.051916@5247a37
 - 0.5.06 release
 - fixed for - weston loop forever when a fading animation is required in an animation of the fading again by same surface.
@@ -43,4 +53,3 @@
 
 * Fri Apr 26 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> 3224fe9
 - Import initial.
-

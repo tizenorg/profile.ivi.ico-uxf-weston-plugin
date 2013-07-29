@@ -1,50 +1,47 @@
 #!/bin/sh
 #
-#	Weston IVI Plugin Test (Resize Buf test)
+#	Weston IVI Plugin Test
 #
 #	  Remark: This examination premises that Weston does not run.
 
 # 1 Delete log file
-if [ -d ../tests/testlog ] ; then
-	rm -fr ../tests/testlog/*
-else
-	mkdir ../tests/testlog
-fi
+mkdir ../tests/testlog 2> /dev/null
+rm -fr ../tests/testlog/* 2> /dev/null
 
-# 2 Weston/Wayland Envionment
-export XDG_RUNTIME_DIR=/tmp/run-root
+# 2 Start Pseudo event device (for Touch Panel)
+../tests/test-send_event -d -mq=5551 2> ../tests/testlog/event_log.log &
+sleep 1
+
+# 3 Weston/Wayland Envionment
 export QT_QPA_PLATFORM=wayland
-export ELM_ENGINE=wayland_egl
-export ECORE_EVAS_ENGINE=wayland_egl
-#export ELM_ENGINE=wayland_shm
-#export ECORE_EVAS_ENGINE=wayland_shm
-export EVAS_FONT_DPI=72
-export ECORE_IMF_MODULE=isf
-export ELM_MODULES="ctxpopup_copypasteUI>entry/api:datetime_input_ctxpopup>datetime/api"
-export ELM_SCALE="0.7"
-export ELM_PROFILE=mobile
+#export ELM_ENGINE=wayland_egl
+#export ECORE_EVAS_ENGINE=wayland_egl
+export ELM_ENGINE=wayland_shm
+export ECORE_EVAS_ENGINE=wayland_shm
+export XDG_RUNTIME_DIR=/run/user/5000
 
-# 3 Set Environment for Test
+# 4 Set Environment for Test
 export WESTON_IVI_PLUGIN_DIR="../src/.libs"
 
-# 4 Start Weston
+# 5 Start Weston
 export XDG_CONFIG_HOME="../tests"
 MOD_DIR="$PWD/../src/.libs"
-/usr/bin/weston --backend=drm-backend.so --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 --log=../tests/testlog/weston.log &
+/usr/bin/weston --backend=fbdev-backend.so --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 --log=../tests/testlog/weston.log &
 sleep 1
 
-# 5 Set library path
+# 6 Set library path
 export LD_LIBRARY_PATH=../src/.libs:$LD_LIBRARY_PATH
 
-# 6 Start test-homescreen
-../tests/test-homescreen < ../tests/testdata/hs_slide.dat 2> ../tests/testlog/test-homescreen.log
+# 7 Start test-homescreen
+../tests/test-homescreen < ../tests/testdata/hs_alltest.dat 2> ../tests/testlog/test-homescreen.log
 
-# 7 End of Test
-sleep 1
+# 8 End of Test
+sleep 2
 /usr/bin/killall weston
+/usr/bin/killall test-send_event
 sleep 1
 
-# 8 Check Error
+# 9 Check Error
 FOUND_ERR=0
 /bin/grep "ERR>" testlog/*
 if [ "$?" != "1" ] ; then

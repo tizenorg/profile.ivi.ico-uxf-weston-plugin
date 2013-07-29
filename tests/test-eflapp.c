@@ -51,6 +51,7 @@ main(int argc, char *argv[])
     int     height;
     unsigned int    color;
     int     r, g, b, a;
+    int     rr, gg, bb;
     int     appno = 1;
     char    sTitle[64];
 
@@ -86,22 +87,20 @@ main(int argc, char *argv[])
     ecore_evas_callback_resize_set(ee, _resize_cb);
 
     ecore_evas_callback_delete_request_set(ee, _on_destroy);
-    sprintf(sTitle, "EFL Native Application %d", appno);
+    sprintf(sTitle, "EFL_Native_Application_%d", appno);
     ecore_evas_title_set(ee, sTitle);
     ecore_evas_show(ee);
 
     canvas = ecore_evas_get(ee);
 
     bg = evas_object_rectangle_add(canvas);
-    r = (color>>16)&0x0ff;
-    g = (color>>8)&0x0ff;
-    b = color&0x0ff;
+    rr = (color>>16)&0x0ff;
+    gg = (color>>8)&0x0ff;
+    bb = color&0x0ff;
     a = (color>>24)&0x0ff;
-    if (a != 255)   {
-        r = (r * a) / 255;
-        g = (g * a) / 255;
-        b = (b * a) / 255;
-    }
+    r = (rr * a) / 255;
+    g = (gg * a) / 255;
+    b = (bb * a) / 255;
     evas_object_color_set(bg, r, g, b, a); /* bg color */
     evas_object_move(bg, 0, 0); /* at origin */
     evas_object_resize(bg, width, height); /* covers full canvas */
@@ -132,19 +131,22 @@ main(int argc, char *argv[])
     ecore_evas_resize(sub_ee, ((2 * width) / 3) - 6, ((2 * height) / 3) - 6);
 
     r1 = evas_object_rectangle_add(sub_canvas);
-    evas_object_color_set(r1, g, b, r, 255);
+    evas_object_color_set(r1, gg, bb, rr, 255);
     evas_object_move(r1, 10, 10);
     evas_object_resize(r1, 100, 100);
     evas_object_show(r1);
 
     r2 = evas_object_rectangle_add(sub_canvas);
-    evas_object_color_set(r2, b/2, g/2, r/2, 128);
+    r = rr * 128 / 256;
+    g = gg * 128 / 256;
+    b = bb * 128 / 256;
+    evas_object_color_set(r2, b, g, r, 128);
     evas_object_move(r2, 10, 10);
     evas_object_resize(r2, 50, 50);
     evas_object_show(r2);
 
     r3 = evas_object_rectangle_add(sub_canvas);
-    evas_object_color_set(r3, b, r, g, 255);
+    evas_object_color_set(r3, bb, rr, gg, 255);
     evas_object_move(r3, 60, 60);
     evas_object_resize(r3, 50, 50);
     evas_object_show(r3);

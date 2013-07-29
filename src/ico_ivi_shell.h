@@ -24,7 +24,7 @@
 /**
  * @brief   Public functions in ico_ivi_shell Weston plugin
  *
- * @date    Feb-08-2013
+ * @date    Jul-26-2013
  */
 
 #ifndef _ICO_IVI_SHELL_H_
@@ -32,55 +32,30 @@
 
 struct shell_surface;
 
-/* max length                           */
-#define ICO_WINDOW_ANIMATION_LEN    20          /* length of window animation name  */
-/* option flag                          */
-#define ICO_OPTION_FLAG_UNVISIBLE   0x00000001  /* unvisible control    */
-/* client attribute                     */
-#define ICO_CLEINT_ATTR_NOCONFIGURE 0           /* client no need configure event   */
-
 /* Prototype for get/set function       */
-void ivi_shell_set_layer(struct shell_surface *shsurf, const int layer);
-bool ivi_shell_is_visible(struct shell_surface *shsurf);
-void ivi_shell_set_visible(struct shell_surface *shsurf, const int visible);
-void ivi_shell_set_raise(struct shell_surface *shsurf, const int raise);
-void ivi_shell_set_toplevel(struct shell_surface *shsurf);
-void ivi_shell_set_surface_type(struct shell_surface *shsurf);
-void ivi_shell_send_configure(struct shell_surface *shsurf, const int id,
-                              const int edges, const int width, const int height);
-void ivi_shell_get_positionsize(struct shell_surface *shsurf, int *x,
-                                int *y, int *width, int *height);
-void ivi_shell_set_positionsize(struct shell_surface *shsurf, const int x,
-                                const int y, const int width, const int height);
-void ivi_shell_set_layer_visible(const int layer, const int visible);
-void ivi_shell_surface_configure(struct shell_surface *shsurf, const int x,
-                                 const int y, const int width, const int height);
-void ivi_shell_set_active(struct shell_surface *shsurf, const int target);
-void ivi_shell_set_client_attr(struct wl_client *client, const int attr, const int value);
-void ivi_shell_restrain_configure(struct shell_surface *shsurf, const int restrain);
-int ivi_shell_is_restrain(struct shell_surface *shsurf);
-const char *ivi_shell_default_animation(int *msec, int *fps);
+struct weston_layer *ico_ivi_shell_current_layer(void);
+void ico_ivi_shell_set_toplevel(struct shell_surface *shsurf);
+void ico_ivi_shell_set_surface_type(struct shell_surface *shsurf);
+void ico_ivi_shell_send_configure(struct weston_surface *surface,
+                                  const uint32_t edges, const int width, const int height);
+void ico_ivi_shell_startup(void *shell);
 
 /* Prototypr for hook routine           */
-void ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client));
-void ivi_shell_hook_unbind(void (*hook_unbind)(struct wl_client *client));
-void ivi_shell_hook_create(void (*hook_create)(struct wl_client *client,
+void ico_ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client, void *shell));
+void ico_ivi_shell_hook_unbind(void (*hook_unbind)(struct wl_client *client));
+void ico_ivi_shell_hook_create(void (*hook_create)(struct wl_client *client,
                             struct wl_resource *resource, struct weston_surface *surface,
                             struct shell_surface *shsurf));
-void ivi_shell_hook_destroy(void (*hook_destroy)(struct weston_surface *surface));
-void ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
+void ico_ivi_shell_hook_destroy(void (*hook_destroy)(struct weston_surface *surface));
+void ico_ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
                             int32_t *width, int32_t *height, int32_t *sx, int32_t *sy));
-void ivi_shell_hook_change(void (*hook_change)(struct weston_surface *surface,
+void ico_ivi_shell_hook_change(void (*hook_change)(struct weston_surface *surface,
                             const int to, const int manager));
-void ivi_shell_hook_select(void (*hook_select)(struct weston_surface *surface));
-
-/* Prototype for hook of Multi Input Manager    */
-void ico_win_mgr_hook_set_user(void (*hook_set_user)(struct wl_client *client,
-                                                    const char *appid));
-void ico_win_mgr_hook_create(void (*hook_create)(struct wl_client *client,
-                                                 struct weston_surface *surface,
-                                                 int surfaceId,
-                                                 const char *appid));
-void ico_win_mgr_hook_destroy(void (*hook_destroy)(struct weston_surface *surface));
+void ico_ivi_shell_hook_select(void (*hook_select)(struct weston_surface *surface));
+void ico_ivi_shell_hook_title(void (*hook_title)(struct weston_surface *surface,
+                            const char *title));
+void ico_ivi_shell_hook_move(void (*hook_move)(struct weston_surface *surface,
+                            int *dx, int *dy));
 
 #endif  /*_ICO_IVI_SHELL_H_*/
+

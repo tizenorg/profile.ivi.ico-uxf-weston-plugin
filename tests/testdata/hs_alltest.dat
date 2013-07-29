@@ -5,7 +5,7 @@
 launch ../tests/test-client < ../tests/testdata/cl_surface1.dat 2> ../tests/testlog/test-client01.log
 waitcreate 2
 show test-client
-sleep 2
+sleep 4
 waitdestroy 60
 sleep 1
 #
@@ -16,13 +16,13 @@ resize test-client 600 400
 move test-client 300 100
 show test-client
 sleep 1
-move test-client 320 120
+move test-client 400 150
 sleep 0.5
-move test-client 340 140
+move test-client 500 200
 sleep 0.5
-move test-client 360 160
+move test-client 600 250
 sleep 0.5
-move test-client 380 180
+move test-client 700 300
 sleep 0.5
 hide test-client
 sleep 1
@@ -45,56 +45,114 @@ sleep 1
 waitdestroy 60
 sleep 1
 #
-#	3. Launch Weston sample client
-launch /usr/bin/wayland-flower 2> ../tests/testlog/wayland-flower.log
+#	3. Surface animation
+launch ../tests/test-client < ../tests/testdata/cl_surface4.dat 2> ../tests/testlog/test-client04.log
 waitcreate 2
-move wayland-flower 200 100
-show wayland-flower
+resize test-client 200 300
+move test-client 400 250 0
+#
+# fade and show/hide
+animation test-client fade 400
+show test-client 1
+sleep 0.7
+hide test-client 1
 sleep 1
-resize wayland-flower 500 400
+#
+# slide.toleft and show/hide
+animation test-client slide.toleft 400
+show test-client 1
+sleep 0.7
+hide test-client 1
+sleep 1
+#
+# slide.toright and show/hide
+animation test-client slide.toright 400
+show test-client 1
+sleep 0.7
+hide test-client 1
+sleep 1
+#
+# slide.totop and show/hide
+animation test-client slide.totop 400
+show test-client 1
+sleep 0.7
+hide test-client 1
+sleep 1
+#
+# slide.tobottom and show/hide
+animation test-client slide.tobottom 400
+show test-client 1
+sleep 0.7
+hide test-client 1
+sleep 1
+#
+# zoom and show/hide
+animation test-client zoom 400
+show test-client 1
+sleep 0.7
+hide test-client 1
 sleep 2
-kill wayland-flower
+#
+# fade and move
+animation test-client fade 600
+move test-client 600 200 1
+sleep 1
+move test-client 500 300 1
 sleep 1
 #
-launch /usr/bin/wayland-smoke 2> ../tests/testlog/wayland-smoke.log
-waitcreate 2
-move wayland-smoke 100 50
-show wayland-smoke
-sleep 0.3
-event XY=168,93
-event Button=Down
-sleep 0.1
-event XY=151,88
-event Button=Up
-sleep 1
-resize wayland-smoke 400 400
-sleep 0.3
-event XY=457,211
-event Button=Down
-sleep 0.1
-event XY=457,209
-event Button=Up
-sleep 1
-resize wayland-smoke 300 600
-sleep 0.4
-event XY=250,495
-event Button=Down
-sleep 0.2
-event XY=246,498
-event Button=Up
-sleep 0.8
-resize wayland-smoke 450 300
-sleep 0.3
-event XY=511,296
-event Button=Down
-sleep 0.1
-event XY=R508,300
-event Button=Up
-sleep 1
-kill wayland-smoke
+waitdestroy 60
 sleep 1
 #
-#	4. Set Layer
+#	4. Launch Weston sample client
+#launch /usr/bin/wayland-flower 2> ../tests/testlog/wayland-flower.log
+#waitcreate 2
+#move wayland-flower 200 100
+#show wayland-flower
+#sleep 1
+#resize wayland-flower 500 400
+#sleep 2
+#kill wayland-flower
+#sleep 1
+#
+#launch /usr/bin/wayland-smoke 2> ../tests/testlog/wayland-smoke.log
+#waitcreate 2
+#move wayland-smoke 100 50
+#show wayland-smoke
+#sleep 0.3
+#event XY=168,93
+#event Button=Down
+#sleep 0.1
+#event XY=151,88
+#event Button=Up
+#sleep 1
+#resize wayland-smoke 400 400
+#sleep 0.3
+#event XY=457,211
+#event Button=Down
+#sleep 0.1
+#event XY=457,209
+#event Button=Up
+#sleep 1
+#resize wayland-smoke 300 600
+#sleep 0.4
+#event XY=250,495
+#event Button=Down
+#sleep 0.2
+#event XY=246,498
+#event Button=Up
+#sleep 0.8
+#resize wayland-smoke 450 300
+#sleep 0.3
+#event XY=511,296
+#event Button=Down
+#sleep 0.1
+#event XY=R508,300
+#event Button=Up
+#sleep 1
+#kill wayland-smoke
+#sleep 1
+#
+#	5. Set Layer
 launch ../tests/test-eflapp @1 -color=0xe02040ff > ../tests/testlog/test-eflapp1.log
 waitcreate 2
 layer test-eflapp@1 101
@@ -135,16 +193,16 @@ show test-eflapp@2
 sleep 2
 #
 #	resize EFL application
-resize test-eflapp@2 200 300
+resize test-eflapp@2 300 300
 sleep 1
 resize test-eflapp@3 720 520
 sleep 1
 resize test-eflapp@3 520 380
 sleep 1
 resize test-eflapp@2 520 380
-sleep 1
+sleep 2
 #
-#	5. Raise/Lower
+#	6. Raise/Lower
 raise test-eflapp@3
 sleep 1
 raise test-eflapp@4
@@ -158,18 +216,18 @@ sleep 1
 lower test-eflapp@3
 sleep 2
 #
-#	6. Layer Change
+#	7. Layer Change
 layer test-eflapp@1 100
 sleep 1
 layer test-eflapp@2 100
 sleep 2
 #
-#	7. layer visibility control
+#	8. layer visibility control
 layer_visible 102 0
 sleep 1
 layer_visible 102 1
 sleep 1
-#	8. kill eflapp's
+#	9. kill eflapp's
 kill test-eflapp@1
 sleep 0.5
 kill test-eflapp@2
@@ -181,12 +239,12 @@ sleep 0.5
 kill test-eflapp@5
 sleep 2
 #
-#	9. Input test
+#	10. Input test
 launch ../tests/test-client @1 -color=0xe0ff2020 -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client11.log
 waitcreate 2
 sleep 0.3
 layer test-client@1 101
-move test-client@1 100 200
+move test-client@1 100 200 1
 show test-client@1
 sleep 0.5
 event XY=240,303
@@ -200,7 +258,7 @@ launch ../tests/test-client @2 -color=0xc020ff20 -postsleep=60 < ../tests/testda
 waitcreate 2
 sleep 0.3
 layer test-client@2 101
-move test-client@2 250 300
+move test-client@2 250 300 1
 show test-client@2
 sleep 0.5
 event XY=625,555
@@ -214,7 +272,7 @@ launch ../tests/test-client @3 -color=0xa02020ff -postsleep=60 < ../tests/testda
 waitcreate 2
 sleep 0.3
 layer test-client@3 101
-move test-client@3 400 400
+move test-client@3 400 400 1
 show test-client@3
 sleep 0.5
 event XY=848,663
@@ -337,6 +395,6 @@ sleep 0.3
 kill test-client@3
 sleep 0.5
 #
-#	10. End of Test
+#	11. End of Test
 bye
 

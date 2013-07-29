@@ -1,22 +1,25 @@
 Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
-Version:    0.5.06
+Version:    0.7.01
 Release:    1.1
 Group:      System/GUI/Libraries
 License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(weston) >= 1.0.6
+BuildRequires: pkgconfig(weston) >= 1.2
+BuildRequires: pkgconfig(pixman-1)
+BuildRequires: pkgconfig(xkbcommon) >= 0.0.578
 BuildRequires: pkgconfig(eina)
 BuildRequires: pkgconfig(evas)
 BuildRequires: pkgconfig(eina)
 BuildRequires: pkgconfig(elementary)
 BuildRequires: pkgconfig(ecore-wayland)
+BuildRequires: mesa-devel
 BuildRequires: aul-devel
 BuildRequires: ecore-devel
-BuildRequires: weston-devel
-Requires: weston >= 1.0.6
+BuildRequires: weston-devel >= 1.2
+Requires: weston >= 1.2
 
 %description
 Weston Plugins for IVI
@@ -47,20 +50,27 @@ rm -rf %{buildroot}
 # configurations
 %define weston_conf %{_sysconfdir}/xdg/weston
 mkdir -p %{buildroot}%{weston_conf} > /dev/null 2>&1
-install -m 0644 weston.ini %{buildroot}%{weston_conf}
-install -m 0644 weston_ivi_plugin.ini %{buildroot}%{weston_conf}
+install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
+mkdir -p %{buildroot}%{_sysconfdir}/profile.d/
+install -m 0644 settings/ico_weston.sh  %{buildroot}%{_sysconfdir}/profile.d/
+install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
 
 %files
 %defattr(-,root,root,-)
 %dir %{_libdir}/weston/
 %{_libdir}/weston/*.so
 %{_libdir}/libico-uxf-weston-plugin.so.*
-%config(noreplace) %{weston_conf}/weston.ini
-%config(noreplace) %{weston_conf}/weston_ivi_plugin.ini
+%{weston_conf}/weston.ini
+%{_sysconfdir}/profile.d/ico_weston.sh
+%{_sysconfdir}/profile.d/ico_weston.csh
 
 %files devel
 %defattr(-,root,root,-)
+%{_includedir}/%{name}/desktop-shell-client-protocol.h
+%{_includedir}/%{name}/input-method-client-protocol.h
+%{_includedir}/%{name}/workspaces-client-protocol.h
 %{_includedir}/%{name}/ico_input_mgr-client-protocol.h
-%{_includedir}/%{name}/ico_ivi_shell-client-protocol.h
 %{_includedir}/%{name}/ico_window_mgr-client-protocol.h
+%{_includedir}/%{name}/ico_input_mgr.h
 %{_libdir}/libico-uxf-weston-plugin.so
+

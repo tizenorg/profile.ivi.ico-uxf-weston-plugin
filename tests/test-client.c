@@ -21,7 +21,7 @@
  * OF THIS SOFTWARE.
  */
 /**
- * @brief   Wayland Application for uint test of Weston(Wayland) IVI plugins
+ * @brief   Wayland Application for unit test of Weston(Wayland) IVI plugins
  *
  * @date    Feb-08-2013
  */
@@ -34,7 +34,6 @@
 #include <poll.h>
 #include <wayland-client.h>
 #include <linux/input.h>
-#include "ico_ivi_shell-client-protocol.h"
 #include "ico_window_mgr-client-protocol.h"
 #include "ico_input_mgr-client-protocol.h"
 #include "test-common.h"
@@ -46,7 +45,6 @@ struct display {
     struct wl_registry *registry;
     struct wl_compositor *compositor;
     struct wl_shell *shell;
-    struct ico_ivi_shell *ico_ivi_shell;
     struct ico_window_mgr *ico_window_mgr;
     struct ico_exinput *ico_exinput;
     struct input *input;
@@ -266,8 +264,8 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
 {
     struct output *output = data;
 
-    print_log("CLIENT: Event[handle_mode] x/y=%d/%d flags=%08x refresh=%d",
-              width, height, flags, refresh);
+    print_log("CLIENT: Event[handle_mode] %08x x/y=%d/%d flags=%08x refresh=%d",
+              (int)wl_output, width, height, flags, refresh);
 
     if (flags & WL_OUTPUT_MODE_CURRENT) {
         output->width = width;
@@ -375,10 +373,6 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
     else if (strcmp(interface, "wl_shell") == 0)    {
         display->shell = wl_registry_bind(display->registry, id, &wl_shell_interface, 1);
     }
-    else if (strcmp(interface, "ico_ivi_shell") == 0)   {
-        display->ico_ivi_shell =
-            wl_registry_bind(display->registry, id, &ico_ivi_shell_interface, 1);
-    }
     else if (strcmp(interface, "ico_window_mgr") == 0)  {
         display->ico_window_mgr = wl_registry_bind(display->registry, id,
                                                    &ico_window_mgr_interface, 1);
@@ -474,7 +468,7 @@ send_state(struct display* display)
 }
 
 static void
-create_surface(struct display *display)
+create_surface(struct display *display, const char *title)
 {
     struct surface *surface;
 
@@ -492,6 +486,7 @@ create_surface(struct display *display)
             wl_shell_surface_add_listener(surface->shell_surface,
                                           &shell_surface_listener, display);
             wl_shell_surface_set_toplevel(surface->shell_surface);
+            wl_shell_surface_set_title(surface->shell_surface, title);
         }
     }
     wl_display_flush(display->display);
@@ -520,7 +515,7 @@ static void
 clear_surface(struct display *display)
 {
     if (! display->surface) {
-        create_surface(display);
+        create_surface(display, "test-client");
     }
     else    {
         opengl_clear_window(display->init_color);
@@ -584,6 +579,7 @@ int main(int argc, char *argv[])
     wl_registry_add_listener(display->registry,
                  &registry_listener, display);
     wl_display_dispatch(display->display);
+    sleep_with_wayland(display->display, 1000);
 
     fd = 0;
 
@@ -608,7 +604,7 @@ int main(int argc, char *argv[])
             break;
         }
         else if (strncasecmp(buf, "create-surface", ret) == 0) {
-            create_surface(display);
+            create_surface(display, "test-client");
         }
         else if (strncasecmp(buf, "clear-surface", 13) == 0) {
             display->init_color = strtoul(&buf[14], (char **)0, 0);

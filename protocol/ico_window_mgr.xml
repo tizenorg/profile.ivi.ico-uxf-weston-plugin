@@ -1,9 +1,34 @@
 <protocol name="ico_window_mgr">
 
   <interface name="ico_window_mgr" version="1">
-    <description summary="interface for HomeScreen Window Management">
-      for IVI HomeScreen interface.
+    <description summary="interface for SystemController Window Management">
+      for IVI SystemController interface.
     </description>
+
+    <enum name="v">
+      <description summary="general fixed value for ico_window_mgr">
+       General values for ico_window_mgr.
+      </description>
+      <entry name="nochange" value="32768" summary="no change value"/>
+    </enum>
+
+    <enum name="declare_manager">
+      <description summary="declare manager">
+       Declare manager application(ex. SystemController).
+      </description>
+      <entry name="application" value="0" summary="declare application"/>
+      <entry name="manager" value="1" summary="declare manager"/>
+    </enum>
+
+    <enum name="layer_attr">
+      <description summary="define layer attribute">
+       Layer attribute.
+      </description>
+      <entry name="background" value="1" summary="background layer"/>
+      <entry name="normal" value="2" summary="normal layer"/>
+      <entry name="cursor" value="4" summary="cursor layer"/>
+      <entry name="input" value="8" summary="input layer"/>
+    </enum>
 
     <enum name="visible">
       <description summary="visiblity control">
@@ -11,9 +36,6 @@
       </description>
       <entry name="hide" value="0" summary="surface hide"/>
       <entry name="show" value="1" summary="surface show"/>
-      <entry name="hide_animation" value="2" summary="hide with animation"/>
-      <entry name="show_animation" value="3" summary="show with animation"/>
-      <entry name="nochange" value="9" summary="show/hide no change"/>
     </enum>
 
     <enum name="raise">
@@ -22,77 +44,178 @@
       </description>
       <entry name="lower" value="0" summary="surface lower"/>
       <entry name="raise" value="1" summary="surface raise"/>
-      <entry name="nochange" value="9" summary="raise/lower no change"/>
     </enum>
 
-    <enum name="client_attr">
-      <description summary="client application attribute">
-       Set client application attribute.
+    <enum name="animation">
+      <description summary="with animation or without animation">
+       With/Without animation of surface change.
       </description>
-      <entry name="noconfigure" value="0" summary="configure event"/>
+      <entry name="noanimation" value="0" summary="without animation"/>
+      <entry name="animation" value="1" summary="with animation"/>
     </enum>
 
-    <request name="set_user">
-      <arg name="pid" type="int"/>
-      <arg name="appid" type="string"/>
+    <enum name="animation_type">
+      <description summary="type of the cutaway for animation">
+       Type of the cutaway for surface animation.
+      </description>
+      <entry name="hide" value="1" summary="animation for hide surface"/>
+      <entry name="show" value="2" summary="animation for shwo surface"/>
+      <entry name="move" value="4" summary="animation for move surface"/>
+      <entry name="resize" value="8" summary="animation for resize surface"/>
+    </enum>
+
+    <enum name="map_surface_event">
+      <description summary="event type of mapped surface change">
+       Event type of mapped surface change.
+      </description>
+      <entry name="contents" value="1" summary="change drawing contents"/>
+      <entry name="resize" value="2" summary="resize surface"/>
+      <entry name="map" value="4" summary="map surface"/>
+      <entry name="unmap" value="8" summary="unmap surface"/>
+    </enum>
+
+    <enum name="active">
+      <description summary="surface active target device">
+       Set surface active target device.
+      </description>
+      <entry name="none" value="0" summary="no active window"/>
+      <entry name="pointer" value="1" summary="wl_pointer"/>
+      <entry name="keyboard" value="2" summary="wl_keyboard"/>
+      <entry name="selected" value="4" summary="selected_window_by_operation"/>
+    </enum>
+
+    <enum name="hint">
+      <description summary="event hint information">
+       Surafce change hint information.
+      </description>
+      <entry name="change" value="0" summary="real change"/>
+      <entry name="hint" value="1" summary="hint, not change"/>
+    </enum>
+
+    <request name="declare_manager">
+      <description summary="declare manager application">
+       Set manager application(ex.SystemController).
+      </description>
+      <arg name="manager" type="int"/>
     </request>
 
-    <request name="set_eventcb">
-      <arg name="eventcb" type="int"/>
+    <request name="set_layer_attr">
+      <description summary="set layer attribute">
+       Create layer Id and set attribute.
+      </description>
+      <arg name="layer" type="uint"/>
+      <arg name="attribute" type="int"/>
     </request>
 
     <request name="set_window_layer">
+      <description summary="set surface layer">
+       Surface belong to a layer.
+      </description>
       <arg name="surfaceid" type="uint"/>
-      <arg name="layer" type="int"/>
+      <arg name="layer" type="uint"/>
     </request>
 
     <request name="set_positionsize">
+      <description summary="set surface display position and surface size">
+       Set surface display position and surface size.
+      </description>
       <arg name="surfaceid" type="uint"/>
+      <arg name="node" type="uint"/>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
+      <arg name="animation" type="int"/>
     </request>
 
     <request name="set_visible">
+      <description summary="surface visibility control">
+       Show/Hide and Raise/Lower surface.
+      </description>
       <arg name="surfaceid" type="uint"/>
       <arg name="visible" type="int"/>
       <arg name="raise" type="int"/>
+      <arg name="animation" type="int"/>
     </request>
 
     <request name="set_animation">
+      <description summary="set surface animation type">
+       Set surface animation type.
+      </description>
       <arg name="surfaceid" type="uint"/>
+      <arg name="type" type="int"/>
       <arg name="animation" type="string"/>
       <arg name="time" type="int"/>
     </request>
 
     <request name="set_active">
+      <description summary="set active surface">
+       Set active surface.
+      </description>
       <arg name="surfaceid" type="uint"/>
-      <arg name="target" type="uint"/>
+      <arg name="active" type="int"/>
     </request>
 
     <request name="set_layer_visible">
-      <arg name="layer" type="int"/>
+      <description summary="layer visibility control">
+       Show/Hide layer.
+      </description>
+      <arg name="layer" type="uint"/>
       <arg name="visible" type="int"/>
     </request>
 
-    <request name="set_client_attr">
+    <request name="get_surfaces">
+      <description summary="get surfaces of the application">
+       Get surfaces of the application.
+      </description>
       <arg name="appid" type="string"/>
-      <arg name="attr" type="int"/>
-      <arg name="value" type="int"/>
+    </request>
+
+    <request name="map_surface">
+      <description summary="map surfaces to shared memory">
+       Map surfaces to shared memory.
+      </description>
+      <arg name="surfaceid" type="uint"/>
+      <arg name="mapname" type="string"/>
+      <arg name="framerate" type="int"/>
+    </request>
+
+    <request name="unmap_surface">
+      <description summary="unmap surfaces to shared memory">
+       Unmap surfaces to shared memory.
+      </description>
+      <arg name="surfaceid" type="uint"/>
     </request>
 
     <event name="window_created">
+      <description summary="event of surface created">
+       Surface create event to manager.
+      </description>
       <arg name="surfaceid" type="uint"/>
+      <arg name="winname" type="string"/>
       <arg name="pid" type="int"/>
       <arg name="appid" type="string"/>
     </event>
 
+    <event name="window_name">
+      <description summary="event of surface name">
+       Surface name event to manager.
+      </description>
+      <arg name="surfaceid" type="uint"/>
+      <arg name="winname" type="string"/>
+    </event>
+
     <event name="window_destroyed">
+      <description summary="event of surface destoryed">
+       Surface destory event to manager.
+      </description>
       <arg name="surfaceid" type="uint"/>
     </event>
 
     <event name="window_visible">
+      <description summary="event of change surface visibility">
+       Surface visibility change event to manager.
+      </description>
       <arg name="surfaceid" type="uint"/>
       <arg name="visible" type="int"/>
       <arg name="raise" type="int"/>
@@ -100,9 +223,12 @@
     </event>
 
     <event name="window_configure">
+      <description summary="event of change surface attributes">
+       Surface attribute change event to manager.
+      </description>
       <arg name="surfaceid" type="uint"/>
-      <arg name="appid" type="string"/>
-      <arg name="layer" type="int"/>
+      <arg name="node" type="uint"/>
+      <arg name="layer" type="uint"/>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
       <arg name="width" type="int"/>
@@ -111,10 +237,40 @@
     </event>
 
     <event name="window_active">
+      <description summary="event of change surface active">
+       Surface active change event to manager.
+      </description>
       <arg name="surfaceid" type="uint"/>
-      <arg name="active" type="uint"/>
+      <arg name="active" type="int"/>
     </event>
 
+    <event name="layer_visible">
+      <description summary="event of change layer visibility">
+       Layer visibility change event to manager.
+      </description>
+      <arg name="layer" type="uint"/>
+      <arg name="visible" type="int"/>
+    </event>
+
+    <event name="app_surfaces">
+      <description summary="event of reply of app_surfaces request">
+       Reply of app_surfaces request.
+      </description>
+      <arg name="appid" type="string"/>
+      <arg name="surfaces" type="array"/>
+    </event>
+
+    <event name="map_surface">
+      <description summary="event of reply of map_surface request">
+       Reply of map_surface request.
+      </description>
+      <arg name="event" type="int"/>
+      <arg name="surfaceid" type="uint"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+      <arg name="stride" type="int"/>
+      <arg name="format" type="int"/>
+    </event>
   </interface>
 
 </protocol>

@@ -24,43 +24,32 @@
 /**
  * @brief   The common functions that each Plugin is available.
  *
- * @date    Feb-08-2013
+ * @date    Jul-26-2013
  */
 
 #ifndef _ICO_IVI_COMMON_H_
 #define _ICO_IVI_COMMON_H_
 
 /* Macros                               */
-#define ICO_IVI_NODEID_2_HOSTID( nodeid )       (((unsigned int)nodeid) >> 16)
-#define ICO_IVI_NODEID_2_DISPLAYNO( nodeid )    (((unsigned int)nodeid) & 0x0ffff)
-#define ICO_IVI_NODEDISP_2_NODEID( nodeid, displayno )  \
-                                                ((nodeid << 16) | displayno)
-#define ICO_IVI_SURFACEID_2_HOSTID( surfid )    (((unsigned int)surfid) >> 24)
-#define ICO_IVI_SURFACEID_2_DISPLAYNO( surfid ) ((((unsigned int)surfid) >> 16) & 0x0ff)
-#define ICO_IVI_SURFACEID_2_NODEID( surfid )    \
-            ICO_IVI_NODEDISP_2_NODEID( ICO_IVI_SURFACEID_2_HOSTID(surfid),  \
-                                       ICO_IVI_SURFACEID_2_DISPLAYNO(surfid) )
-#define ICO_IVI_SURFACEID_BASE( nodeid )    \
-            (ICO_IVI_NODEID_2_HOSTID(nodeid) << 24) |   \
-            (ICO_IVI_NODEID_2_DISPLAYNO(nodeid) << 16)
-
-/* Return value                         */
-#define ICO_IVI_EOK         0               /* OK                                   */
-#define ICO_IVI_ENOENT      -2              /* No such object                       */
-#define ICO_IVI_EIO         -5              /* Send error                           */
-#define ICO_IVI_ENOMEM      -12             /* Out of memory                        */
-#define ICO_IVI_EBUSY       -16             /* Not available now                    */
-#define ICO_IVI_EINVAL      -22             /* Invalid argument                     */
-
-/* Configuration file                   */
-#define ICO_IVI_PLUGIN_CONFIG   "weston_ivi_plugin.ini"
+#define ICO_IVI_NODEID_2_HOSTID(nodeid)         (((unsigned int)nodeid) >> 8)
+#define ICO_IVI_NODEID_2_DISPLAYNO(nodeid)      (((unsigned int)nodeid) & 0x0ff)
+#define ICO_IVI_NODEDISP_2_NODEID(nodeid, displayno)  \
+                                                ((nodeid << 8) | displayno)
+#define ICO_IVI_SURFACEID_2_HOSTID(surfid)      (((unsigned int)surfid) >> 24)
+#define ICO_IVI_SURFACEID_2_DISPLAYNO(surfid)   ((((unsigned int)surfid) >> 16) & 0x0ff)
+#define ICO_IVI_SURFACEID_2_NODEID(surfid)      (((unsigned int)surfid) >> 16)
+#define ICO_IVI_SURFACEID_BASE(nodeid)          (((unsigned int)nodeid) << 16)
 
 /* System limit                         */
-#define ICO_IVI_APPID_LENGTH    (128)       /* Maximum length of applicationId(AppCore) */
+#define ICO_IVI_MAX_DISPLAY      (8)        /* Maximum display number of one ECU    */
+#define ICO_IVI_APPID_LENGTH     (128)      /* Maximum length of applicationId(AppCore) */
                                             /* (with terminate NULL)                */
-#define ICO_IVI_MAX_COORDINATE  (16383)     /* Maximum X or Y coordinate            */
+#define ICO_IVI_WINNAME_LENGTH   (32)       /* Maximum length of window name (with NULL)*/
+#define ICO_IVI_ANIMATION_LENGTH (16)       /* Maximum length of animation name (w NULL)*/
+#define ICO_IVI_MAX_COORDINATE   (16383)    /* Maximum X or Y coordinate            */
+
 /* Fixed value                          */
-#define ICO_IVI_DEFAULT_LAYER   (0)         /* Default layerId for surface creation */
+#define ICO_IVI_DEFAULT_LAYER    (0)        /* Default layerId for surface creation */
 #ifndef TRUE
 #define TRUE    1
 #endif
@@ -68,36 +57,17 @@
 #define FALSE   0
 #endif
 
+/* Debug flags                          */
+#define ICO_IVI_DEBUG_SHOW_SURFACE  0x01    /* new surface show on create           */
+
 /* Function prototype                   */
-                                        /* Get my node numner                       */
-int ico_ivi_get_mynode(void);
-                                        /* Convert host name to ECU number          */
-int ico_ivi_nodename_2_node(const char *nodename);
-                                        /* Convert display name to nodeId           */
-int ico_ivi_dispname_2_node(const char *dispname);
-                                        /* Regist function of display to nodeId convert*/
-void ico_ivi_set_usurf_2_node(int (*usurf_2_node)(const int surfaceid));
-                                        /* Convery surfaceId to nodeId              */
-int ico_ivi_usurf_2_node(const int surfaceid);
-                                        /* Regist function of send event to manager */
-void ico_ivi_set_send_to_mgr(int (*send_to_mgr)(const int event,
-                            const int surfaceid, const char *appid,
-                            const int param1, const int param2, const int param3,
-                            const int param4, const int param5, const int param6));
-                                        /* Send event to manager                    */
-int ico_ivi_send_to_mgr(const int event, struct wl_resource *client_resource,
-                            const int surfaceid, const char *appid,
-                            const int param1, const int param2, const int param3,
-                            const int param4, const int param5, const int param6);
-
-void ico_ivi_set_send_surface_change(int (*send_surface_change)(
-                            struct weston_surface *surface,
-                            const int x, const int y, const int width, const int height));
-int ico_ivi_send_surface_change(struct weston_surface *surface,
-                            const int x, const int y, const int width, const int height);
-
-int ico_option_flag(void);
-int ico_ivi_debuglevel(void);
+int ico_ivi_get_mynode(void);               /* Get my node numner                   */
+int ico_ivi_debugflag(void);                /* Get debug flag                       */
+int ico_ivi_debuglevel(void);               /* Get debug level                      */
+                                            /* Get default animation name           */
+const char *ico_ivi_default_animation_name(void);
+int ico_ivi_default_animation_time(void);   /* Get default animation time(ms)       */
+int ico_ivi_default_animation_fps(void);    /* Get animation frame rate(fps)        */
 
 /* Debug Traces                         */
 /* Define for debug write               */

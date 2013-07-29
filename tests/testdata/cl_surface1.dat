@@ -3,15 +3,15 @@
 #
 #	1. Create Surface
 create-surface
-#	2. Sleep 2 sec with color change
-sleep 0.4
+#	2. Sleep 1 sec with color change
+sleep 1
 clear-surface 0x80ff2020
-sleep 0.6
+sleep 0.5
 clear-surface 0xb020ff20
-sleep 0.6
+sleep 0.5
 clear-surface 0xe02020ff
-sleep 0.6
+sleep 0.5
 clear-surface 0xff808080
-sleep 0.6
+sleep 0.5
 #	3. End of this Application (exit)
 bye

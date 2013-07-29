@@ -1,0 +1,9 @@
+[Unit]
+Description=Weston
+Requires=dbus.socket
+
+[Service]
+ExecStart=/usr/bin/weston-launch --user app -- -i0 --log=/tmp/weston.log
+
+[Install]
+WantedBy=weston.target

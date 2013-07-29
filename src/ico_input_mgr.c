@@ -24,7 +24,7 @@
 /**
  * @brief   Multi Input Manager (Weston(Wayland) PlugIn)
  *
- * @date    Feb-08-2013
+ * @date    Jul-26-2013
  */
 
 #include <stdlib.h>
@@ -44,6 +44,7 @@
 #include "ico_ivi_common.h"
 #include "ico_ivi_shell.h"
 #include "ico_window_mgr.h"
+#include "ico_input_mgr.h"
 #include "ico_input_mgr-server-protocol.h"
 
 /* degine maximum length                */
@@ -122,7 +123,7 @@ static struct ico_app_mgr *find_app_by_appid(const char *appid);
 /* add input event to application     */
 static void ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *resource,
                                   const char *appid, const char *device, int32_t input,
-                                  uint32_t fix);
+                                  int32_t fix, int32_t keycode);
 /* delete input event to application  */
 static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
                                   const char *appid, const char *device, int32_t input);
@@ -139,9 +140,6 @@ static void ico_device_configure_code(struct wl_client *client,
 static void ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                                    uint32_t time, const char *device,
                                    int32_t input, int32_t code, int32_t state);
-
-/* entry finction called by Weston  */
-WL_EXPORT int module_init(struct weston_compositor *ec);
 
 /* definition of Wayland protocol */
 /* mgr interface */
@@ -171,15 +169,17 @@ struct ico_input_mgr    *pInputMgr = NULL;
  * @param[in]   device          device name
  * @param[in]   input           input switch number
  * @param[in]   fix             fix to application(1=fix,0=general)
+ * @param[in]   keycode         switch map to keyboard operation(0=not map to keyboard)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
 ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *resource,
-                      const char *appid, const char *device, int32_t input, uint32_t fix)
+                      const char *appid, const char *device, int32_t input,
+                      int32_t fix, int32_t keycode)
 {
-    uifw_trace("ico_mgr_add_input_app: Enter(appid=%s,dev=%s,input=%d,fix=%d)",
-               appid, device, input, fix);
+    uifw_trace("ico_mgr_add_input_app: Enter(appid=%s,dev=%s,input=%d,fix=%d,key=%d)",
+               appid, device, input, fix, keycode);
 
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
@@ -602,7 +602,7 @@ ico_control_bind(struct wl_client *client, void *data, uint32_t version, uint32_
     struct ico_app_mgr      *pAppMgr;
 
     uifw_trace("ico_control_bind: Enter(client=%08x)", (int)client);
-    appid = ico_window_mgr_appid(client);
+    appid = ico_window_mgr_get_appid(client);
 
     if (! appid)    {
         /* client dose not exist        */
@@ -625,11 +625,13 @@ ico_control_bind(struct wl_client *client, void *data, uint32_t version, uint32_
     }
     pAppMgr->client = client;
     if (! pAppMgr->mgr_resource)    {
-        pAppMgr->mgr_resource = wl_client_add_object(client,
-                                                     &ico_input_mgr_control_interface,
-                                                     &ico_input_mgr_implementation,
-                                                     id, pInputMgr);
-        pAppMgr->mgr_resource->destroy = ico_control_unbind;
+        pAppMgr->mgr_resource = wl_resource_create(client,
+                                                   &ico_input_mgr_control_interface, 1, id);
+        if (pAppMgr->mgr_resource)  {
+            wl_resource_set_implementation(pAppMgr->mgr_resource,
+                                           &ico_input_mgr_implementation,
+                                           pInputMgr, ico_control_unbind);
+        }
     }
     uifw_trace("ico_control_bind: Leave");
 }
@@ -656,8 +658,6 @@ ico_control_unbind(struct wl_resource *resource)
             break;
         }
     }
-
-    free(resource);
     uifw_trace("ico_control_unbind: Leave");
 }
 
@@ -679,10 +679,11 @@ ico_device_bind(struct wl_client *client, void *data, uint32_t version, uint32_t
 
     uifw_trace("ico_device_bind: Enter(client=%08x)", (int)client);
 
-    mgr_resource = wl_client_add_object(client, &ico_input_mgr_device_interface,
-                                        &input_mgr_ictl_implementation,
-                                        id, NULL);
-    mgr_resource->destroy = ico_device_unbind;
+    mgr_resource = wl_resource_create(client, &ico_input_mgr_device_interface, 1, id);
+    if (mgr_resource)   {
+        wl_resource_set_implementation(mgr_resource, &input_mgr_ictl_implementation,
+                                       NULL, ico_device_unbind);
+    }
     uifw_trace("ico_device_bind: Leave");
 }
 
@@ -698,7 +699,6 @@ static void
 ico_device_unbind(struct wl_resource *resource)
 {
     uifw_trace("ico_device_unbind: Enter(resource=%08x)", (int)resource);
-    free(resource);
     uifw_trace("ico_device_unbind: Leave");
 }
 
@@ -722,7 +722,7 @@ ico_exinput_bind(struct wl_client *client, void *data, uint32_t version, uint32_
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
 
-    appid = ico_window_mgr_appid(client);
+    appid = ico_window_mgr_get_appid(client);
     uifw_trace("ico_exinput_bind: Enter(client=%08x,%s)", (int)client,
                appid ? appid : "(NULL)");
 
@@ -748,9 +748,11 @@ ico_exinput_bind(struct wl_client *client, void *data, uint32_t version, uint32_
     }
     pAppMgr->client = client;
     if (! pAppMgr->resource)    {
-        pAppMgr->resource = wl_client_add_object(client, &ico_exinput_interface,
-                                                 NULL, id, pInputMgr);
-        pAppMgr->resource->destroy = ico_exinput_unbind;
+        pAppMgr->resource = wl_resource_create(client, &ico_exinput_interface, 1, id);
+        if (pAppMgr->resource)  {
+            wl_resource_set_implementation(pAppMgr->resource, NULL,
+                                           pInputMgr, ico_exinput_unbind);
+        }
     }
 
     /* send all capabilities    */
@@ -766,7 +768,7 @@ ico_exinput_bind(struct wl_client *client, void *data, uint32_t version, uint32_
                 uifw_trace("ico_exinput_bind: Input %s not initialized", pIctlMgr->device);
                 continue;
             }
-            if ((pInput->app != NULL) && (pInput->app != pAppMgr) && (pInput->fix)) {   
+            if ((pInput->app != NULL) && (pInput->app != pAppMgr) && (pInput->fix)) {
                 uifw_trace("ico_exinput_bind: Input %s.%s fixed assign to App.%s",
                            pIctlMgr->device, pInput->swname, pInput->app->appid);
                 continue;
@@ -835,8 +837,6 @@ ico_exinput_unbind(struct wl_resource *resource)
             }
         }
     }
-
-    free(resource);
     uifw_trace("ico_exinput_unbind: Leave");
 }
 
@@ -915,15 +915,17 @@ find_app_by_appid(const char *appid)
  * @brief   module_init: initialization of this plugin
  *
  * @param[in]   ec          weston compositor
+ * @param[in]   argc        number of arguments(unused)
+ * @param[in]   argv        argument list(unused)
  * @return      result
  * @retval      0           OK
  * @retval      -1          error
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT int
-module_init(struct weston_compositor *ec)
+module_init(struct weston_compositor *ec, int *argc, char *argv[])
 {
-    uifw_trace("ico_input_mgr: Enter(module_init)");
+    uifw_info("ico_input_mgr: Enter(module_init)");
 
     /* initialize management table */
     pInputMgr = (struct ico_input_mgr *)malloc(sizeof(struct ico_input_mgr));
@@ -935,27 +937,23 @@ module_init(struct weston_compositor *ec)
     pInputMgr->compositor = ec;
 
     /* interface to desktop manager(ex.HomeScreen)  */
-    if (wl_display_add_global(ec->wl_display,
-                              &ico_input_mgr_control_interface,
-                              pInputMgr,
-                              ico_control_bind) == NULL) {
-        uifw_trace("ico_input_mgr: wl_display_add_global mgr failed");
+    if (wl_global_create(ec->wl_display, &ico_input_mgr_control_interface, 1,
+                         pInputMgr, ico_control_bind) == NULL) {
+        uifw_trace("ico_input_mgr: wl_global_create mgr failed");
         return -1;
     }
 
     /* interface to Input Controller(ictl) */
-    if (wl_display_add_global(ec->wl_display,
-                              &ico_input_mgr_device_interface,
-                              pInputMgr,
-                              ico_device_bind) == NULL) {
-        uifw_trace("ico_input_mgr: wl_display_add_global ictl failed");
+    if (wl_global_create(ec->wl_display, &ico_input_mgr_device_interface, 1,
+                         pInputMgr, ico_device_bind) == NULL) {
+        uifw_trace("ico_input_mgr: wl_global_create ictl failed");
         return -1;
     }
 
     /* interface to App(exinput) */
-    if (wl_display_add_global(ec->wl_display, &ico_exinput_interface,
-                              pInputMgr, ico_exinput_bind) == NULL) {
-        uifw_trace("ico_input_mgr: wl_display_add_global exseat failed");
+    if (wl_global_create(ec->wl_display, &ico_exinput_interface, 1,
+                         pInputMgr, ico_exinput_bind) == NULL) {
+        uifw_trace("ico_input_mgr: wl_global_create exseat failed");
         return -1;
     }
 
@@ -963,7 +961,7 @@ module_init(struct weston_compositor *ec)
     wl_list_init(&pInputMgr->ictl_list);
     wl_list_init(&pInputMgr->app_list);
 
-    uifw_trace("ico_input_mgr: Leave(module_init)");
+    uifw_info("ico_input_mgr: Leave(module_init)");
     return 0;
 }
 
