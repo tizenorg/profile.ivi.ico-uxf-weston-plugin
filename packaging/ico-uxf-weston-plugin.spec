@@ -35,8 +35,6 @@ Development files that expose the wayland extended protocols for IVI.
 %setup -q -n %{name}-%{version}
 
 %build
-autoreconf --install
-
 %autogen
 
 %configure
