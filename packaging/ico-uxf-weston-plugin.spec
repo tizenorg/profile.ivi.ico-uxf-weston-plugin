@@ -56,6 +56,7 @@ install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
 
 %files
 %defattr(-,root,root,-)
+%license COPYING
 %dir %{_libdir}/weston/
 %{_libdir}/weston/*.so
 %{_libdir}/libico-uxf-weston-plugin.so.*
