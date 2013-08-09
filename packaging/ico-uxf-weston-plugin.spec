@@ -43,7 +43,6 @@ autoreconf --install
 make %{?_smp_mflags}
 
 %install
-rm -rf %{buildroot}
 %make_install
 
 # configurations
