@@ -2,7 +2,7 @@ Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
 Version:    0.7.01
 Release:    1.1
-Group:      System/GUI/Libraries
+Group:      Graphics & UI Framework/Automotive UI
 License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
@@ -25,7 +25,7 @@ Weston Plugins for IVI
 
 %package devel
 Summary:    Development files for %{name}
-Group:      Development/GUI/Libraries
+Group:      Graphics & UI Framework/Development
 Requires:   %{name} = %{version}-%{release}
 
 %description devel
