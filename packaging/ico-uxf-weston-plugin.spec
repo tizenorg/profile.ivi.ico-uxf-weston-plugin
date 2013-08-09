@@ -16,9 +16,8 @@ BuildRequires: pkgconfig(eina)
 BuildRequires: pkgconfig(elementary)
 BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: mesa-devel
-BuildRequires: aul-devel
-BuildRequires: ecore-devel
-BuildRequires: weston-devel >= 1.2
+BuildRequires: pkgconfig(aul)
+BuildRequires: pkgconfig(ecore)
 Requires: weston >= 1.2
 
 %description
