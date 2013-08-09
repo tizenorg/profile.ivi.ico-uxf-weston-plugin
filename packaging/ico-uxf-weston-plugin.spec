@@ -37,7 +37,7 @@ Development files that expose the wayland extended protocols for IVI.
 %build
 autoreconf --install
 
-%autogen --prefix=/usr
+%autogen
 
 %configure
 make %{?_smp_mflags}
