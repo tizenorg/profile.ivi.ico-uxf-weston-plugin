@@ -54,6 +54,10 @@ mkdir -p %{buildroot}%{_sysconfdir}/profile.d/
 install -m 0644 settings/ico_weston.sh  %{buildroot}%{_sysconfdir}/profile.d/
 install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
 
+%post -p /sbin/ldconfig
+
+%postun -p /sbin/ldconfig
+
 %files
 %defattr(-,root,root,-)
 %license COPYING
