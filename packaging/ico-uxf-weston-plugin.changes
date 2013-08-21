@@ -1,3 +1,10 @@
+* Wed Aug 21 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130612.174820@6b54175
+- Fix spec file.
+-- Correct package BuildRequires fields to address build errors.
+-- Corrected package group tags based on Tizen packaging guidelines.
+-- Add missing tag and scriptlets.
+-- Remove items that are not necessary.
+
 * Mon Jul 29 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130612.174820@2b428f3
 - 0.7.01 release
 - Following corrections for TizenIVI 3.0M1.
