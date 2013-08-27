@@ -97,55 +97,60 @@ struct ico_app_mgr {
 };
 
 /* prototype of static function */
-/* bind input manager form manager(ex.HomeScreen)   */
+                                            /* bind input manager form manager      */
 static void ico_control_bind(struct wl_client *client, void *data,
                              uint32_t version, uint32_t id);
-/* unbind input manager form manager(ex.HomeScreen) */
+                                            /* unbind input manager form manager    */
 static void ico_control_unbind(struct wl_resource *resource);
-/* bind input manager form input controller         */
+                                            /* bind input manager form input controller*/
 static void ico_device_bind(struct wl_client *client, void *data,
                             uint32_t version, uint32_t id);
-/* unbind input manager form input controller       */
+                                            /* unbind input manager form input controller*/
 static void ico_device_unbind(struct wl_resource *resource);
-/* bind input manager (form application)            */
+                                            /* bind input manager(form application) */
 static void ico_exinput_bind(struct wl_client *client, void *data,
                              uint32_t version, uint32_t id);
-/* unbind input manager (form application)          */
+                                            /* unbind input manager(form application)*/
 static void ico_exinput_unbind(struct wl_resource *resource);
 
-/* find ictl manager by device name */
+                                            /* find ictl manager by device name     */
 static struct ico_ictl_mgr *find_ictlmgr_by_device(const char *device);
-/* find ictl input switch by input Id */
+                                            /* find ictl input switch by input Id   */
 static struct ico_ictl_input *find_ictlinput_by_input(struct ico_ictl_mgr *pIctlMgr,
                                                       const int32_t input);
-/* find app manager by application Id */
+                                            /* find app manager by application Id   */
 static struct ico_app_mgr *find_app_by_appid(const char *appid);
-/* add input event to application     */
+                                            /* add input event to application       */
 static void ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *resource,
                                   const char *appid, const char *device, int32_t input,
                                   int32_t fix, int32_t keycode);
-/* delete input event to application  */
+                                            /* delete input event to application    */
 static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
                                   const char *appid, const char *device, int32_t input);
-/* create and regist Input Controller table */
+                                            /* send input event from manager        */
+static void ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
+                                     const char *appid, uint32_t surfaceid, int32_t type,
+                                     int32_t deviceno, int32_t code, int32_t value);
+                                            /* create and regist Input Controller table*/
 static void ico_device_configure_input(struct wl_client *client,
                                        struct wl_resource *resource, const char *device,
                                        int32_t type, const char *swname, int32_t input,
                                        const char *codename, int32_t code);
-/* add input to from Input Controller table */
+                                            /* add input to from Input Controller table*/
 static void ico_device_configure_code(struct wl_client *client,
                                       struct wl_resource *resource, const char *device,
                                       int32_t input, const char *codename, int32_t code);
-/* device input event                       */
+                                            /* device input event                   */
 static void ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                                    uint32_t time, const char *device,
                                    int32_t input, int32_t code, int32_t state);
 
-/* definition of Wayland protocol */
-/* mgr interface */
+/* definition of Wayland protocol       */
+/* mgr interface                */
 static const struct ico_input_mgr_control_interface ico_input_mgr_implementation = {
     ico_mgr_add_input_app,
     ico_mgr_del_input_app,
+    ico_mgr_send_input_event
 };
 
 /* Input Controller interface */
@@ -353,6 +358,32 @@ ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
         }
     }
     uifw_trace("ico_mgr_del_input_app: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_mgr_send_input_event: send input event from manager
+ *
+ * @param[in]   client          client(HomeScreen)
+ * @param[in]   resource        resource of request
+ * @param[in]   appid           target application id
+ * @param[in]   surfaceid       target surface id
+ * @param[in]   type            event device type
+ * @param[in]   deviceno        device number
+ * @param[in]   code            event code
+ * @param[in]   value           event value
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
+                         const char *appid, uint32_t surfaceid, int32_t type,
+                         int32_t deviceno, int32_t code, int32_t value)
+{
+    uifw_trace("ico_mgr_send_input_event: Enter(app=%s surf=%08x dev=%d code=%x value=%d)",
+               appid ? appid : "(NULL)", surfaceid, deviceno, code, value);
+
+    uifw_trace("ico_mgr_send_input_event: Leave");
 }
 
 /*--------------------------------------------------------------------------*/

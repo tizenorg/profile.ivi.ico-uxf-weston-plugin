@@ -406,7 +406,7 @@ opengl_clear_window(const unsigned int color)
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   opengl_create_window: Create OpenGL/EGL window
+ * @brief   opengl_swap_buffer: Swap OpenGL/EGL buffer
  *
  * @param[in]   display     Wayland connection
  * @param[in]   dpy         EGL display

@@ -16,7 +16,6 @@ sleep 1
 export QT_QPA_PLATFORM=wayland
 export ELM_ENGINE=wayland_egl
 export ECORE_EVAS_ENGINE=wayland_egl
-export XDG_RUNTIME_DIR=/run/user/5000
 
 # 4 Set Environment for Test
 export WESTON_IVI_PLUGIN_DIR="../src/.libs"
@@ -31,7 +30,7 @@ sleep 1
 export LD_LIBRARY_PATH=../src/.libs:$LD_LIBRARY_PATH
 
 # 7 Start test-homescreen
-../tests/test-homescreen < ../tests/testdata/hs_resize.dat 2> ../tests/testlog/test-homescreen.log 1>&2
+../tests/test-homescreen < ../tests/testdata/hs_mapsurf.dat 2> ../tests/testlog/test-homescreen.log
 
 # 8 End of Test
 sleep 2
