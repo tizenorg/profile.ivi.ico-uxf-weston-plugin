@@ -1,13 +1,13 @@
 Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
-Version:    0.7.02
-Release:    1.1
+Version:    0.7.03
+Release:    1.2
 Group:      Graphics & UI Framework/Automotive UI
 License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(weston) >= 1.2
+BuildRequires: pkgconfig(weston) >= 1.2.1
 BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(xkbcommon) >= 0.0.578
 BuildRequires: pkgconfig(eina)
@@ -18,7 +18,7 @@ BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: mesa-devel
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
-Requires: weston >= 1.2
+Requires: weston >= 1.2.1
 
 %description
 Weston Plugins for IVI
@@ -74,4 +74,3 @@ install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
 %{_includedir}/%{name}/ico_window_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_input_mgr.h
 %{_libdir}/libico-uxf-weston-plugin.so
-

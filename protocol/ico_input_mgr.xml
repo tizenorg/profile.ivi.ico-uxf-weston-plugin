@@ -33,6 +33,7 @@
       <arg name="appid" type="string" summary="application Id for input switch"/>
       <arg name="surfaceid" type="uint" summary="event surface Id"/>
       <arg name="type" type="int" summary="event device type"/>
+      <arg name="deviceno" type="int" summary="device number"/>
       <arg name="code" type="int" summary="event code"/>
       <arg name="value" type="int" summary="event value"/>
     </request>

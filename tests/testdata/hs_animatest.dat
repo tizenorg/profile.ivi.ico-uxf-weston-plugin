@@ -3,66 +3,48 @@
 #
 #	1. Surface animation
 sleep 1
-launch ../tests/test-client < ../tests/testdata/cl_surface4.dat 2> ../tests/testlog/test-client04.log
+launch ../tests/test-eflapp @1 -color=0xe02040ff 2> ../tests/testlog/test-eflapp.log 1>&2
 waitcreate 2
-resize test-client 200 300
-move test-client 300 350 0
-#
-# fade and show/hide
-animation test-client fade 400
-#
-show test-client
-sleep 0.5
-hide test-client
+resize test-eflapp@1 400 300
+move test-eflapp@1 300 350 0
+show test-eflapp@1
 sleep 1
 #
-# slide.toleft and show/hide
-animation test-client slide.toleft 400
-show test-client 1
+# zoom and show/hide
+animation test-eflapp@1 zoom 600
+show test-eflapp@1 1
+sleep 2
+hide test-eflapp@1 1
+sleep 2
+#
+# zoom and move
+animation test-eflapp@1 zoom 1000
+show test-eflapp@1
 sleep 1
-hide test-client 1
+move test-eflapp@1 100 50 0 1
+sleep 2
+move test-eflapp@1 500 400 0 1
+#sleep 2
+#
+# zoom and resize
+animation test-eflapp@1 zoom 1000
+resize test-eflapp@1 80 50 1
+sleep 2
+resize test-eflapp@1 300 200 1
 sleep 2
 #
-# slide.toright and show/hide
-animation test-client slide.toright 400
-show test-client 1
+# zoom and positionsize
+positionsize test-eflapp@1 800 600 120 80 0 1
 sleep 2
-hide test-client 1
+positionsize test-eflapp@1 200 300 80 60
+sleep 2
+positionsize test-eflapp@1 400 500 300 200 0 1
 sleep 2
 #
-# slide.totop and show/hide
-animation test-client slide.totop 400
-show test-client 1
 sleep 1
-hide test-client 1
-sleep 2
-#
-# slide.tobottom and show/hide
-animation test-client slide.tobottom 400
-show test-client 1
-sleep 1
-hide test-client 1
-sleep 2
-#
-### zoom and show/hide
-##animation test-client zoom 400
-##show test-client 1
-##sleep 1
-##hide test-client 1
-##sleep 3
-#
-### fade and move
-##animation test-client fade 600
-##move test-client 600 200 1
-##sleep 2
-##move test-client 500 300 1
-##sleep 3
-#
-waitdestroy 60
+kill test-eflapp@1
 sleep 1
 #
-kill test-client
-sleep 0.5
 #
 #	2. End of Test
 bye

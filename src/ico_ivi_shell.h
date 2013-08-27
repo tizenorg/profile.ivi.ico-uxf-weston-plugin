@@ -49,8 +49,7 @@ void ico_ivi_shell_hook_create(void (*hook_create)(struct wl_client *client,
 void ico_ivi_shell_hook_destroy(void (*hook_destroy)(struct weston_surface *surface));
 void ico_ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
                             int32_t *width, int32_t *height, int32_t *sx, int32_t *sy));
-void ico_ivi_shell_hook_change(void (*hook_change)(struct weston_surface *surface,
-                            const int to, const int manager));
+void ico_ivi_shell_hook_configure(void (*hook_configure)(struct weston_surface *surface));
 void ico_ivi_shell_hook_select(void (*hook_select)(struct weston_surface *surface));
 void ico_ivi_shell_hook_title(void (*hook_title)(struct weston_surface *surface,
                             const char *title));

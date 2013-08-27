@@ -49,7 +49,6 @@
 #define ICO_IVI_MAX_COORDINATE   (16383)    /* Maximum X or Y coordinate            */
 
 /* Fixed value                          */
-#define ICO_IVI_DEFAULT_LAYER    (0)        /* Default layerId for surface creation */
 #ifndef TRUE
 #define TRUE    1
 #endif

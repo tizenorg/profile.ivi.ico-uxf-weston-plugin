@@ -1,0 +1,38 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Surface Map Test
+#
+#
+#	1. Surface Map/Unmap
+#
+launch ../tests/test-client < ../tests/testdata/cl_surface5.dat 2> ../tests/testlog/test-client01.log 1>&2
+waitcreate 2
+show test-client
+sleep 1
+# map surface
+map test-client 0
+#
+sleep 1
+launch ../tests/test-eflapp @1 -color=0xe02040ff 2> ../tests/testlog/test-eflapp.log 1>&2
+waitcreate 2
+move test-eflapp@1 100 150
+show test-eflapp@1
+sleep 1
+#
+# map surface
+map test-eflapp@1 15
+sleep 2
+#
+# unmap surface
+unmap test-eflapp@1
+unmap test-client
+sleep 2
+#
+sleep 2
+kill test-client
+kill test-eflapp@1
+sleep 1
+sleep 1
+#
+#	2. End of Test
+bye
+
