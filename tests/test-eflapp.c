@@ -26,6 +26,7 @@ static Evas_Object *border, *img; /* canvas objects */
 static void
 _on_destroy(Ecore_Evas *ee __UNUSED__)
 {
+    fprintf(stderr, "EFL-App destory, end of test\n"); fflush(stderr);
     ecore_main_loop_quit();
 }
 
@@ -74,10 +75,12 @@ main(int argc, char *argv[])
         }
     }
 
+    fprintf(stderr, "EFL-App call ecore_evas_init()\n"); fflush(stderr);
     ecore_evas_init();
 
     /* this will give you a window with an Evas canvas under the first
      * engine available */
+    fprintf(stderr, "EFL-App create surace(ecore_evas_new(%d,%d))\n", width, height); fflush(stderr);
     ee = ecore_evas_new(NULL, 0, 0, width, height, "frame=0");
     if (!ee) goto error;
 
@@ -89,6 +92,7 @@ main(int argc, char *argv[])
     ecore_evas_callback_delete_request_set(ee, _on_destroy);
     sprintf(sTitle, "EFL_Native_Application_%d", appno);
     ecore_evas_title_set(ee, sTitle);
+    fprintf(stderr, "EFL-App show surace(ecore_evas_show)\n"); fflush(stderr);
     ecore_evas_show(ee);
 
     canvas = ecore_evas_get(ee);
@@ -152,6 +156,7 @@ main(int argc, char *argv[])
     evas_object_show(r3);
 
     evas_object_show(img);
+    fprintf(stderr, "EFL-App event mainloop\n"); fflush(stderr);
     ecore_main_loop_begin();
 
     ecore_evas_free(ee);

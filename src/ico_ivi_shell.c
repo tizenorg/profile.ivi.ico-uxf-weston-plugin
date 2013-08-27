@@ -236,11 +236,22 @@ struct shell_grab {
     struct weston_pointer_grab grab;
     struct shell_surface *shsurf;
     struct wl_listener shsurf_destroy_listener;
-    struct weston_pointer *pointer;
+};
+
+struct shell_touch_grab {
+    struct weston_touch_grab grab;
+    struct shell_surface *shsurf;
+    struct wl_listener shsurf_destroy_listener;
+    struct weston_touch *touch;
 };
 
 struct weston_move_grab {
     struct shell_grab base;
+    wl_fixed_t dx, dy;
+};
+
+struct weston_touch_move_grab {
+    struct shell_touch_grab base;
     wl_fixed_t dx, dy;
 };
 
@@ -288,7 +299,8 @@ shell_fade_startup(struct desktop_shell *shell);
 static struct desktop_shell *_ico_ivi_shell = NULL;
 /* shell program path for ico-ivi   */
 static char *shell_exe = NULL;
-static int  ico_debug_level = 3;            /* Debug Level                          */
+#define DEFAULT_DEBUG_LEVEL 4
+static int  ico_debug_level = DEFAULT_DEBUG_LEVEL;  /* Debug Level                  */
 
 /* debug log macros         */
 #define uifw_trace(fmt,...)  \
@@ -309,8 +321,7 @@ static void (*shell_hook_create)(struct wl_client *client, struct wl_resource *r
 static void (*shell_hook_destroy)(struct weston_surface *surface) = NULL;
 static void (*shell_hook_map)(struct weston_surface *surface, int32_t *width,
                               int32_t *height, int32_t *sx, int32_t *sy) = NULL;
-static void (*shell_hook_change)(struct weston_surface *surface, const int to,
-                                 const int manager) = NULL;
+static void (*shell_hook_configure)(struct weston_surface *surface) = NULL;
 static void (*shell_hook_select)(struct weston_surface *surface) = NULL;
 static void (*shell_hook_title)(struct weston_surface *surface, const char *title) = NULL;
 static void (*shell_hook_move)(struct weston_surface *surface, int *dx, int *dy) = NULL;
@@ -363,8 +374,6 @@ shell_grab_start(struct shell_grab *grab,
     wl_signal_add(&shsurf->destroy_signal,
               &grab->shsurf_destroy_listener);
 
-    grab->pointer = pointer;
-
     weston_pointer_start_grab(pointer, &grab->grab);
     if (shell->child.desktop_shell) {
         desktop_shell_send_grab_cursor(shell->child.desktop_shell,
@@ -381,7 +390,37 @@ shell_grab_end(struct shell_grab *grab)
     if (grab->shsurf)
         wl_list_remove(&grab->shsurf_destroy_listener.link);
 
-    weston_pointer_end_grab(grab->pointer);
+    weston_pointer_end_grab(grab->grab.pointer);
+}
+
+static void
+shell_touch_grab_start(struct shell_touch_grab *grab,
+               const struct weston_touch_grab_interface *interface,
+               struct shell_surface *shsurf,
+               struct weston_touch *touch)
+{
+    struct desktop_shell *shell = shsurf->shell;
+
+    grab->grab.interface = interface;
+    grab->shsurf = shsurf;
+    grab->shsurf_destroy_listener.notify = destroy_shell_grab_shsurf;
+    wl_signal_add(&shsurf->destroy_signal,
+              &grab->shsurf_destroy_listener);
+
+    grab->touch = touch;
+
+    weston_touch_start_grab(touch, &grab->grab);
+    if (shell->child.desktop_shell)
+        weston_touch_set_focus(touch->seat, shell->grab_surface);
+}
+
+static void
+shell_touch_grab_end(struct shell_touch_grab *grab)
+{
+    if (grab->shsurf)
+        wl_list_remove(&grab->shsurf_destroy_listener.link);
+
+    weston_touch_end_grab(grab->touch);
 }
 
 static void
@@ -452,7 +491,8 @@ shell_configuration(struct desktop_shell *shell)
     /* get debug level for ivi debug    */
     section = weston_config_get_section(shell->compositor->config, "ivi-debug", NULL, NULL);
     if (section)    {
-        weston_config_section_get_int(section, "log", &ico_debug_level, 3);
+        weston_config_section_get_int(section, "log",
+                                      &ico_debug_level, DEFAULT_DEBUG_LEVEL);
     }
 }
 
@@ -1080,6 +1120,74 @@ bind_workspace_manager(struct wl_client *client,
 }
 
 static void
+touch_move_grab_down(struct weston_touch_grab *grab, uint32_t time,
+             int touch_id, wl_fixed_t sx, wl_fixed_t sy)
+{
+}
+
+static void
+touch_move_grab_up(struct weston_touch_grab *grab, uint32_t time, int touch_id)
+{
+    struct shell_touch_grab *shell_grab = container_of(grab,
+                               struct shell_touch_grab,
+                               grab);
+    shell_touch_grab_end(shell_grab);
+}
+
+static void
+touch_move_grab_motion(struct weston_touch_grab *grab, uint32_t time,
+               int touch_id, wl_fixed_t sx, wl_fixed_t sy)
+{
+    struct weston_touch_move_grab *move = (struct weston_touch_move_grab *) grab;
+    struct shell_surface *shsurf = move->base.shsurf;
+    struct weston_surface *es;
+    int dx = wl_fixed_to_int(grab->touch->grab_x + move->dx);
+    int dy = wl_fixed_to_int(grab->touch->grab_y + move->dy);
+
+    if (!shsurf)
+        return;
+
+    es = shsurf->surface;
+
+    weston_surface_configure(es, dx, dy,
+                 es->geometry.width, es->geometry.height);
+
+    weston_compositor_schedule_repaint(es->compositor);
+}
+
+static const struct weston_touch_grab_interface touch_move_grab_interface = {
+    touch_move_grab_down,
+    touch_move_grab_up,
+    touch_move_grab_motion,
+};
+
+static int
+surface_touch_move(struct shell_surface *shsurf, struct weston_seat *seat)
+{
+    struct weston_touch_move_grab *move;
+
+    if (!shsurf)
+        return -1;
+
+    if (shsurf->type == SHELL_SURFACE_FULLSCREEN)
+        return 0;
+
+    move = malloc(sizeof *move);
+    if (!move)
+        return -1;
+
+    move->dx = wl_fixed_from_double(shsurf->surface->geometry.x) -
+            seat->touch->grab_x;
+    move->dy = wl_fixed_from_double(shsurf->surface->geometry.y) -
+            seat->touch->grab_y;
+
+    shell_touch_grab_start(&move->base, &touch_move_grab_interface, shsurf,
+                   seat->touch);
+
+    return 0;
+}
+
+static void
 noop_grab_focus(struct weston_pointer_grab *grab)
 {
 }
@@ -1098,9 +1206,6 @@ move_grab_motion(struct weston_pointer_grab *grab, uint32_t time)
         return;
 
     es = shsurf->surface;
-
-    uifw_trace("move_grab_motion: configure %08x x/y=%d/%d w/h=%d/%d",
-               (int)es, (int)dx, (int)dy, es->geometry.width, es->geometry.height);
 
     /* ico-ivi-shell hook move      */
     if (shell_hook_move)    {
@@ -1169,13 +1274,17 @@ shell_surface_move(struct wl_client *client, struct wl_resource *resource,
     struct weston_surface *surface;
 
     surface = weston_surface_get_main_surface(seat->pointer->focus);
-    if (seat->pointer->button_count == 0 ||
-        seat->pointer->grab_serial != serial ||
-        surface != shsurf->surface)
-        return;
-
-    if (surface_move(shsurf, seat) < 0)
-        wl_resource_post_no_memory(resource);
+    if (seat->pointer->button_count > 0 && seat->pointer->grab_serial == serial) {
+        surface = weston_surface_get_main_surface(seat->pointer->focus);
+        if ((surface == shsurf->surface) &&
+            (surface_move(shsurf, seat) < 0))
+            wl_resource_post_no_memory(resource);
+    } else if (seat->touch->grab_serial == serial) {
+        surface = weston_surface_get_main_surface(seat->touch->focus);
+        if ((surface == shsurf->surface) &&
+            (surface_touch_move(shsurf, seat) < 0))
+            wl_resource_post_no_memory(resource);
+    }
 }
 
 struct weston_resize_grab {
@@ -2508,6 +2617,11 @@ configure_static_surface(struct weston_surface *es, struct weston_layer *layer, 
         wl_list_insert(&layer->surface_list, &es->layer_link);
         weston_compositor_schedule_repaint(es->compositor);
     }
+
+    /* if ico_window_mgr hook, call hook routine    */
+    if (shell_hook_configure)  {
+        (*shell_hook_configure)(es);
+    }
 }
 
 static void
@@ -3095,7 +3209,10 @@ click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t butt
     struct weston_surface *focus;
     struct weston_surface *main_surface;
 
-    focus = (struct weston_surface *) seat->pointer->focus;
+    if (button == BTN_LEFT)
+        focus = (struct weston_surface *) seat->pointer->focus;
+    else
+        focus = (struct weston_surface *) seat->touch->focus;
     if (!focus)
         return;
 
@@ -3573,8 +3690,8 @@ map(struct desktop_shell *shell, struct weston_surface *surface,
     if (shell_hook_map)  {
         (*shell_hook_map)(surface, &width, &height, &sx, &sy);
     }
-    if (shell_hook_change)  {
-        (*shell_hook_change)(surface, -1, 0);       /* send event to manager    */
+    if (shell_hook_configure)  {
+        (*shell_hook_configure)(surface);           /* send event to manager    */
     }
 }
 
@@ -3622,8 +3739,8 @@ configure(struct desktop_shell *shell, struct weston_surface *surface,
     }
 
     /* if ico_window_mgr hook, call hook routine    */
-    if (shell_hook_change)  {
-        (*shell_hook_change)(surface, -1, 0);
+    if (shell_hook_configure)  {
+        (*shell_hook_configure)(surface);
     }
 }
 
@@ -3690,7 +3807,7 @@ desktop_shell_sigchld(struct weston_process *process, int status)
 
     shell->child.deathcount++;
     if (shell->child.deathcount > 5) {
-        weston_log("%s, giving up.\n", shell_exe);
+        weston_log("%s died, giving up.\n", shell_exe);
         return;
     }
 
@@ -4508,6 +4625,9 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
     weston_compositor_add_button_binding(ec, BTN_LEFT, 0,
                          click_to_activate_binding,
                          shell);
+    weston_compositor_add_button_binding(ec, BTN_TOUCH, 0,
+                         click_to_activate_binding,
+                         shell);
     weston_compositor_add_axis_binding(ec, WL_POINTER_AXIS_VERTICAL_SCROLL,
                            MODIFIER_SUPER | MODIFIER_ALT,
                            surface_opacity_binding, NULL);
@@ -4834,17 +4954,16 @@ ico_ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   ico_ivi_shell_hook_change: regist hook function for change shell surface
+ * @brief   ico_ivi_shell_hook_configure: regist hook function for configure shell surface
  *
- * @param[in]   hook_change     hook function(if NULL, reset hook function)
+ * @param[in]   hook_configure  hook function(if NULL, reset hook function)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT void
-ico_ivi_shell_hook_change(void (*hook_change)(struct weston_surface *surface,
-                                              const int to, const int manager))
+ico_ivi_shell_hook_configure(void (*hook_configure)(struct weston_surface *surface))
 {
-    shell_hook_change = hook_change;
+    shell_hook_configure = hook_configure;
 }
 
 /*--------------------------------------------------------------------------*/

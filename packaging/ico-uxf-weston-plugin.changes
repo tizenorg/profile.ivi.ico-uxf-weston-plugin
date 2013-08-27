@@ -1,4 +1,10 @@
+* Tue Aug 27 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130823.164747@50fc72f
+- 0.7.03 release
+-- A correction with version up of weston(1.2.0->1.2.1).
+-- The implementation of the application screen acquisition interface for thumbnail indication by HomeScreen.
+
 * Wed Aug 21 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/2.0alpha-wayland/20130612.174820@6b54175
+- 0.7.02 release
 - Fix spec file.
 -- Correct package BuildRequires fields to address build errors.
 -- Corrected package group tags based on Tizen packaging guidelines.

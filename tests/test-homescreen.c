@@ -39,7 +39,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <signal.h>
+#include <fcntl.h>
 #include <linux/input.h>
 #include <wayland-client.h>
 #include "ico_window_mgr-client-protocol.h"
@@ -47,6 +49,9 @@
 #include "test-common.h"
 
 #define MAX_APPID   128
+#define SHM_SIZE    (16*1024*1024)
+#define MAX_CON_NAME    127
+#define MAX_OUTPUT      8
 
 struct surface_name {
     struct surface_name *next;
@@ -61,8 +66,6 @@ struct surface_name {
     int     visible;
 };
 
-#define MAX_CON_NAME    127
-
 struct display {
     struct wl_display *display;
     struct wl_registry *registry;
@@ -73,7 +76,13 @@ struct display {
     struct ico_input_mgr_device *ico_input_device;
     struct ico_exinput *ico_exinput;
     struct input *input;
-    struct output *output;
+    int    num_output;
+    struct output *output[MAX_OUTPUT];
+#if 0                       /* 2013/08/23 no need shm   */
+    struct wl_shm *shm;
+    void   *shm_buf;
+    struct wl_shm_pool *shm_pool;
+#endif
     struct surface *surface;
     struct surface_name *surface_name;
     struct surface_name *bgsurface_name;
@@ -626,11 +635,28 @@ window_surfaces(void *data, struct ico_window_mgr *ico_window_mgr,
 
 static void
 window_map(void *data, struct ico_window_mgr *ico_window_mgr,
-            int32_t event, uint32_t surfaceid,
-            int32_t width, int32_t height, int32_t stride, int32_t format)
+           int32_t event, uint32_t surfaceid, uint32_t type, uint32_t target,
+           int32_t width, int32_t height, int32_t stride, uint32_t format)
 {
-    print_log("HOMESCREEN: Event[map_surface] ev=%d surf=%08x w/h/s/f=%d/%d/%d/%x",
-              event, (int)surfaceid, width, height, stride, format);
+    char    sevt[16];
+
+    switch (event)  {
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS:
+        strcpy(sevt, "Contents");   break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_RESIZE:
+        strcpy(sevt, "Resize"); break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP:
+        strcpy(sevt, "Map");    break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP:
+        strcpy(sevt, "Unmap");  break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR:
+        sprintf(sevt, "Error %d", target);  break;
+    default:
+        sprintf(sevt, "??%d??", event); break;
+    }
+    print_log("HOMESCREEN: Event[map_surface] ev=%s(%d) surf=%08x type=%d target=%x "
+              "w/h/s/f=%d/%d/%d/%x",
+              sevt, event, (int)surfaceid, type, target, width, height, stride, format);
 }
 
 static const struct ico_window_mgr_listener window_mgr_listener = {
@@ -701,13 +727,17 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
         display->input = input;
     }
     else if (strcmp(interface, "wl_output") == 0) {
-        output = malloc(sizeof *output);
-        output->display = display;
-        output->output = wl_registry_bind(display->registry, id, &wl_output_interface, 1);
-        wl_output_add_listener(output->output, &output_listener, output);
-        display->output = output;
-
-        print_log("HOMESCREEN: created output global %p", display->output);
+        if (display->num_output < MAX_OUTPUT)   {
+            output = malloc(sizeof *output);
+            output->display = display;
+            output->output = wl_registry_bind(display->registry, id, &wl_output_interface, 1);
+            wl_output_add_listener(output->output, &output_listener, output);
+            display->output[display->num_output] = output;
+    
+            print_log("HOMESCREEN: created output[%d] global %p",
+                      display->num_output, display->output[display->num_output]);
+            display->num_output ++;
+        }
     }
     else if (strcmp(interface, "wl_shell") == 0)    {
         display->shell =
@@ -731,6 +761,13 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
                                                      &ico_input_mgr_device_interface, 1);
         print_log("HOMESCREEN: created input_device global %p", display->ico_input_device);
     }
+#if 0                       /* 2013/08/23 no need shm   */
+    else if (strcmp(interface, "wl_shm") == 0)   {
+        display->shm = wl_registry_bind(display->registry, id,
+                                        &wl_shm_interface, 1);
+        print_log("HOMESCREEN: created wl_shm global %p", display->shm);
+    }
+#endif
     else if (strcmp(interface, "ico_exinput") == 0)   {
         display->ico_exinput =
             wl_registry_bind(display->registry, id, &ico_exinput_interface, 1);
@@ -943,9 +980,11 @@ move_surface(struct display *display, char *buf)
         y = strtol(args[2], (char **)0, 0);
         if (narg >= 4)  {
             node = strtol(args[3], (char **)0, 0);
-            if (p)  {
-                p->node = node;
+            if (node < 0)   {
+                if (p)  node = p->node;
+                else    node = 0;
             }
+            if (p)  p->node = node;
         }
         else if (p) {
             node = p->node;
@@ -1053,23 +1092,55 @@ show_surface(struct display *display, char *buf, const int show)
     int     narg;
     int     surfaceid;
     int     anima = 0;
+    int     ax = 0;
+    int     ay = 0;
+    int     awidth = 1;
+    int     aheight = 1;
 
     narg = pars_command(buf, args, 10);
     if (narg >= 1)  {
         surfaceid = search_surface(display, args[0]);
         if (narg >= 2)  {
             anima = strtol(args[1], (char **)0, 0);
+            if (anima >= 2) {
+                ax = 0;
+                ay = 0;
+                awidth = 1;
+                aheight = 1;
+                if (narg >= 3)  ax = strtol(args[2], (char **)0, 0);
+                if (narg >= 4)  ay = strtol(args[3], (char **)0, 0);
+                if (narg >= 5)  awidth = strtol(args[4], (char **)0, 0);
+                if (narg >= 6)  aheight = strtol(args[5], (char **)0, 0);
+            }
         }
         if (surfaceid >= 0) {
             if (show)   {
-                print_log("HOMESCREEN: show(%s,%08x,anima=%d)", args[0], surfaceid, anima);
-                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
-                                           1, ICO_WINDOW_MGR_V_NOCHANGE, anima);
+                if (anima >= 2) {
+                    print_log("HOMESCREEN: show anima(%s,%08x,x/y=%d/%d,w/h=%d/%d)",
+                              args[0], surfaceid, ax, ay, awidth, aheight);
+                    ico_window_mgr_visible_animation(display->ico_window_mgr, surfaceid,
+                                                     1, ax, ay, awidth, aheight);
+                }
+                else    {
+                    print_log("HOMESCREEN: show(%s,%08x,anima=%d)",
+                              args[0], surfaceid, anima);
+                    ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                               1, ICO_WINDOW_MGR_V_NOCHANGE, anima);
+                }
             }
             else    {
-                print_log("HOMESCREEN: hide(%s,%08x,anima=%d)", args[0], surfaceid, anima);
-                ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
-                                           0, ICO_WINDOW_MGR_V_NOCHANGE, anima);
+                if (anima >= 2) {
+                    print_log("HOMESCREEN: hide anima(%s,%08x,x/y=%d/%d,w/h=%d/%d)",
+                              args[0], surfaceid, ax, ay, awidth, aheight);
+                    ico_window_mgr_visible_animation(display->ico_window_mgr, surfaceid,
+                                                     0, ax, ay, awidth, aheight);
+                }
+                else    {
+                    print_log("HOMESCREEN: hide(%s,%08x,anima=%d)",
+                              args[0], surfaceid, anima);
+                    ico_window_mgr_set_visible(display->ico_window_mgr, surfaceid,
+                                               0, ICO_WINDOW_MGR_V_NOCHANGE, anima);
+                }
             }
         }
         else    {
@@ -1077,7 +1148,8 @@ show_surface(struct display *display, char *buf, const int show)
         }
     }
     else    {
-        print_log("HOMESCREEN: show command[show/hide appid anima] has no argument");
+        print_log("HOMESCREEN: show command[show/hide appid anima x y width height]"
+                  " has no argument");
     }
 }
 
@@ -1146,6 +1218,51 @@ animation_surface(struct display *display, char *buf)
     else    {
         print_log("HOMESCREEN: animation command"
                   "[animation appid animation time] has no argument");
+    }
+}
+
+static void
+map_surface(struct display *display, char *buf, int map)
+{
+    char    *args[10];
+    int     narg;
+    int     surfaceid;
+    int     fps;
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 1)  {
+        surfaceid = search_surface(display, args[0]);
+        if (surfaceid >= 0) {
+            if (narg >= 2)  {
+                fps = strtol(args[1], (char **)0, 0);
+            }
+            else    {
+                fps = 0;
+            }
+            if (map)    {
+                print_log("HOMESCREEN: map surface(%s,%08x,%d)",
+                          args[0], surfaceid, fps);
+                ico_window_mgr_map_surface(display->ico_window_mgr, surfaceid, fps);
+            }
+            else    {
+                print_log("HOMESCREEN: unmap surface(%s,%08x)", args[0], surfaceid);
+                ico_window_mgr_unmap_surface(display->ico_window_mgr, surfaceid);
+            }
+        }
+        else    {
+            print_log("HOMESCREEN: Unknown surface(%s) at %s command", args[0],
+                      map ? "map" : "unmap");
+        }
+    }
+    else    {
+        if (map)    {
+            print_log("HOMESCREEN: map surface command"
+                      "[map surface framerate] has no argument");
+        }
+        else    {
+            print_log("HOMESCREEN: unmap surface command"
+                      "[unmap surface] has no argument");
+        }
     }
 }
 
@@ -1409,6 +1526,11 @@ int main(int argc, char *argv[])
     char buf[256];
     int ret, fd;
     int msec;
+#if 1           /* use mkostemp */
+    extern int  mkostemp(char *template, int flags);
+#else           /* use mkostemp */
+    long flags;
+#endif          /* use mkostemp */
 
     display = malloc(sizeof *display);
     assert(display);
@@ -1441,10 +1563,61 @@ int main(int argc, char *argv[])
     assert(display->display);
 
     display->registry = wl_display_get_registry(display->display);
-    wl_registry_add_listener(display->registry,
-                 &registry_listener, display);
+    wl_registry_add_listener(display->registry, &registry_listener, display);
     wl_display_dispatch(display->display);
 
+#if 0                       /* 2013/08/23 no need shm   */
+    /* make wl_shm              */
+    do  {
+        sleep_with_wayland(display->display, 20);
+    } while(! display->shm);
+
+    strcpy(buf, "/tmp/test-homescreen-shm-XXXXXX");
+#if 1           /* use mkostemp */
+    fd = mkostemp(buf, O_CLOEXEC);
+    if (fd < 0) {
+        fprintf(stderr, "test-homescreen: can not make temp file for shm\n");
+        exit(1);
+    }
+#else           /* use mkostemp */
+    fd = mkstemp(buf);
+    if (fd < 0) {
+        fprintf(stderr, "test-homescreen: can not make temp file for shm\n");
+        exit(1);
+    }
+    flags = fcntl(fd, F_GETFD);
+    if (flags == -1)    {
+        fprintf(stderr, "test-homescreen: can not get file flags\n");
+        close(fd);
+        exit(1);
+    }
+    if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)   {
+        fprintf(stderr, "test-homescreen: can not set file flags to FD_CLOEXEC\n");
+        close(fd);
+        exit(1);
+    }
+#endif          /* use mkostemp */
+    unlink(buf);
+    if (ftruncate(fd, SHM_SIZE) < 0)    {
+        fprintf(stderr, "test-homescreen: can not truncate temp file for shm\n");
+        close(fd);
+        exit(1);
+    }
+    display->shm_buf = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (display->shm_buf == MAP_FAILED) {
+        fprintf(stderr, "test-homescreen: can not mmap temp file for shm\n");
+        close(fd);
+        exit(1);
+    }
+    display->shm_pool = wl_shm_create_pool(display->shm, fd, SHM_SIZE);
+    close(fd);
+    if (! display->shm_pool)    {
+        fprintf(stderr, "test-homescreen: wayland can not make shm_pool\n");
+        exit(1);
+    }
+    print_log("HOMESCREEN: shm pool=%08x addr=%08x",
+              (int)display->shm_pool, (int)display->shm_buf);
+#endif
     fd = 0;
 
     while (1) {
@@ -1515,8 +1688,16 @@ int main(int argc, char *argv[])
             raise_surface(display, &buf[5], 0);
         }
         else if (strncasecmp(buf, "animation", 9) == 0) {
-            /* Set animation surface window*/
+            /* Set animation surface window */
             animation_surface(display, &buf[9]);
+        }
+        else if (strncasecmp(buf, "map", 3) == 0) {
+            /* map surface                  */
+            map_surface(display, &buf[3], 1);
+        }
+        else if (strncasecmp(buf, "unmap", 5) == 0) {
+            /* unmap surface                */
+            map_surface(display, &buf[5], 0);
         }
         else if (strncasecmp(buf, "input_add", 9) == 0) {
             /* Set input switch to application */
