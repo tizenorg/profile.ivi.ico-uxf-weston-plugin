@@ -1,0 +1,229 @@
+# Test for Weston IVI Plugin for HomeScreen(SystemController)
+# send input event Test
+#
+# 1. trigger clients
+#
+launch ../tests/test-client < ../tests/testdata/cl_surface4.dat 2> ../tests/testlog/test-client.log 1>&2
+waitcreate 2
+move test-client 100 200
+show test-client
+sleep 1
+#
+launch ../tests/test-eflapp @1 -color=0xe02040ff 2> ../tests/testlog/test-eflapp.log 1>&2
+waitcreate 2
+move test-eflapp@1 650 80
+show test-eflapp@1
+#
+# 11. send pointer event to general pointer motion(general event)
+#
+sleep 1
+input_send @ pointer 0 ABS_Z 80 160
+sleep 0.1
+input_send @ pointer 0 ABS_X 270
+input_send @ pointer 0 ABS_Y 440
+sleep 0.1
+input_send @ pointer 0 BTN_LEFT 1
+sleep 0.2
+input_send @ pointer 0 BTN_LEFT 0
+sleep 0.5
+input_send @ pointer 0 ABS_X 272
+input_send @ pointer 0 ABS_Y 438
+sleep 0.1
+input_send @ pointer 0 BTN_LEFT 1
+sleep 0.1
+input_send @ pointer 0 ABS_X 271
+input_send @ pointer 0 ABS_Y 439
+sleep 0.1
+input_send @ pointer 0 BTN_LEFT 0
+sleep 1
+#
+# 12. send keyboard event(general event)
+#
+active test-client
+input_send @ keyboard 0 1 1
+input_send @ keyboard 0 1 0
+sleep 0.2
+input_send @ keyboard 0 2 1
+sleep 0.1
+input_send @ keyboard 0 2 0
+sleep 1
+#
+# 13. send touch event(general event)
+#
+active test-client
+input_send @ touch 0 ABS_Z 250 450
+input_send @ touch 0 BTN_TOUCH 1
+sleep 0.1
+input_send @ touch 0 ABS_Z 255 455
+sleep 0.2
+input_send @ touch 0 BTN_TOUCH 0
+sleep 1
+#
+# 14. switch event(general event)
+#
+active test-client
+input_send @ switch 0 11 1
+input_send @ switch 0 11 0
+sleep 0.1
+input_send @ switch 0 12 1
+sleep 0.1
+input_send @ switch 0 12 0
+sleep 1
+#
+# 15. haptic event(general event)
+#
+active test-client
+input_send @ haptic 0 ABS_Z 260 460
+sleep 0.1
+input_send @ haptic 0 ABS_Z 262 462
+sleep 0.1
+input_send @ haptic 0 BTN_LEFT 1
+sleep 0.1
+input_send @ haptic 0 BTN_LEFT 0
+sleep 1
+#
+# 21. send pointer event to general pointer motion(appid)
+#
+sleep 1
+input_send @test-client pointer 0 ABS_Z 80 160
+sleep 0.1
+input_send @test-client pointer 0 ABS_X 270
+input_send @test-client pointer 0 ABS_Y 440
+sleep 0.1
+input_send @test-client pointer 0 BTN_LEFT 1
+sleep 0.2
+input_send @test-client pointer 0 BTN_LEFT 0
+sleep 0.5
+input_send @test-client pointer 0 ABS_X 272
+input_send @test-client pointer 0 ABS_Y 438
+sleep 0.1
+input_send @test-client pointer 0 BTN_LEFT 1
+sleep 0.1
+input_send @test-client pointer 0 ABS_X 271
+input_send @test-client pointer 0 ABS_Y 439
+sleep 0.1
+input_send @test-client pointer 0 BTN_LEFT 0
+sleep 1
+#
+# 22. send keyboard event(appid)
+#
+active test-client
+input_send @test-client keyboard 0 1 1
+input_send @test-client keyboard 0 1 0
+sleep 0.2
+input_send @test-client keyboard 0 2 1
+sleep 0.1
+input_send @test-client keyboard 0 2 0
+sleep 1
+#
+# 23. send touch event(appid)
+#
+active test-client
+input_send @test-client touch 0 ABS_Z 250 450
+input_send @test-client touch 0 BTN_TOUCH 1
+sleep 0.1
+input_send @test-client touch 0 ABS_Z 255 455
+sleep 0.2
+input_send @test-client touch 0 BTN_TOUCH 0
+sleep 1
+#
+# 24. switch event(appid)
+#
+active test-client
+input_send @test-client switch 0 11 1
+input_send @test-client switch 0 11 0
+sleep 0.1
+input_send @test-client switch 0 12 1
+sleep 0.1
+input_send @test-client switch 0 12 0
+sleep 1
+#
+# 25. haptic event(appid)
+#
+active test-client
+input_send @test-client haptic 0 ABS_Z 260 460
+sleep 0.1
+input_send @test-client haptic 0 ABS_Z 262 462
+sleep 0.1
+input_send @test-client haptic 0 BTN_LEFT 1
+sleep 0.1
+input_send @test-client haptic 0 BTN_LEFT 0
+sleep 1
+#
+# 31. send pointer event to general pointer motion(urface id)
+#
+sleep 1
+input_send test-client pointer 0 ABS_Z 80 160
+sleep 0.1
+input_send test-client pointer 0 ABS_X 270
+input_send test-client pointer 0 ABS_Y 440
+sleep 0.1
+input_send test-client pointer 0 BTN_LEFT 1
+sleep 0.2
+input_send test-client pointer 0 BTN_LEFT 0
+sleep 0.5
+input_send test-client pointer 0 ABS_X 272
+input_send test-client pointer 0 ABS_Y 438
+sleep 0.1
+input_send test-client pointer 0 BTN_LEFT 1
+sleep 0.1
+input_send test-client pointer 0 ABS_X 271
+input_send test-client pointer 0 ABS_Y 439
+sleep 0.1
+input_send test-client pointer 0 BTN_LEFT 0
+sleep 1
+#
+# 32. send keyboard event(surface id)
+#
+active test-client
+input_send test-client keyboard 0 1 1
+input_send test-client keyboard 0 1 0
+sleep 0.2
+input_send test-client keyboard 0 2 1
+sleep 0.1
+input_send test-client keyboard 0 2 0
+sleep 1
+#
+# 33. send touch event(surface id)
+#
+active test-client
+input_send test-client touch 0 ABS_Z 250 450
+input_send test-client touch 0 BTN_TOUCH 1
+sleep 0.1
+input_send test-client touch 0 ABS_Z 255 455
+sleep 0.2
+input_send test-client touch 0 BTN_TOUCH 0
+sleep 1
+#
+# 34. switch event(surface id)
+#
+active test-client
+input_send test-client switch 0 11 1
+input_send test-client switch 0 11 0
+sleep 0.1
+input_send test-client switch 0 12 1
+sleep 0.1
+input_send test-client switch 0 12 0
+sleep 1
+#
+# 35. haptic event(surface id)
+#
+active test-client
+input_send test-client haptic 0 ABS_Z 260 460
+sleep 0.1
+input_send test-client haptic 0 ABS_Z 262 462
+sleep 0.1
+input_send test-client haptic 0 BTN_LEFT 1
+sleep 0.1
+input_send test-client haptic 0 BTN_LEFT 0
+sleep 1
+#
+sleep 60
+#
+kill test-client
+kill test-eflapp@1
+sleep 1
+#
+# 99. End of Test
+bye
+

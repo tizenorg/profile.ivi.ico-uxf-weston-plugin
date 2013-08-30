@@ -62,6 +62,7 @@ struct input {
     struct wl_seat *seat;
     struct wl_pointer *pointer;
     struct wl_keyboard *keyboard;
+    struct wl_touch *touch;
     float x, y;
     uint32_t button_mask;
     struct surface *pointer_focus;
@@ -99,8 +100,8 @@ pointer_handle_enter(void *data, struct wl_pointer *pointer,
     input->pointer_focus = wl_surface_get_user_data(surface);
     input->x = wl_fixed_to_double(x);
     input->y = wl_fixed_to_double(y);
-    print_log("CLIENT: got pointer enter (%d,%d), surface %p",
-              (int)input->x, (int)input->y, surface);
+    print_log("CLIENT: got pointer enter (%d,%d)=(%d,%d), surface %p",
+              x, y, (int)input->x, (int)input->y, surface);
 }
 
 static void
@@ -123,7 +124,8 @@ pointer_handle_motion(void *data, struct wl_pointer *pointer,
     input->x = wl_fixed_to_double(x);
     input->y = wl_fixed_to_double(y);
 
-    print_log("CLIENT: got pointer motion (%d,%d)", (int)input->x, (int)input->y);
+    print_log("CLIENT: got pointer motion (%d,%d)=(%d,%d)",
+              x, y, (int)input->x, (int)input->y);
 }
 
 static void
@@ -197,6 +199,39 @@ keyboard_handle_modifiers(void *data, struct wl_keyboard *keyboard,
     print_log("CLIENT: got keyboard modifier");
 }
 
+static void
+touch_handle_down(void *data, struct wl_touch *wl_touch, uint32_t serial, uint32_t time,
+                  struct wl_surface *surface, int32_t id, wl_fixed_t x, wl_fixed_t y)
+{
+    print_log("CLIENT: got touch down %d (%d,%d)", id, x/256, y/256);
+}
+
+static void
+touch_handle_up(void *data, struct wl_touch *wl_touch, uint32_t serial, uint32_t time,
+                int32_t id)
+{
+    print_log("CLIENT: got touch up %d", id);
+}
+
+static void
+touch_handle_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
+                    int32_t id, wl_fixed_t x, wl_fixed_t y)
+{
+    print_log("CLIENT: got touch motion %d (%d,%d)", id, x/256, y/256);
+}
+
+static void
+touch_handle_frame(void *data, struct wl_touch *wl_touch)
+{
+    print_log("CLIENT: got touch frame");
+}
+
+static void
+touch_handle_cancel(void *data, struct wl_touch *wl_touch)
+{
+    print_log("CLIENT: got touch cancel");
+}
+
 static const struct wl_pointer_listener pointer_listener = {
     pointer_handle_enter,
     pointer_handle_leave,
@@ -211,6 +246,14 @@ static const struct wl_keyboard_listener keyboard_listener = {
     keyboard_handle_leave,
     keyboard_handle_key,
     keyboard_handle_modifiers,
+};
+
+static const struct wl_touch_listener touch_listener = {
+    touch_handle_down,
+    touch_handle_up,
+    touch_handle_motion,
+    touch_handle_frame,
+    touch_handle_cancel
 };
 
 static void
@@ -237,6 +280,16 @@ seat_handle_capabilities(void *data, struct wl_seat *seat,
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && input->keyboard) {
         wl_keyboard_destroy(input->keyboard);
         input->keyboard = NULL;
+    }
+
+    if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !input->touch) {
+        input->touch = wl_seat_get_touch(seat);
+        wl_touch_set_user_data(input->touch, input);
+        wl_touch_add_listener(input->touch, &touch_listener, input);
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && input->touch) {
+        wl_touch_destroy(input->touch);
+        input->touch = NULL;
     }
 }
 
@@ -586,9 +639,9 @@ int main(int argc, char *argv[])
     while (1) {
         sleep_with_wayland(display->display, 20);
         if (display->prompt)    {
-            printf("CLIENT: "); fflush(stdout);
+            printf("CLIENT> "); fflush(stdout);
         }
-        ret = getdata(display->ico_window_mgr, "CLIENT: ", fd, buf, sizeof(buf));
+        ret = getdata(display->ico_window_mgr, "CLIENT> ", fd, buf, sizeof(buf));
         if (ret < 0) {
             fprintf(stderr, "CLIENT: read error: fd %d, %m\n",
                 fd);

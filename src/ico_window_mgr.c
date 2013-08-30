@@ -64,8 +64,7 @@
 #define UIFW_HASH           64              /* Hash value (2's compliment)          */
 
 /* Internal fixed value                 */
-                                            /* map buffer, buffsize bound           */
-#define ICO_WINDOW_MGR_BUFBOUND 4096
+#define ICO_WINDOW_MGR_APPID_FIXCOUNT   5   /* retry count of appid fix             */
                                             /* show/hide animation with position    */
 #define ICO_WINDOW_MGR_ANIMATION_POS    0x10000000
 
@@ -171,8 +170,6 @@ struct ico_win_mgr {
 #define MAKE_WSHASH(v)  ((((uint32_t)v) >> 5) & (UIFW_HASH-1))
 
 /* function prototype                   */
-                                            /* get surface table from surfece id    */
-static struct uifw_win_surface *find_uifw_win_surface_by_id(uint32_t surfaceid);
                                             /* get surface table from weston surface*/
 static struct uifw_win_surface *find_uifw_win_surface_by_ws(
                     struct weston_surface *wsurf);
@@ -184,6 +181,8 @@ static uint32_t generate_id(void);
 static void win_mgr_bind_client(struct wl_client *client, void *shell);
                                             /* unind shell client                   */
 static void win_mgr_unbind_client(struct wl_client *client);
+                                            /* get appid from pid                   */
+static void win_mgr_get_client_appid(struct uifw_client *uclient);
                                             /* create new surface                   */
 static void win_mgr_register_surface(
                     struct wl_client *client, struct wl_resource *resource,
@@ -212,8 +211,6 @@ static void win_mgr_set_raise(struct uifw_win_surface *usurf, const int raise);
                                             /* surface change from manager          */
 static int win_mgr_surface_change_mgr(struct weston_surface *surface, const int x,
                                       const int y, const int width, const int height);
-                                            /* restack surface list                 */
-static void win_mgr_restack_ivi_layer(struct uifw_win_surface *usurf);
                                             /* create new layer                     */
 static struct uifw_win_layer *win_mgr_create_layer(struct uifw_win_surface *usurf,
                                                    const uint32_t layer);
@@ -305,11 +302,13 @@ static const struct ico_window_mgr_interface ico_window_mgr_implementation = {
 static int  _ico_ivi_debug_flag = 0;            /* Debug flags                      */
 static int  _ico_ivi_debug_level = 3;           /* Debug Level                      */
 static char *_ico_ivi_animation_name = NULL;    /* Default animation name           */
-static int  _ico_ivi_animation_time = 600;      /* Default animation time           */
+static int  _ico_ivi_animation_time = 500;      /* Default animation time           */
 static int  _ico_ivi_animation_fps = 15;        /* Animation frame rate             */
+static int  _ico_ivi_background_layer = 0;      /* Background layer                 */
 static int  _ico_ivi_default_layer = 1;         /* Deafult layer id at surface create*/
-static int  _ico_ivi_startup_layer = 101;       /* Deafult layer id at system startup*/
+static int  _ico_ivi_input_layer = 101;         /* Input layer id                   */
 static int  _ico_ivi_cursor_layer = 102;        /* Cursor layer id                  */
+static int  _ico_ivi_startup_layer = 109;       /* Deafult layer id at system startup*/
 
 /* static management table              */
 static struct ico_win_mgr       *_ico_win_mgr = NULL;
@@ -419,7 +418,7 @@ ico_ivi_get_mynode(void)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
-WL_EXPORT void
+WL_EXPORT   void
 ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
                                   int x, int y, int width, int height)
 {
@@ -479,7 +478,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
-WL_EXPORT void
+WL_EXPORT   void
 ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
                               const int to, const int manager)
 {
@@ -491,7 +490,7 @@ ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   find_uifw_win_surface_by_id: find UIFW surface by surface id
+ * @brief   ico_window_mgr_get_usurf: find UIFW surface by surface id
  *
  * @param[in]   surfaceid   UIFW surface id
  * @return      UIFW surface table address
@@ -499,8 +498,8 @@ ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
  * @retval      NULL        error(surface id dose not exist)
  */
 /*--------------------------------------------------------------------------*/
-static struct uifw_win_surface *
-find_uifw_win_surface_by_id(uint32_t surfaceid)
+WL_EXPORT   struct uifw_win_surface *
+ico_window_mgr_get_usurf(const uint32_t surfaceid)
 {
     struct uifw_win_surface *usurf;
 
@@ -512,7 +511,7 @@ find_uifw_win_surface_by_id(uint32_t surfaceid)
         }
         usurf = usurf->next_idhash;
     }
-    uifw_trace("find_uifw_win_surface_by_id: NULL");
+    uifw_trace("ico_window_mgr_get_usurf: NULL");
     return NULL;
 }
 
@@ -680,11 +679,6 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
     pid_t   pid;
     uid_t   uid;
     gid_t   gid;
-    int     fd;
-    int     size;
-    int     i;
-    int     j;
-    char    procpath[128];
 
     uifw_trace("win_mgr_bind_client: Enter(client=%08x, shell=%08x)",
                (int)client, (int)shell);
@@ -706,6 +700,7 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         }
         memset(uclient, 0, sizeof(struct uifw_client));
         uclient->client = client;
+        wl_list_init(&uclient->surface_link);
         newclient = 1;
     }
     else    {
@@ -717,74 +712,15 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
     if (pid > 0)    {
         uclient->pid = (int)pid;
         /* get applicationId from AppCore(AUL)  */
-        memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
-        aul_app_get_appid_bypid(uclient->pid, uclient->appid, ICO_IVI_APPID_LENGTH);
-        uifw_trace("win_mgr_bind_client: client=%08x pid=%d appid=<%s>",
-                   (int)client, uclient->pid, uclient->appid);
-        if (uclient->appid[0] == 0) {
-            /* client dose not exist in AppCore, search Linux process table */
-            uifw_trace("win_mgr_bind_client: pid=%d dose not exist in AppCore(AUL)",
-                       uclient->pid);
+        win_mgr_get_client_appid(uclient);
 
-            memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
-            snprintf(procpath, sizeof(procpath)-1, "/proc/%d/cmdline", uclient->pid);
-            fd = open(procpath, O_RDONLY);
-            if (fd >= 0)    {
-                size = read(fd, procpath, sizeof(procpath));
-                for (; size > 0; size--)    {
-                    if (procpath[size-1])   break;
-                }
-                if (size > 0)   {
-                    /* get program base name    */
-                    i = 0;
-                    for (j = 0; j < size; j++)  {
-                        if (procpath[j] == 0)   break;
-                        if (procpath[j] == '/') i = j + 1;
-                    }
-                    j = 0;
-                    for (; i < size; i++)   {
-                        uclient->appid[j] = procpath[i];
-                        if ((uclient->appid[j] == 0) ||
-                            (j >= (ICO_IVI_APPID_LENGTH-1)))    break;
-                        j++;
-                    }
-                    /* search application number in apprication start option    */
-                    if ((uclient->appid[j] == 0) && (j < (ICO_IVI_APPID_LENGTH-2))) {
-                        for (; i < size; i++)   {
-                            if ((procpath[i] == 0) &&
-                                (procpath[i+1] == '@')) {
-                                strncpy(&uclient->appid[j], &procpath[i+1],
-                                        ICO_IVI_APPID_LENGTH - j - 2);
-                            }
-                        }
-                    }
-                }
-                close(fd);
-            }
-            for (i = strlen(uclient->appid)-1; i >= 0; i--) {
-                if (uclient->appid[i] != ' ')   break;
-            }
-            uclient->appid[i+1] = 0;
-            if (uclient->appid[0])  {
-                uifw_trace("win_mgr_bind_client: client=%08x pid=%d appid=<%s> from "
-                           "Process table", (int)client, uclient->pid, uclient->appid);
-                /* weston internal client, not manage   */
-                if (strcmp(uclient->appid, "weston") == 0)  {
-                    newclient = -newclient;
-                }
-            }
-            else    {
-                uifw_trace("win_mgr_bind_client: pid=%d dose not exist in Process table",
-                           uclient->pid);
-                sprintf(uclient->appid, "?%d?", uclient->pid);
-            }
-        }
-        if (newclient > 0)  {
-            wl_list_insert(&_ico_win_mgr->client_list, &uclient->link);
-        }
-        else if (newclient < 0) {
+        /* weston internal client, not manage   */
+        if (strcmp(uclient->appid, "weston") == 0)  {
             free(uclient);
             uifw_trace("win_mgr_bind_client: client=%08x is internal, delete", (int)client);
+        }
+        else if (newclient > 0)  {
+            wl_list_insert(&_ico_win_mgr->client_list, &uclient->link);
         }
     }
     else    {
@@ -815,6 +751,92 @@ win_mgr_unbind_client(struct wl_client *client)
         free(uclient);
     }
     uifw_trace("win_mgr_unbind_client: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   win_mgr_get_client_appid: get applicationId from pid
+ *
+ * @param[in]   uclient     UIFW client management table
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+win_mgr_get_client_appid(struct uifw_client *uclient)
+{
+    int     fd;
+    int     size;
+    int     i;
+    int     j;
+    char    procpath[128];
+
+    uifw_trace("win_mgr_get_client_appid: Enter(pid=%d)", uclient->pid);
+
+    memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
+    i = aul_app_get_appid_bypid(uclient->pid, uclient->appid, ICO_IVI_APPID_LENGTH);
+    uifw_trace("win_mgr_get_client_appid: aul_app_get_appid_bypid ret=%d "
+               "pid=%d appid=<%s>", i, uclient->pid, uclient->appid);
+    if (uclient->appid[0] != 0) {
+        /* OK, end of get appid         */
+        uclient->fixed_appid = ICO_WINDOW_MGR_APPID_FIXCOUNT;
+    }
+    else    {
+        uclient->fixed_appid ++;
+        /* client dose not exist in AppCore, search Linux process table */
+        uifw_trace("win_mgr_get_client_appid: pid=%d dose not exist in AppCore(AUL)",
+                   uclient->pid);
+
+        memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
+        snprintf(procpath, sizeof(procpath)-1, "/proc/%d/cmdline", uclient->pid);
+        fd = open(procpath, O_RDONLY);
+        if (fd >= 0)    {
+            size = read(fd, procpath, sizeof(procpath));
+            for (; size > 0; size--)    {
+                if (procpath[size-1])   break;
+            }
+            if (size > 0)   {
+                /* get program base name    */
+                i = 0;
+                for (j = 0; j < size; j++)  {
+                    if (procpath[j] == 0)   break;
+                    if (procpath[j] == '/') i = j + 1;
+                }
+                j = 0;
+                for (; i < size; i++)   {
+                    uclient->appid[j] = procpath[i];
+                    if ((uclient->appid[j] == 0) ||
+                        (j >= (ICO_IVI_APPID_LENGTH-1)))    break;
+                    j++;
+                }
+                /* search application number in apprication start option    */
+                if ((uclient->appid[j] == 0) && (j < (ICO_IVI_APPID_LENGTH-2))) {
+                    for (; i < size; i++)   {
+                        if ((procpath[i] == 0) &&
+                            (procpath[i+1] == '@')) {
+                            strncpy(&uclient->appid[j], &procpath[i+1],
+                                    ICO_IVI_APPID_LENGTH - j - 2);
+                        }
+                    }
+                }
+            }
+            close(fd);
+        }
+        for (i = strlen(uclient->appid)-1; i >= 0; i--) {
+            if (uclient->appid[i] != ' ')   break;
+        }
+        uclient->appid[i+1] = 0;
+        if (uclient->appid[0])  {
+            uifw_trace("win_mgr_get_client_appid: pid=%d appid=<%s> from "
+                       "Process table", uclient->pid, uclient->appid);
+        }
+        else    {
+            uifw_trace("win_mgr_get_client_appid: pid=%d dose not exist in Process table",
+                       uclient->pid);
+            sprintf(uclient->appid, "?%d?", uclient->pid);
+        }
+    }
+    uifw_trace("win_mgr_get_client_appid: Leave(pid=%d,appid=%s)",
+               uclient->pid, uclient->appid);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -890,6 +912,7 @@ win_mgr_register_surface(struct wl_client *client, struct wl_resource *resource,
     usurf->shsurf = shsurf;
     usurf->node_tbl = &_ico_node_table[0];  /* set default node table (display no=0)    */
     wl_list_init(&usurf->ivi_layer);
+    wl_list_init(&usurf->client_link);
     wl_list_init(&usurf->animation.animation.link);
     wl_list_init(&usurf->surf_map);
     usurf->animation.hide_anima = ico_get_animation_name(ico_ivi_default_animation_name());
@@ -923,6 +946,7 @@ win_mgr_register_surface(struct wl_client *client, struct wl_resource *resource,
             return;
         }
     }
+    wl_list_insert(usurf->uclient->surface_link.prev, &usurf->client_link);
 
     /* make surface id hash table       */
     hash = MAKE_IDHASH(usurf->surfaceid);
@@ -1031,7 +1055,7 @@ win_mgr_map_surface(struct weston_surface *surface, int32_t *width, int32_t *hei
         }
         usurf->mapped = 1;
         if (usurf->visible) {
-            win_mgr_restack_ivi_layer(NULL);
+            ico_window_mgr_restack_layer(NULL, FALSE);
         }
         uifw_trace("win_mgr_map_surface: Leave");
     }
@@ -1042,14 +1066,15 @@ win_mgr_map_surface(struct weston_surface *surface, int32_t *width, int32_t *hei
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_restack_ivi_layer: restack surface list
+ * @brief   ico_window_mgr_restack_layer: restack surface list
  *
- * @param[in]   usurf           UIFW surface
+ * @param[in]   usurf           UIFW surface (if NULL, no surface)
+ * @param[in]   omit_touch      omit touch layer flag (TRUE=omit/FALSE=not omit)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
-static void
-win_mgr_restack_ivi_layer(struct uifw_win_surface *usurf)
+WL_EXPORT   void
+ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch)
 {
     struct uifw_win_surface  *es;
     struct uifw_win_layer *el;
@@ -1058,7 +1083,8 @@ win_mgr_restack_ivi_layer(struct uifw_win_surface *usurf)
     struct weston_layer *wlayer;
     int     num_visible = 0;
 
-    uifw_trace("win_mgr_restack_ivi_layer: Enter(surf=%08x)", (int)usurf);
+    uifw_trace("ico_window_mgr_restack_layer: Enter(surf=%08x,omit=%d)",
+               (int)usurf, omit_touch);
 
     /* make compositor surface list     */
     wlayer = ico_ivi_shell_current_layer();
@@ -1067,7 +1093,10 @@ win_mgr_restack_ivi_layer(struct uifw_win_surface *usurf)
     wl_list_for_each (el, &_ico_win_mgr->ivi_layer_list, link) {
         wl_list_for_each (es, &el->surface_list, ivi_layer) {
             if ((es->mapped != 0) && (es->surface != NULL))    {
-                if ((el->visible == FALSE) || (es->visible == FALSE))   {
+                if ((el->visible == FALSE) || (es->visible == FALSE) ||
+                    ((omit_touch != FALSE) &&
+                     ((el->layer_type == ICO_WINDOW_MGR_LAYER_TYPE_INPUT) ||
+                      (el->layer_type == ICO_WINDOW_MGR_LAYER_TYPE_CURSOR))))   {
                     new_x = (float)(ICO_IVI_MAX_COORDINATE+1);
                     new_y = (float)(ICO_IVI_MAX_COORDINATE+1);
                 }
@@ -1104,7 +1133,7 @@ win_mgr_restack_ivi_layer(struct uifw_win_surface *usurf)
                     weston_surface_damage(es->surface);
                 }
 #if 0           /* too many debug log   */
-                uifw_trace("win_mgr_restack_ivi_layer: %08x x/y=%d/%d w/h=%d/%d",
+                uifw_trace("ico_window_mgr_restack_layer: %08x x/y=%d/%d w/h=%d/%d",
                            es->surfaceid,
                            (int)es->surface->geometry.x, (int)es->surface->geometry.y,
                            es->surface->geometry.width, es->surface->geometry.height);
@@ -1119,15 +1148,17 @@ win_mgr_restack_ivi_layer(struct uifw_win_surface *usurf)
     }
 
     /* composit and draw screen(plane)  */
-    weston_compositor_schedule_repaint(_ico_win_mgr->compositor);
+    if (omit_touch == FALSE)    {
+        weston_compositor_schedule_repaint(_ico_win_mgr->compositor);
 
-    if ((_ico_win_mgr->shell_init == 0) && (num_visible > 0) &&
-        (_ico_win_mgr->shell != NULL) && (_ico_win_mgr->num_manager > 0))   {
-        /* start shell fade         */
-        _ico_win_mgr->shell_init = 1;
-        ico_ivi_shell_startup(_ico_win_mgr->shell);
+        if ((_ico_win_mgr->shell_init == 0) && (num_visible > 0) &&
+            (_ico_win_mgr->shell != NULL) && (_ico_win_mgr->num_manager > 0))   {
+            /* start shell fade         */
+            _ico_win_mgr->shell_init = 1;
+            ico_ivi_shell_startup(_ico_win_mgr->shell);
+        }
     }
-    uifw_trace("win_mgr_restack_ivi_layer: Leave");
+    uifw_trace("ico_window_mgr_restack_layer: Leave");
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1155,6 +1186,18 @@ win_mgr_create_layer(struct uifw_win_surface *usurf, const uint32_t layer)
 
     memset(new_el, 0, sizeof(struct uifw_win_layer));
     new_el->layer = layer;
+    if ((int)layer == _ico_ivi_background_layer )   {
+        new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_BACKGROUND;
+    }
+    else if ((int)layer == _ico_ivi_input_layer )   {
+        new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_INPUT;
+    }
+    else if ((int)layer == _ico_ivi_cursor_layer )  {
+        new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_CURSOR;
+    }
+    else    {
+        new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_NORMAL;
+    }
     new_el->visible = TRUE;
     wl_list_init(&new_el->surface_list);
     wl_list_init(&new_el->link);
@@ -1224,7 +1267,7 @@ win_mgr_set_layer(struct uifw_win_surface *usurf, const uint32_t layer)
 
     /* rebild compositor surface list       */
     if (usurf->visible) {
-        win_mgr_restack_ivi_layer(usurf);
+        ico_window_mgr_restack_layer(usurf, 0);
     }
     uifw_trace("win_mgr_set_layer: Leave");
 }
@@ -1410,7 +1453,7 @@ uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_window_layer: Enter res=%08x surfaceid=%08x layer=%d",
                (int)resource, surfaceid, layer);
 
-    struct uifw_win_surface *usurf = find_uifw_win_surface_by_id(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
 
     if (! usurf)    {
         uifw_trace("uifw_set_window_layer: Leave(No Surface(id=%08x))", surfaceid);
@@ -1458,7 +1501,7 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
                    node, _ico_num_nodes);
         node = 0;
     }
-    struct uifw_win_surface *usurf = find_uifw_win_surface_by_id(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
 
     if (usurf && (usurf->surface))  {
         /* weston surface exist             */
@@ -1602,7 +1645,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
         uifw_trace("uifw_set_visible: Request from Unknown App, not Manager");
     }
 
-    usurf = find_uifw_win_surface_by_id(surfaceid);
+    usurf = ico_window_mgr_get_usurf(surfaceid);
 
     if ((! usurf) || (! usurf->surface))    {
         uifw_trace("uifw_set_visible: Leave(Surface Not Exist)");
@@ -1715,7 +1758,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
         weston_surface_damage(usurf->surface);
     }
     else if(restack & 2)    {
-        win_mgr_restack_ivi_layer(usurf);
+        ico_window_mgr_restack_layer(usurf, 0);
     }
 
     /* send event(VISIBLE) to manager           */
@@ -1748,7 +1791,7 @@ uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
                    uint32_t surfaceid, int32_t type, const char *animation, int32_t time)
 {
     int animaid;
-    struct uifw_win_surface *usurf = find_uifw_win_surface_by_id(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
 
     uifw_trace("uifw_set_transition: Enter(surf=%08x,type=%x,anim=%s,time=%d)",
                surfaceid, type, animation, time);
@@ -1827,7 +1870,7 @@ static void
 uifw_set_attributes(struct wl_client *client, struct wl_resource *resource,
                     uint32_t surfaceid, uint32_t attributes)
 {
-    struct uifw_win_surface *usurf = find_uifw_win_surface_by_id(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
 
     uifw_trace("uifw_set_attributes: Enter(surf=%08x,attributes=%x)", surfaceid, attributes);
 
@@ -1872,7 +1915,7 @@ uifw_visible_animation(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_visible_animation: Enter(%08x,%d,x/y=%d/%d,w/h=%d/%d)",
                surfaceid, visible, x, y, width, height);
 
-    usurf = find_uifw_win_surface_by_id(surfaceid);
+    usurf = ico_window_mgr_get_usurf(surfaceid);
 
     if ((! usurf) || (! usurf->surface))    {
         uifw_trace("uifw_visible_animation: Leave(Surface Not Exist)");
@@ -1914,7 +1957,7 @@ uifw_set_active(struct wl_client *client, struct wl_resource *resource,
 
     if ((surfaceid > 0) &&
         ((active & (ICO_WINDOW_MGR_ACTIVE_POINTER|ICO_WINDOW_MGR_ACTIVE_KEYBOARD)) != 0)) {
-        usurf = find_uifw_win_surface_by_id(surfaceid);
+        usurf = ico_window_mgr_get_usurf(surfaceid);
     }
     else    {
         usurf = NULL;
@@ -2071,7 +2114,7 @@ uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
     }
 
     /* rebild compositor surface list       */
-    win_mgr_restack_ivi_layer(NULL);
+    ico_window_mgr_restack_layer(NULL, 0);
 
     /* send layer visible event to manager  */
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_LAYER_VISIBLE, NULL,
@@ -2294,7 +2337,7 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
 
     uifw_trace("uifw_map_surface: Enter(surface=%08x,fps=%d)", surfaceid, framerate);
 
-    usurf = find_uifw_win_surface_by_id(surfaceid);
+    usurf = ico_window_mgr_get_usurf(surfaceid);
     if (! usurf)    {
         /* surface dose not exist, error        */
         ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
@@ -2413,7 +2456,7 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
 
     uifw_trace("uifw_unmap_surface: Enter(surface=%08x)", surfaceid);
 
-    usurf = find_uifw_win_surface_by_id(surfaceid);
+    usurf = ico_window_mgr_get_usurf(surfaceid);
     if (! usurf)    {
         /* surface dose not exist, error        */
         uifw_trace("uifw_unmap_surface: Leave(surface=%08x dose not exist)", surfaceid);
@@ -2548,7 +2591,7 @@ win_mgr_change_surface(struct weston_surface *surface, const int to, const int m
                                                 usurf->x + usurf->xadd),
                                         (float)(usurf->node_tbl->disp_y +
                                                 usurf->y + usurf->yadd));
-            win_mgr_restack_ivi_layer(usurf);
+            ico_window_mgr_restack_layer(usurf, 0);
         }
         else    {
             weston_surface_set_position(usurf->surface, (float)(ICO_IVI_MAX_COORDINATE+1),
@@ -2812,7 +2855,7 @@ win_mgr_surface_move(struct weston_surface *surface, int *dx, int *dy)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
-WL_EXPORT void
+WL_EXPORT   void
 ico_window_mgr_set_visible(struct uifw_win_surface *usurf, const int visible)
 {
     if (visible)    {
@@ -2820,7 +2863,7 @@ ico_window_mgr_set_visible(struct uifw_win_surface *usurf, const int visible)
             uifw_trace("ico_window_mgr_set_visible: Chagne to Visible(%08x)", (int)usurf);
             usurf->visible = 1;
             /* change unvisible to visible, restack surface list    */
-            win_mgr_restack_ivi_layer(usurf);
+            ico_window_mgr_restack_layer(usurf, 0);
         }
     }
     else    {
@@ -2828,7 +2871,7 @@ ico_window_mgr_set_visible(struct uifw_win_surface *usurf, const int visible)
             uifw_trace("ico_window_mgr_set_visible: Chagne to Unvisible(%08x)", (int)usurf);
             usurf->visible = 0;
             /* change visible to unvisible, restack surface list    */
-            win_mgr_restack_ivi_layer(usurf);
+            ico_window_mgr_restack_layer(usurf, 0);
         }
     }
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_VISIBLE,
@@ -2866,7 +2909,7 @@ win_mgr_set_raise(struct uifw_win_surface *usurf, const int raise)
 
     /* rebild compositor surface list               */
     if (usurf->visible) {
-        win_mgr_restack_ivi_layer(usurf);
+        ico_window_mgr_restack_layer(usurf, 0);
     }
     ico_win_mgr_send_to_mgr(ICO_WINDOW_MGR_WINDOW_VISIBLE,
                             usurf, usurf->visible, usurf->raise, 0, 0,0);
@@ -2917,7 +2960,10 @@ win_mgr_destroy_surface(struct weston_surface *surface)
 
     /* delete from layer list       */
     wl_list_remove(&usurf->ivi_layer);
-    win_mgr_restack_ivi_layer(NULL);
+    ico_window_mgr_restack_layer(NULL, 0);
+
+    /* delete from cleint list      */
+    wl_list_remove(&usurf->client_link);
 
     /* delete from hash table       */
     hash = MAKE_IDHASH(usurf->surfaceid);
@@ -3060,6 +3106,12 @@ ico_win_mgr_send_to_mgr(const int event, struct uifw_win_surface *usurf,
 {
     int     num_mgr = 0;
     struct uifw_manager* mgr;
+
+    /* if appid not fix, check and fix appid    */
+    if ((usurf != NULL) &&
+        (usurf->uclient->fixed_appid < ICO_WINDOW_MGR_APPID_FIXCOUNT)) {
+        win_mgr_get_client_appid(usurf->uclient);
+    }
 
     /* send created if not send created event   */
     if ((usurf != NULL) && (usurf->created == 0) &&
@@ -3215,8 +3267,8 @@ win_mgr_set_scale(struct uifw_win_surface *usurf)
                 usurf->set_transform = 0;
                 wl_list_remove(&usurf->transform.link);
             }
-            weston_surface_update_transform(es);
             weston_surface_geometry_dirty(es);
+            weston_surface_update_transform(es);
             weston_surface_damage_below(es);
             weston_surface_damage(es);
             ret = 1;
@@ -3227,13 +3279,66 @@ win_mgr_set_scale(struct uifw_win_surface *usurf)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_get_uclient: get UIFW client table
+ *
+ * @param[in]   appid       application Id
+ * @return      UIFW client table
+ * @retval      !=NULL      success(UIFW client table address)
+ * @retval      = NULL      error(appid not exist)
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   struct uifw_client *
+ico_window_mgr_get_uclient(const char *appid)
+{
+    struct uifw_client *uclient;
+
+    wl_list_for_each (uclient, &_ico_win_mgr->client_list, link)    {
+        if (strcmp(uclient->appid, appid) == 0) {
+            return uclient;
+        }
+    }
+    return NULL;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_window_mgr_get_client_usurf: get client UIFW surface table
+ *
+ * @param[in]   appid       application Id
+ * @param[in]   winname     window name
+ * @return      UIFW surface table
+ * @retval      !=NULL      success(UIFW surface table address)
+ * @retval      = NULL      error(appid or winname not exist)
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   struct uifw_win_surface *
+ico_window_mgr_get_client_usurf(const char *appid, const char *winname)
+{
+    struct uifw_client      *uclient;
+    struct uifw_win_surface *usurf;
+
+    wl_list_for_each (uclient, &_ico_win_mgr->client_list, link)    {
+        if (strcmp(uclient->appid, appid) == 0) {
+            wl_list_for_each (usurf, &uclient->surface_link, client_link)   {
+                if ((winname == NULL) || (*winname == 0) ||
+                    (strcmp(winname, usurf->winname) == 0)) {
+                    return usurf;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   ico_window_mgr_set_hook_animation: set animation hook routine
  *
  * @param[in]   hook_animation  hook routine
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
-WL_EXPORT void
+WL_EXPORT   void
 ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data))
 {
     win_mgr_hook_animation = hook_animation;
@@ -3252,16 +3357,16 @@ ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data
  * @retval      -1          error
  */
 /*--------------------------------------------------------------------------*/
-WL_EXPORT int
+WL_EXPORT   int
 module_init(struct weston_compositor *ec, int *argc, char *argv[])
 {
     int     nodeId;
     int     i;
     int     idx;
+    char    *p;
     struct weston_output *output;
     struct weston_config_section *section;
     char    *displayno = NULL;
-    char    *p;
 
     uifw_info("ico_window_mgr: Enter(module_init)");
 
@@ -3270,6 +3375,22 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     if (section)    {
         weston_config_section_get_int(section, "flag", &_ico_ivi_debug_flag, 0);
         weston_config_section_get_int(section, "log", &_ico_ivi_debug_level, 3);
+    }
+
+    /* get display number list                  */
+    section = weston_config_get_section(ec->config, "ivi-display", NULL, NULL);
+    if (section)    {
+        weston_config_section_get_string(section, "displayno", &displayno, NULL);
+    }
+
+    /* get layer id                             */
+    section = weston_config_get_section(ec->config, "ivi-layer", NULL, NULL);
+    if (section)    {
+        weston_config_section_get_int(section, "default", &_ico_ivi_default_layer, 1);
+        weston_config_section_get_int(section, "startup", &_ico_ivi_startup_layer, 109);
+        weston_config_section_get_int(section, "input", &_ico_ivi_input_layer, 101);
+        weston_config_section_get_int(section, "cursor", &_ico_ivi_cursor_layer, 102);
+        weston_config_section_get_int(section, "background", &_ico_ivi_background_layer, 0);
     }
 
     /* get animation default                    */
@@ -3281,20 +3402,6 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     }
     if (_ico_ivi_animation_time < 100)  _ico_ivi_animation_time = 600;
     if (_ico_ivi_animation_fps < 2)     _ico_ivi_animation_fps = 15;
-
-    /* get display number list                  */
-    section = weston_config_get_section(ec->config, "ivi-display", NULL, NULL);
-    if (section)    {
-        weston_config_section_get_int(section, "default", &_ico_ivi_default_layer, 1);
-        weston_config_section_get_int(section, "startup", &_ico_ivi_startup_layer, 101);
-        weston_config_section_get_int(section, "cursor", &_ico_ivi_cursor_layer, 102);
-    }
-
-    /* get default layer id                     */
-    section = weston_config_get_section(ec->config, "ivi-layer", NULL, NULL);
-    if (section)    {
-        weston_config_section_get_string(section, "displayno", &displayno, NULL);
-    }
 
     /* create ico_window_mgr management table   */
     _ico_win_mgr = (struct ico_win_mgr *)malloc(sizeof(struct ico_win_mgr));
@@ -3309,7 +3416,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
         uifw_error("ico_window_mgr: malloc failed");
         return -1;
     }
-    uifw_trace("ico_window_mgr: table=%08x", (int)_ico_win_mgr);
+    uifw_debug("ico_window_mgr: table=%08x", (int)_ico_win_mgr);
     memset(_ico_win_mgr->surfaceid_map, 0, INIT_SURFACE_IDS/8);
 
     _ico_win_mgr->compositor = ec;
@@ -3407,6 +3514,15 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     ico_ivi_shell_hook_select(win_mgr_select_surface);
     ico_ivi_shell_hook_title(win_mgr_set_title);
     ico_ivi_shell_hook_move(win_mgr_surface_move);
+
+    uifw_info("ico_window_mgr: animation name=%s time=%d fps=%d",
+              _ico_ivi_animation_name, _ico_ivi_animation_time, _ico_ivi_animation_fps);
+    uifw_info("ico_window_mgr: layer default=%d startup=%d background=%d",
+              _ico_ivi_default_layer, _ico_ivi_startup_layer, _ico_ivi_background_layer);
+    uifw_info("ico_window_mgr: layer input=%d cursor=%d",
+              _ico_ivi_input_layer, _ico_ivi_cursor_layer);
+    uifw_info("ico_window_mgr: debug flag=%x log level=%d",
+              _ico_ivi_debug_flag, _ico_ivi_debug_level);
 
     uifw_info("ico_window_mgr: Leave(module_init)");
 

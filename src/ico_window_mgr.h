@@ -44,8 +44,10 @@ struct uifw_client  {
     char    appid[ICO_IVI_APPID_LENGTH];    /* ApplicationId(from AppCore AUL)      */
     struct uifw_manager *mgr;               /* Manager table (if manager)           */
     char    manager;                        /* Manager flag (Need send event)       */
+    char    fixed_appid;                    /* ApplicationId fix flag(and counter)  */
     char    noconfigure;                    /* no need configure event              */
-    char    res[2];
+    char    res;                            /* (unused)                             */
+    struct wl_list  surface_link;           /* surface list of same client          */
     struct wl_list  link;
 };
 
@@ -63,7 +65,8 @@ struct uifw_node_table {
 struct  uifw_win_layer  {
     uint32_t layer;                         /* Layer Id                             */
     char     visible;                       /* visibility                           */
-    char     res[3];                        /* (unused)                             */
+    char     layer_type;                    /* layer type                           */
+    char     res[2];                        /* (unused)                             */
     struct wl_list surface_list;            /* Surfacae list                        */
     struct wl_list link;                    /* Link pointer for layer list          */
 };
@@ -146,10 +149,17 @@ struct uifw_win_surface {
         void    *animadata;                 /* animation data                       */
     }       animation;
     struct wl_list          ivi_layer;      /* surface list of same layer           */
+    struct wl_list          client_link;    /* surface list of same client          */
     struct wl_list          surf_map;       /* surface map list                     */
     struct uifw_win_surface *next_idhash;   /* UIFW SurfaceId hash list             */
     struct uifw_win_surface *next_wshash;   /* Weston SurfaceId hash list           */
 };
+
+/* layer type                           */
+#define ICO_WINDOW_MGR_LAYER_TYPE_NORMAL     0      /* normal layer                 */
+#define ICO_WINDOW_MGR_LAYER_TYPE_BACKGROUND 1      /* touch input layer            */
+#define ICO_WINDOW_MGR_LAYER_TYPE_INPUT      7      /* touch input layer            */
+#define ICO_WINDOW_MGR_LAYER_TYPE_CURSOR     8      /* cursor layer                 */
 
 /* animation operation                  */
 /* default animation                    */
@@ -190,6 +200,15 @@ void ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf, int x, in
                                             /* surface change                       */
 void ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
                                    const int to, const int manager);
+                                            /* get UIFW client table                */
+struct uifw_client *ico_window_mgr_get_uclient(const char *appid);
+                                            /* get UIFW surface table               */
+struct uifw_win_surface *ico_window_mgr_get_usurf(const uint32_t surfaceid);
+                                            /* get application surface              */
+struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *appid,
+                                                         const char *winname);
+                                            /* rebuild surface layer list           */
+void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
 

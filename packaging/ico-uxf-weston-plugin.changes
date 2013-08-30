@@ -1,3 +1,8 @@
+* Fri Aug 30 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130828.211548@4cf16ef
+- 0.9.01 release
+-- The change of the configuration(weston.ini) with the version up of HomeScreen(0.7.x->0.9.x).
+-- The implementation of the event input from application.
+
 * Tue Aug 27 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130823.164747@50fc72f
 - 0.7.03 release
 -- A correction with version up of weston(1.2.0->1.2.1).
