@@ -41,7 +41,7 @@
 #define ICO_IVI_SURFACEID_BASE(nodeid)          (((unsigned int)nodeid) << 16)
 
 /* System limit                         */
-#define ICO_IVI_MAX_DISPLAY      (8)        /* Maximum display number of one ECU    */
+#define ICO_IVI_MAX_DISPLAY      (8)        /* Maximum numer of displays in a ECU   */
 #define ICO_IVI_APPID_LENGTH     (128)      /* Maximum length of applicationId(AppCore) */
                                             /* (with terminate NULL)                */
 #define ICO_IVI_WINNAME_LENGTH   (32)       /* Maximum length of window name (with NULL)*/
@@ -73,16 +73,17 @@ int ico_ivi_default_animation_fps(void);    /* Get animation frame rate(fps)    
 #define UIFW_DEBUG_OUT  1   /* 1=Debug Print/0=No Debug Print           */
 
 #if UIFW_DEBUG_OUT > 0
+#define uifw_debug(fmt,...)  \
+    { if (ico_ivi_debuglevel() >= 5) {weston_log("DBG>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_trace(fmt,...)  \
-    { if (ico_ivi_debuglevel() >= 4) {weston_log("DBG>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
+    { if (ico_ivi_debuglevel() >= 4) {weston_log("TRC>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #else  /*UIFW_DEBUG_OUT*/
+#define uifw_debug(fmt,...)
 #define uifw_trace(fmt,...)
 #endif /*UIFW_DEBUG_OUT*/
 
 #define uifw_info(fmt,...)  \
     { if (ico_ivi_debuglevel() >= 3) {weston_log("INF>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
-#define uifw_msg(fmt,...)  \
-    { if (ico_ivi_debuglevel() >= 3) {weston_log("INF>"fmt"\n",##__VA_ARGS__);} }
 #define uifw_warn(fmt,...)  \
     { if (ico_ivi_debuglevel() >= 2) {weston_log("WRN>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_error(fmt,...)  \

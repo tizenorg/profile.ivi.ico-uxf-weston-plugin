@@ -3,7 +3,7 @@
 #
 #	1. Create Surface
 create-surface
-#	2. Sleep 10 sec
+#	2. Sleep 8 sec
 sleep 8
 #	3. End of this Application (exit)
 bye

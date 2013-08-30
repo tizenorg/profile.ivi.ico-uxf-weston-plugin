@@ -303,8 +303,10 @@ static char *shell_exe = NULL;
 static int  ico_debug_level = DEFAULT_DEBUG_LEVEL;  /* Debug Level                  */
 
 /* debug log macros         */
+#define uifw_debug(fmt,...)  \
+    { if (ico_debug_level >= 5) {weston_log("DBG>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_trace(fmt,...)  \
-    { if (ico_debug_level >= 4) {weston_log("DBG>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
+    { if (ico_debug_level >= 4) {weston_log("TRC>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_info(fmt,...)  \
     { if (ico_debug_level >= 3) {weston_log("INF>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_warn(fmt,...)  \
@@ -365,6 +367,11 @@ shell_grab_start(struct shell_grab *grab,
          enum desktop_shell_cursor cursor)
 {
     struct desktop_shell *shell = shsurf->shell;
+
+    /* if ico_window_mgr hook, not change grab  */
+    if (shell_hook_select)  {
+        return;
+    }
 
     popup_grab_end(pointer);
 
@@ -801,6 +808,8 @@ workspace_deactivate_transforms(struct workspace *ws)
         }
         weston_surface_geometry_dirty(surface);
     }
+
+    weston_surface_damage_below(surface);
 }
 
 static void
@@ -3169,6 +3178,11 @@ activate(struct desktop_shell *shell, struct weston_surface *es,
     wl_list_remove(&state->surface_destroy_listener.link);
     wl_signal_add(&es->destroy_signal, &state->surface_destroy_listener);
 
+    /* if ico_window_mgr hook, not change surface stack */
+    if (shell_hook_select)  {
+        return;
+    }
+
     switch (get_shell_surface_type(main_surface)) {
     case SHELL_SURFACE_FULLSCREEN:
         /* should on top of panels */
@@ -4038,6 +4052,22 @@ get_input_panel_surface(struct weston_surface *surface)
     } else {
         return NULL;
     }
+
+    if (next == NULL)
+        next = first;
+
+    if (next == NULL)
+        return;
+
+    wl_list_remove(&switcher->listener.link);
+    wl_signal_add(&next->destroy_signal, &switcher->listener);
+
+    switcher->current = next;
+    next->alpha = 1.0;
+
+    shsurf = get_shell_surface(switcher->current);
+    if (shsurf && shsurf->type ==SHELL_SURFACE_FULLSCREEN)
+        shsurf->fullscreen.black_surface->alpha = 1.0;
 }
 
 static void

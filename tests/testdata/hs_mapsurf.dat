@@ -31,7 +31,6 @@ sleep 2
 kill test-client
 kill test-eflapp@1
 sleep 1
-sleep 1
 #
 #	2. End of Test
 bye

@@ -102,6 +102,7 @@ struct input {
     struct wl_seat *seat;
     struct wl_pointer *pointer;
     struct wl_keyboard *keyboard;
+    struct wl_touch *touch;
     float x, y;
     uint32_t button_mask;
     struct surface *pointer_focus;
@@ -237,6 +238,39 @@ keyboard_handle_modifiers(void *data, struct wl_keyboard *keyboard,
     print_log("HOMESCREEN: got keyboard modifier");
 }
 
+static void
+touch_handle_down(void *data, struct wl_touch *wl_touch, uint32_t serial, uint32_t time,
+                  struct wl_surface *surface, int32_t id, wl_fixed_t x, wl_fixed_t y)
+{
+    print_log("CLIENT: got touch down %d (%d,%d)", id, x/256, y/256);
+}
+
+static void
+touch_handle_up(void *data, struct wl_touch *wl_touch, uint32_t serial, uint32_t time,
+                int32_t id)
+{
+    print_log("CLIENT: got touch up %d", id);
+}
+
+static void
+touch_handle_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
+                    int32_t id, wl_fixed_t x, wl_fixed_t y)
+{
+    print_log("CLIENT: got touch motion %d (%d,%d)", id, x/256, y/256);
+}
+
+static void
+touch_handle_frame(void *data, struct wl_touch *wl_touch)
+{
+    print_log("CLIENT: got touch frame");
+}
+
+static void
+touch_handle_cancel(void *data, struct wl_touch *wl_touch)
+{
+    print_log("CLIENT: got touch cancel");
+}
+
 static const struct wl_pointer_listener pointer_listener = {
     pointer_handle_enter,
     pointer_handle_leave,
@@ -251,6 +285,14 @@ static const struct wl_keyboard_listener keyboard_listener = {
     keyboard_handle_leave,
     keyboard_handle_key,
     keyboard_handle_modifiers,
+};
+
+static const struct wl_touch_listener touch_listener = {
+    touch_handle_down,
+    touch_handle_up,
+    touch_handle_motion,
+    touch_handle_frame,
+    touch_handle_cancel
 };
 
 static void
@@ -277,6 +319,16 @@ seat_handle_capabilities(void *data, struct wl_seat *seat,
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && input->keyboard) {
         wl_keyboard_destroy(input->keyboard);
         input->keyboard = NULL;
+    }
+
+    if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !input->touch) {
+        input->touch = wl_seat_get_touch(seat);
+        wl_touch_set_user_data(input->touch, input);
+        wl_touch_add_listener(input->touch, &touch_listener, input);
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && input->touch) {
+        wl_touch_destroy(input->touch);
+        input->touch = NULL;
     }
 }
 
@@ -624,6 +676,43 @@ window_active(void *data, struct ico_window_mgr *ico_window_mgr,
 {
     print_log("HOMESCREEN: Event[window_active] surface=%08x acive=%d",
               (int)surfaceid, (int)active);
+    if ((surfaceid & 0x0000ffff) == 0x0001) {
+        ico_window_mgr_set_visible(ico_window_mgr, surfaceid,
+                                   ICO_WINDOW_MGR_V_NOCHANGE, 0, 0);
+    }
+}
+
+static void
+window_surfaces(void *data, struct ico_window_mgr *ico_window_mgr,
+                const char *appid, struct wl_array *surfaces)
+{
+    print_log("HOMESCREEN: Event[app_surfaces] app=%s", appid);
+}
+
+static void
+window_map(void *data, struct ico_window_mgr *ico_window_mgr,
+           int32_t event, uint32_t surfaceid, uint32_t type, uint32_t target,
+           int32_t width, int32_t height, int32_t stride, uint32_t format)
+{
+    char    sevt[16];
+
+    switch (event)  {
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS:
+        strcpy(sevt, "Contents");   break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_RESIZE:
+        strcpy(sevt, "Resize"); break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP:
+        strcpy(sevt, "Map");    break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP:
+        strcpy(sevt, "Unmap");  break;
+    case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR:
+        sprintf(sevt, "Error %d", target);  break;
+    default:
+        sprintf(sevt, "??%d??", event); break;
+    }
+    print_log("HOMESCREEN: Event[map_surface] ev=%s(%d) surf=%08x type=%d target=%x "
+              "w/h/s/f=%d/%d/%d/%x",
+              sevt, event, (int)surfaceid, type, target, width, height, stride, format);
 }
 
 static void
@@ -733,7 +822,7 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
             output->output = wl_registry_bind(display->registry, id, &wl_output_interface, 1);
             wl_output_add_listener(output->output, &output_listener, output);
             display->output[display->num_output] = output;
-    
+
             print_log("HOMESCREEN: created output[%d] global %p",
                       display->num_output, display->output[display->num_output]);
             display->num_output ++;
@@ -1189,6 +1278,37 @@ raise_surface(struct display *display, char *buf, const int raise)
 }
 
 static void
+active_window(struct display *display, char *buf)
+{
+    char    *args[10];
+    int     narg;
+    int     surfaceid;
+    int     target;
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 1)  {
+        surfaceid = search_surface(display, args[0]);
+        if (narg >= 2)  {
+            target = strtol(args[1], (char **)0, 0);
+        }
+        else    {
+            target = ICO_WINDOW_MGR_ACTIVE_POINTER | ICO_WINDOW_MGR_ACTIVE_KEYBOARD;
+        }
+        if (surfaceid >= 0) {
+            print_log("HOMESCREEN: active(%s,%08x,target=%x)", args[0], surfaceid, target);
+            ico_window_mgr_set_active(display->ico_window_mgr, surfaceid, target);
+        }
+        else    {
+            print_log("HOMESCREEN: Unknown surface(%s) at active command", args[0]);
+        }
+    }
+    else    {
+        print_log("HOMESCREEN: active command[active appid[target]] has no argument");
+    }
+}
+
+
+static void
 animation_surface(struct display *display, char *buf)
 {
     char    *args[10];
@@ -1345,6 +1465,98 @@ input_del(struct display *display, char *buf)
     else    {
         print_log("HOMESCREEN: input_del command[input_del device inputId appid] "
                   "has no argument");
+    }
+}
+
+static void
+input_send(struct display *display, char *buf)
+{
+    char    *args[10];
+    int     narg;
+    int     surfaceid;
+    int     type;
+    int     no;
+    int     code;
+    int     value;
+    char    appid[64];
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 5)  {
+        memset(appid, 0, sizeof(appid));
+        if (args[0][0] == '@')  {
+            strncpy(appid, &args[0][1], sizeof(appid)-1);
+            surfaceid = 0;
+        }
+        else    {
+            surfaceid = search_surface(display, args[0]);
+        }
+        if (strcasecmp(args[1], "POINTER") == 0)    {
+            type = ICO_INPUT_MGR_DEVICE_TYPE_POINTER;
+        }
+        else if (strcasecmp(args[1], "KEYBOARD") == 0)  {
+            type = ICO_INPUT_MGR_DEVICE_TYPE_KEYBOARD;
+        }
+        else if (strcasecmp(args[1], "TOUCH") == 0) {
+            type = ICO_INPUT_MGR_DEVICE_TYPE_TOUCH;
+        }
+        else if (strcasecmp(args[1], "SWITCH") == 0)    {
+            type = ICO_INPUT_MGR_DEVICE_TYPE_SWITCH;
+        }
+        else if (strcasecmp(args[1], "HAPTIC") == 0)    {
+            type = ICO_INPUT_MGR_DEVICE_TYPE_HAPTIC;
+        }
+        else    {
+            type = strtol(args[1], (char **)0, 0);
+        }
+        no = strtol(args[2], (char **)0, 0);
+        if (strcasecmp(args[3], "ABS_X") == 0)  {
+            code = ABS_X;
+        }
+        else if (strcasecmp(args[3], "ABS_Y") == 0) {
+            code = ABS_Y;
+        }
+        else if (strcasecmp(args[3], "ABS_Z") == 0) {
+            code = ABS_Z;
+        }
+        else if (strcasecmp(args[3], "REL_X") == 0) {
+            code = REL_X | (EV_REL << 16);
+        }
+        else if (strcasecmp(args[3], "REL_Y") == 0) {
+            code = REL_Y | (EV_REL << 16);
+        }
+        else if (strcasecmp(args[3], "REL_Z") == 0) {
+            code = REL_Z | (EV_REL << 16);
+        }
+        else if (strcasecmp(args[3], "BTN_TOUCH") == 0) {
+            code = BTN_TOUCH;
+        }
+        else if (strcasecmp(args[3], "BTN_LEFT") == 0)  {
+            code = BTN_LEFT;
+        }
+        else if (strcasecmp(args[3], "BTN_RIGHT") == 0) {
+            code = BTN_RIGHT;
+        }
+        else if (strcasecmp(args[3], "BTN_MIDDLE") == 0)    {
+            code = BTN_MIDDLE;
+        }
+        else if (strcasecmp(args[3], "BTN_RIGHT") == 0) {
+            code = BTN_RIGHT;
+        }
+        else    {
+            code = strtol(args[3], (char **)0, 0);
+        }
+        value = strtol(args[4], (char **)0, 0);
+        if (narg >= 6)  {
+            value = (value << 16) + strtol(args[5], (char **)0, 0);
+        }
+        print_log("HOMESCREEN: input_send(%s.%x,%d,%d,%x,%d)",
+                  appid, surfaceid, type, no, code, value);
+        ico_input_mgr_control_send_input_event(display->ico_input_mgr,
+                                               appid, surfaceid, type, no, code, value);
+    }
+    else    {
+        print_log("HOMESCREEN: input_send command[input_send {@app/serface} type no code "
+                  "value [value2]] has no argument");
     }
 }
 
@@ -1623,9 +1835,9 @@ int main(int argc, char *argv[])
     while (1) {
         sleep_with_wayland(display->display, 20);
         if (display->prompt)    {
-            printf("HOMESCREEN: "); fflush(stdout);
+            printf("HOMESCREEN> "); fflush(stdout);
         }
-        ret = getdata(display->ico_window_mgr, "HOMESCREEN: ", fd, buf, sizeof(buf));
+        ret = getdata(display->ico_window_mgr, "HOMESCREEN> ", fd, buf, sizeof(buf));
         if (ret < 0) {
             fprintf(stderr, "HOMESCREEN: read error: fd %d, %m\n", fd);
             return -1;
@@ -1687,6 +1899,10 @@ int main(int argc, char *argv[])
             /* Raise/Lower surface window   */
             raise_surface(display, &buf[5], 0);
         }
+        else if (strncasecmp(buf, "active", 6) == 0) {
+            /* Active surface window        */
+            active_window(display, &buf[6]);
+        }
         else if (strncasecmp(buf, "animation", 9) == 0) {
             /* Set animation surface window */
             animation_surface(display, &buf[9]);
@@ -1706,6 +1922,10 @@ int main(int argc, char *argv[])
         else if (strncasecmp(buf, "input_del", 9) == 0) {
             /* Reset input switch to application*/
             input_del(display, &buf[9]);
+        }
+        else if (strncasecmp(buf, "input_send", 10) == 0) {
+            /* Input event send to application*/
+            input_send(display, &buf[10]);
         }
         else if (strncasecmp(buf, "input_conf", 10) == 0) {
             /* input switch configuration       */
