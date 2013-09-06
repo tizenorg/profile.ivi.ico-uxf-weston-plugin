@@ -16,6 +16,7 @@ sleep 1
 export QT_QPA_PLATFORM=wayland
 export ELM_ENGINE=wayland_egl
 export ECORE_EVAS_ENGINE=wayland_egl
+export XDG_RUNTIME_DIR=/run/user/5000
 
 # 4 Set Environment for Test
 export WESTON_IVI_PLUGIN_DIR="../src/.libs"

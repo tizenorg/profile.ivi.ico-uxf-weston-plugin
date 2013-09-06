@@ -1333,7 +1333,7 @@ resize_grab_motion(struct weston_pointer_grab *grab, uint32_t time)
         height += wl_fixed_to_int(to_y - from_y);
     }
 
-    uifw_trace("resize_grab_motion: send configure %08x %x w/h=%d/%d",
+    uifw_debug("resize_grab_motion: send configure %08x %x w/h=%d/%d",
                (int)shsurf->surface, resize->edges, width, height);
     shsurf->client->send_configure(shsurf->surface,
                        resize->edges, width, height);
@@ -1907,7 +1907,7 @@ shell_surface_set_maximized(struct wl_client *client,
     panel_height = get_output_panel_height(shell, shsurf->output);
     edges = WL_SHELL_SURFACE_RESIZE_TOP|WL_SHELL_SURFACE_RESIZE_LEFT;
 
-    uifw_trace("shell_surface_set_maximized: send %08x %x w/h=%d/%d",
+    uifw_debug("shell_surface_set_maximized: send %08x %x w/h=%d/%d",
                (int)shsurf->surface, edges, shsurf->output->width,
                shsurf->output->height - panel_height);
     shsurf->client->send_configure(shsurf->surface, edges,
@@ -1935,7 +1935,7 @@ create_black_surface(struct weston_compositor *ec,
 
     surface->configure = black_surface_configure;
     surface->configure_private = fs_surface;
-    uifw_trace("create_black_surface: configure %08x x/y=%d/%d w/h=%d/%d",
+    uifw_debug("create_black_surface: configure %08x x/y=%d/%d w/h=%d/%d",
                (int)surface, (int)x, (int)y, w, h);
     weston_surface_configure(surface, x, y, w, h);
     weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1);
@@ -2025,7 +2025,7 @@ shell_configure_fullscreen(struct shell_surface *shsurf)
                 weston_surface_set_position(surface,
                                 output->x - surf_x,
                                 output->y - surf_y);
-                uifw_trace("shell_configure_fullscreen: configure %08x x/y=%d/%d w/h=%d/%d",
+                uifw_debug("shell_configure_fullscreen: configure %08x x/y=%d/%d w/h=%d/%d",
                            (int)shsurf->fullscreen.black_surface, (int)(output->x - surf_x),
                            (int)(output->y - surf_y), output->width, output->height);
                 weston_surface_configure(shsurf->fullscreen.black_surface,
@@ -2102,7 +2102,7 @@ set_fullscreen(struct shell_surface *shsurf,
     shsurf->fullscreen.framerate = framerate;
     shsurf->next_type = SHELL_SURFACE_FULLSCREEN;
 
-    uifw_trace("set_fullscreen: send %08x 0 w/h=%d/%d",
+    uifw_debug("set_fullscreen: send %08x 0 w/h=%d/%d",
                (int)shsurf->surface, shsurf->output->width, shsurf->output->height);
     shsurf->client->send_configure(shsurf->surface, 0,
                        shsurf->output->width,
@@ -2616,7 +2616,7 @@ configure_static_surface(struct weston_surface *es, struct weston_layer *layer, 
         }
     }
 
-    uifw_trace("configure_static_surface: configure %08x x/y=%d/%d w/h=%d/%d",
+    uifw_debug("configure_static_surface: configure %08x x/y=%d/%d w/h=%d/%d",
                (int)es, (int)es->output->x, (int)es->output->y, width, height);
     weston_surface_configure(es, es->output->x, es->output->y, width, height);
 
@@ -2659,7 +2659,7 @@ desktop_shell_set_background(struct wl_client *client,
     surface->configure = background_configure;
     surface->configure_private = shell;
     surface->output = wl_resource_get_user_data(output_resource);
-    uifw_trace("desktop_shell_set_background: send %08x 0 w/h=%d/%d",
+    uifw_debug("desktop_shell_set_background: send %08x 0 w/h=%d/%d",
                (int)surface, surface->output->width, surface->output->height);
     desktop_shell_send_configure(resource, 0,
                      surface_resource,
@@ -2695,7 +2695,7 @@ desktop_shell_set_panel(struct wl_client *client,
     surface->configure = panel_configure;
     surface->configure_private = shell;
     surface->output = wl_resource_get_user_data(output_resource);
-    uifw_trace("desktop_shell_set_panel: send %08x 0 w/h=%d/%d",
+    uifw_debug("desktop_shell_set_panel: send %08x 0 w/h=%d/%d",
                (int)surface, surface->output->width, surface->output->height);
     desktop_shell_send_configure(resource, 0,
                      surface_resource,
@@ -2711,7 +2711,7 @@ lock_surface_configure(struct weston_surface *surface, int32_t sx, int32_t sy, i
     if (width == 0)
         return;
 
-    uifw_trace("lock_surface_configure: change %08x w/h=%d/%d", (int)surface, width, height);
+    uifw_debug("lock_surface_configure: change %08x w/h=%d/%d", (int)surface, width, height);
     surface->geometry.width = width;
     surface->geometry.height = height;
     center_on_output(surface, get_default_output(shell->compositor));
@@ -3324,7 +3324,7 @@ shell_fade_create_surface(struct desktop_shell *shell)
     if (!surface)
         return NULL;
 
-    uifw_trace("shell_fade_create_surface: configure %08x x/y=%d/%d w/h=%d/%d",
+    uifw_debug("shell_fade_create_surface: configure %08x x/y=%d/%d w/h=%d/%d",
                (int)surface, 0, 0, 8192, 8192);
     weston_surface_configure(surface, 0, 0, 8192, 8192);
     weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1.0);
@@ -3528,7 +3528,7 @@ center_on_output(struct weston_surface *surface, struct weston_output *output)
     x = output->x + (output->width - width) / 2 - surf_x / 2;
     y = output->y + (output->height - height) / 2 - surf_y / 2;
 
-    uifw_trace("center_on_output: %08x x/y=%d/%d w/h=%d/%d",
+    uifw_debug("center_on_output: %08x x/y=%d/%d w/h=%d/%d",
                (int)output, (int)x, (int)y, width, height);
     weston_surface_configure(surface, x, y, width, height);
 }
@@ -4014,7 +4014,7 @@ input_panel_configure(struct weston_surface *surface, int32_t sx, int32_t sy, in
         y = ip_surface->output->y + ip_surface->output->height - height;
     }
 
-    uifw_trace("input_panel_configure: configure %08x x/y=%d/%d w/h=%d/%d",
+    uifw_debug("input_panel_configure: configure %08x x/y=%d/%d w/h=%d/%d",
                (int)surface, (int)x, (int)y, width, height);
     weston_surface_configure(surface,
                  x, y,

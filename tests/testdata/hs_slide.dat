@@ -7,9 +7,9 @@ waitcreate 2
 hide test-client
 animation test-client Slide.toRight
 sleep 1
-show test-client
+show test-client 1
 sleep 3
-hide test-client
+hide test-client 1
 sleep 3
 kill test-client
 #

@@ -78,11 +78,6 @@ struct display {
     struct input *input;
     int    num_output;
     struct output *output[MAX_OUTPUT];
-#if 0                       /* 2013/08/23 no need shm   */
-    struct wl_shm *shm;
-    void   *shm_buf;
-    struct wl_shm_pool *shm_pool;
-#endif
     struct surface *surface;
     struct surface_name *surface_name;
     struct surface_name *bgsurface_name;
@@ -242,33 +237,33 @@ static void
 touch_handle_down(void *data, struct wl_touch *wl_touch, uint32_t serial, uint32_t time,
                   struct wl_surface *surface, int32_t id, wl_fixed_t x, wl_fixed_t y)
 {
-    print_log("CLIENT: got touch down %d (%d,%d)", id, x/256, y/256);
+    print_log("HOMESCREEN: got touch down %d (%d,%d)", id, x/256, y/256);
 }
 
 static void
 touch_handle_up(void *data, struct wl_touch *wl_touch, uint32_t serial, uint32_t time,
                 int32_t id)
 {
-    print_log("CLIENT: got touch up %d", id);
+    print_log("HOMESCREEN: got touch up %d", id);
 }
 
 static void
 touch_handle_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
                     int32_t id, wl_fixed_t x, wl_fixed_t y)
 {
-    print_log("CLIENT: got touch motion %d (%d,%d)", id, x/256, y/256);
+    print_log("HOMESCREEN: got touch motion %d (%d,%d)", id, x/256, y/256);
 }
 
 static void
 touch_handle_frame(void *data, struct wl_touch *wl_touch)
 {
-    print_log("CLIENT: got touch frame");
+    print_log("HOMESCREEN: got touch frame");
 }
 
 static void
 touch_handle_cancel(void *data, struct wl_touch *wl_touch)
 {
-    print_log("CLIENT: got touch cancel");
+    print_log("HOMESCREEN: got touch cancel");
 }
 
 static const struct wl_pointer_listener pointer_listener = {
@@ -301,32 +296,40 @@ seat_handle_capabilities(void *data, struct wl_seat *seat,
 {
     struct input *input = data;
 
+    print_log("HOMESCREEN: seat_handle_capabilities caps=%x", caps);
+
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !input->pointer) {
         input->pointer = wl_seat_get_pointer(seat);
+        print_log("HOMESCREEN: seat_handle_capabilities add pointer=%x", (int)input->pointer);
         wl_pointer_set_user_data(input->pointer, input);
         wl_pointer_add_listener(input->pointer, &pointer_listener, input);
     }
     else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && input->pointer) {
+        print_log("HOMESCREEN: seat_handle_capabilities delete pointer");
         wl_pointer_destroy(input->pointer);
         input->pointer = NULL;
     }
 
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !input->keyboard) {
         input->keyboard = wl_seat_get_keyboard(seat);
+        print_log("HOMESCREEN: seat_handle_capabilities add keyboard=%x", (int)input->keyboard);
         wl_keyboard_set_user_data(input->keyboard, input);
         wl_keyboard_add_listener(input->keyboard, &keyboard_listener, input);
     }
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && input->keyboard) {
+        print_log("HOMESCREEN: seat_handle_capabilities delete keyboard");
         wl_keyboard_destroy(input->keyboard);
         input->keyboard = NULL;
     }
 
     if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !input->touch) {
         input->touch = wl_seat_get_touch(seat);
+        print_log("HOMESCREEN: seat_handle_capabilities add touch=%x", (int)input->touch);
         wl_touch_set_user_data(input->touch, input);
         wl_touch_add_listener(input->touch, &touch_listener, input);
     }
     else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && input->touch) {
+        print_log("HOMESCREEN: seat_handle_capabilities delete touch");
         wl_touch_destroy(input->touch);
         input->touch = NULL;
     }
@@ -694,6 +697,7 @@ window_map(void *data, struct ico_window_mgr *ico_window_mgr,
            int32_t event, uint32_t surfaceid, uint32_t type, uint32_t target,
            int32_t width, int32_t height, int32_t stride, uint32_t format)
 {
+    struct display *display = data;
     char    sevt[16];
 
     switch (event)  {
@@ -706,13 +710,18 @@ window_map(void *data, struct ico_window_mgr *ico_window_mgr,
     case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP:
         strcpy(sevt, "Unmap");  break;
     case ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR:
-        sprintf(sevt, "Error %d", target);  break;
+        sprintf(sevt, "Error %d", type);  break;
     default:
         sprintf(sevt, "??%d??", event); break;
     }
     print_log("HOMESCREEN: Event[map_surface] ev=%s(%d) surf=%08x type=%d target=%x "
               "w/h/s/f=%d/%d/%d/%x",
               sevt, event, (int)surfaceid, type, target, width, height, stride, format);
+    if ((event == ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP) ||
+        (event == ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS))   {
+        opengl_thumbnail(display->display, surfaceid, display->surface->dpy,
+                         display->surface->ctx, target, width, height, stride, format);             
+    }
 }
 
 static const struct ico_window_mgr_listener window_mgr_listener = {
@@ -817,13 +826,6 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
                                                      &ico_input_mgr_device_interface, 1);
         print_log("HOMESCREEN: created input_device global %p", display->ico_input_device);
     }
-#if 0                       /* 2013/08/23 no need shm   */
-    else if (strcmp(interface, "wl_shm") == 0)   {
-        display->shm = wl_registry_bind(display->registry, id,
-                                        &wl_shm_interface, 1);
-        print_log("HOMESCREEN: created wl_shm global %p", display->shm);
-    }
-#endif
     else if (strcmp(interface, "ico_exinput") == 0)   {
         display->ico_exinput =
             wl_registry_bind(display->registry, id, &ico_exinput_interface, 1);
@@ -1745,58 +1747,6 @@ int main(int argc, char *argv[])
     wl_registry_add_listener(display->registry, &registry_listener, display);
     wl_display_dispatch(display->display);
 
-#if 0                       /* 2013/08/23 no need shm   */
-    /* make wl_shm              */
-    do  {
-        sleep_with_wayland(display->display, 20);
-    } while(! display->shm);
-
-    strcpy(buf, "/tmp/test-homescreen-shm-XXXXXX");
-#if 1           /* use mkostemp */
-    fd = mkostemp(buf, O_CLOEXEC);
-    if (fd < 0) {
-        fprintf(stderr, "test-homescreen: can not make temp file for shm\n");
-        exit(1);
-    }
-#else           /* use mkostemp */
-    fd = mkstemp(buf);
-    if (fd < 0) {
-        fprintf(stderr, "test-homescreen: can not make temp file for shm\n");
-        exit(1);
-    }
-    flags = fcntl(fd, F_GETFD);
-    if (flags == -1)    {
-        fprintf(stderr, "test-homescreen: can not get file flags\n");
-        close(fd);
-        exit(1);
-    }
-    if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)   {
-        fprintf(stderr, "test-homescreen: can not set file flags to FD_CLOEXEC\n");
-        close(fd);
-        exit(1);
-    }
-#endif          /* use mkostemp */
-    unlink(buf);
-    if (ftruncate(fd, SHM_SIZE) < 0)    {
-        fprintf(stderr, "test-homescreen: can not truncate temp file for shm\n");
-        close(fd);
-        exit(1);
-    }
-    display->shm_buf = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (display->shm_buf == MAP_FAILED) {
-        fprintf(stderr, "test-homescreen: can not mmap temp file for shm\n");
-        close(fd);
-        exit(1);
-    }
-    display->shm_pool = wl_shm_create_pool(display->shm, fd, SHM_SIZE);
-    close(fd);
-    if (! display->shm_pool)    {
-        fprintf(stderr, "test-homescreen: wayland can not make shm_pool\n");
-        exit(1);
-    }
-    print_log("HOMESCREEN: shm pool=%08x addr=%08x",
-              (int)display->shm_pool, (int)display->shm_buf);
-#endif
     fd = 0;
 
     while (1) {

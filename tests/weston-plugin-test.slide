@@ -12,17 +12,10 @@ else
 fi
 
 # 2 Weston/Wayland Envionment
-export XDG_RUNTIME_DIR=/tmp/run-root
+export XDG_RUNTIME_DIR=/run/user/5000
 export QT_QPA_PLATFORM=wayland
 export ELM_ENGINE=wayland_egl
 export ECORE_EVAS_ENGINE=wayland_egl
-#export ELM_ENGINE=wayland_shm
-#export ECORE_EVAS_ENGINE=wayland_shm
-export EVAS_FONT_DPI=72
-export ECORE_IMF_MODULE=isf
-export ELM_MODULES="ctxpopup_copypasteUI>entry/api:datetime_input_ctxpopup>datetime/api"
-export ELM_SCALE="0.7"
-export ELM_PROFILE=mobile
 
 # 3 Set Environment for Test
 export WESTON_IVI_PLUGIN_DIR="../src/.libs"

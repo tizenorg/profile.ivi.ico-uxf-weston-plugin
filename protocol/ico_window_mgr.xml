@@ -10,6 +10,7 @@
        General values for ico_window_mgr.
       </description>
       <entry name="nochange" value="0x8000" summary="no change value"/>
+      <entry name="mainsurface" value="0x8000" summary="main serface id"/>
     </enum>
 
     <enum name="declare_manager">
