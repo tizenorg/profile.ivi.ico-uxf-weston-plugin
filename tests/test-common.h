@@ -47,6 +47,9 @@ EGLSurface opengl_create_window(struct wl_display *display, struct wl_surface *s
                                 const int width, const int height, const int color);
 void opengl_clear_window(const unsigned int color);
 void opengl_swap_buffer(struct wl_display *display, EGLDisplay dpy, EGLSurface egl_surface);
+void opengl_thumbnail(struct wl_display *display, uint32_t surfaceid, EGLDisplay dpy,
+                      EGLContext ctx, uint32_t name, int width, int height, int stride,
+                      uint32_t format);
 
 #endif /*_TEST_COMMON_H_*/
 

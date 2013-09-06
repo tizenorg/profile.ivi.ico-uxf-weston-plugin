@@ -113,13 +113,14 @@ struct uifw_win_surface {
     uint16_t conf_height;                   /* Height that notified to client       */
     uint32_t attributes;                    /* surface attributes                   */
     char    winname[ICO_IVI_WINNAME_LENGTH];/* Window name                          */
+    char    disable;                        /* can not display                      */
     char    visible;                        /* visibility                           */
     char    raise;                          /* raise(top of the layer)              */
     char    created;                        /* sended created event to manager      */
     char    mapped;                         /* end of map                           */
     char    restrain_configure;             /* restrant configure event             */
     char    set_transform;                  /* surface transform flag               */
-    char    res[2];                         /* (unused)                             */
+    char    res;                            /* (unused)                             */
     struct  _uifw_win_surface_animation {   /* wndow animation                      */
         struct weston_animation animation;  /* weston animation control             */
         uint16_t type;                      /* current animation type               */
@@ -204,6 +205,9 @@ void ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
 struct uifw_client *ico_window_mgr_get_uclient(const char *appid);
                                             /* get UIFW surface table               */
 struct uifw_win_surface *ico_window_mgr_get_usurf(const uint32_t surfaceid);
+                                            /* get UIFW surface table               */
+struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfaceid,
+                                                         struct wl_client *client);
                                             /* get application surface              */
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *appid,
                                                          const char *winname);

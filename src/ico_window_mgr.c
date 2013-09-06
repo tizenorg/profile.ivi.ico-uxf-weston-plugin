@@ -68,12 +68,14 @@
                                             /* show/hide animation with position    */
 #define ICO_WINDOW_MGR_ANIMATION_POS    0x10000000
 
-/* wl_drm_buffer (inport from mesa-9.1.3/src/egl/wayland/wayland-drm/wayland-drm.h) */
+/* wl_buffer (inport from wayland-1.2.0/src/wayland-server.h)                       */
 struct uifw_wl_buffer   {
     struct wl_resource resource;
     int32_t width, height;
     uint32_t busy_count;
 };
+
+/* wl_drm_buffer (inport from mesa-9.1.3/src/egl/wayland/wayland-drm/wayland-drm.h) */
 struct uifw_drm_buffer {
     struct uifw_wl_buffer buffer;
     void *drm;                  /* struct wl_drm    */
@@ -517,6 +519,44 @@ ico_window_mgr_get_usurf(const uint32_t surfaceid)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_get_usurf_client: find UIFW surface by surface id/or client
+ *
+ * @param[in]   surfaceid   UIFW surface id
+ * @param[in]   client      Wayland client
+ * @return      UIFW surface table address
+ * @retval      !=NULL      success(surface table address)
+ * @retval      NULL        error(surface id or client dose not exist)
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   struct uifw_win_surface *
+ico_window_mgr_get_usurf_client(const uint32_t surfaceid, struct wl_client *client)
+{
+    struct uifw_win_surface *usurf;
+    struct uifw_client *uclient;
+
+    if (surfaceid == ICO_WINDOW_MGR_V_MAINSURFACE) {
+        uclient = find_client_from_client(client);
+        if (uclient)    {
+            if (&uclient->surface_link != uclient->surface_link.next)   {
+                usurf = container_of(uclient->surface_link.next,
+                                     struct uifw_win_surface, client_link);
+            }
+            else    {
+                usurf = NULL;
+            }
+        }
+        else    {
+            usurf = NULL;
+        }
+    }
+    else    {
+        usurf = ico_window_mgr_get_usurf(surfaceid);
+    }
+    return usurf;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   find_uifw_win_surface_by_ws: find UIFW surface by weston surface
  *
  * @param[in]   wsurf       Weston surface
@@ -770,8 +810,6 @@ win_mgr_get_client_appid(struct uifw_client *uclient)
     int     j;
     char    procpath[128];
 
-    uifw_trace("win_mgr_get_client_appid: Enter(pid=%d)", uclient->pid);
-
     memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
     i = aul_app_get_appid_bypid(uclient->pid, uclient->appid, ICO_IVI_APPID_LENGTH);
     uifw_trace("win_mgr_get_client_appid: aul_app_get_appid_bypid ret=%d "
@@ -781,11 +819,8 @@ win_mgr_get_client_appid(struct uifw_client *uclient)
         uclient->fixed_appid = ICO_WINDOW_MGR_APPID_FIXCOUNT;
     }
     else    {
-        uclient->fixed_appid ++;
         /* client dose not exist in AppCore, search Linux process table */
-        uifw_trace("win_mgr_get_client_appid: pid=%d dose not exist in AppCore(AUL)",
-                   uclient->pid);
-
+        uclient->fixed_appid ++;
         memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
         snprintf(procpath, sizeof(procpath)-1, "/proc/%d/cmdline", uclient->pid);
         fd = open(procpath, O_RDONLY);
@@ -835,8 +870,6 @@ win_mgr_get_client_appid(struct uifw_client *uclient)
             sprintf(uclient->appid, "?%d?", uclient->pid);
         }
     }
-    uifw_trace("win_mgr_get_client_appid: Leave(pid=%d,appid=%s)",
-               uclient->pid, uclient->appid);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1122,8 +1155,8 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touc
                     num_visible ++;
                 }
                 else    {
-                    new_x = (float)(ICO_IVI_MAX_COORDINATE+1);
-                    new_y = (float)(ICO_IVI_MAX_COORDINATE+1);
+                    new_x = (float)(es->x + es->node_tbl->disp_x + es->xadd);
+                    new_y = (float)(es->y + es->node_tbl->disp_y + es->yadd);
                 }
                 wl_list_insert(wlayer->surface_list.prev, &es->surface->layer_link);
                 if ((new_x != es->surface->geometry.x) ||
@@ -1133,8 +1166,9 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touc
                     weston_surface_damage(es->surface);
                 }
 #if 0           /* too many debug log   */
-                uifw_trace("ico_window_mgr_restack_layer: %08x x/y=%d/%d w/h=%d/%d",
-                           es->surfaceid,
+                uifw_debug("ico_window_mgr_restack_layer:%3d(%d).%08x(%d) "
+                           "x/y=%d/%d w/h=%d/%d",
+                           el->layer, el->visible, es->surfaceid, es->visible,
                            (int)es->surface->geometry.x, (int)es->surface->geometry.y,
                            es->surface->geometry.width, es->surface->geometry.height);
 #endif
@@ -1235,8 +1269,8 @@ win_mgr_set_layer(struct uifw_win_surface *usurf, const uint32_t layer)
     struct uifw_win_layer *el;
     struct uifw_win_layer *new_el;
 
-    uifw_trace("win_mgr_set_layer: Enter([%08x],%08x,%x)",
-               (int)usurf, (int)usurf->surface, layer);
+    uifw_trace("win_mgr_set_layer: Enter(%08x,%08x,%x)",
+               usurf->surfaceid, (int)usurf->surface, layer);
 
     /* check if same layer                      */
     if ((usurf->win_layer != NULL) && (usurf->win_layer->layer == layer))   {
@@ -1396,6 +1430,9 @@ uifw_declare_manager(struct wl_client *client, struct wl_resource *resource, int
         uifw_trace("uifw_declare_manager: Leave(unknown client=%08x)", (int)client);
         return;
     }
+    new_el->visible = TRUE;
+    wl_list_init(&new_el->surface_list);
+    wl_list_init(&new_el->link);
 
     uclient->manager = manager;
 
@@ -1437,11 +1474,9 @@ uifw_declare_manager(struct wl_client *client, struct wl_resource *resource, int
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   uifw_set_window_layer: set layer id to surface
+ * @brief   win_mgr_set_layer: set(or change) surface layer
  *
- * @param[in]   client      Weyland client
- * @param[in]   resource    resource of request
- * @param[in]   surfaceid   UIFW surface id
+ * @param[in]   usurf       UIFW surface
  * @param[in]   layer       layer id
  * @return      none
  */
@@ -1450,10 +1485,10 @@ static void
 uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
                       uint32_t surfaceid, uint32_t layer)
 {
-    uifw_trace("uifw_set_window_layer: Enter res=%08x surfaceid=%08x layer=%d",
-               (int)resource, surfaceid, layer);
+    struct uifw_win_layer *el;
+    struct uifw_win_layer *new_el;
 
-    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     if (! usurf)    {
         uifw_trace("uifw_set_window_layer: Leave(No Surface(id=%08x))", surfaceid);
@@ -1464,7 +1499,28 @@ uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
 
         win_mgr_change_surface(usurf->surface, -1, 1);
     }
-    uifw_trace("uifw_set_window_layer: Leave");
+
+    if (&el->link == &_ico_win_mgr->ivi_layer_list)    {
+        /* layer not exist, create new layer    */
+        uifw_trace("win_mgr_set_layer: New Layer %d", layer);
+        new_el = win_mgr_create_layer(usurf, layer);
+        if (! new_el)   {
+            uifw_trace("win_mgr_set_layer: Leave(No Memory)");
+            return;
+        }
+    }
+    else    {
+        uifw_trace("win_mgr_set_layer: Add surface to Layer %d", layer);
+        wl_list_remove(&usurf->ivi_layer);
+        wl_list_insert(&el->surface_list, &usurf->ivi_layer);
+        usurf->win_layer = el;
+    }
+
+    /* rebild compositor surface list       */
+    if (usurf->visible) {
+        ico_window_mgr_restack_layer(usurf, 0);
+    }
+    uifw_trace("win_mgr_set_layer: Leave");
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1489,6 +1545,7 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
                       int32_t width, int32_t height, int32_t flags)
 {
     struct uifw_client *uclient;
+    struct uifw_win_surface *usurf;
     struct weston_surface *es;
     int     op;
     int     retanima;
@@ -1496,16 +1553,28 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_positionsize: Enter surf=%08x node=%x x/y/w/h=%d/%d/%d/%d flag=%x",
                surfaceid, node, x, y, width, height, flags);
 
+    usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
+    if (! usurf)    {
+        uifw_trace("uifw_set_positionsize: Leave(surf=%08x NOT Found)", surfaceid);
+        return;
+    }
+
+    uclient = find_client_from_client(client);
+
+    usurf->disable = 0;
     if (((int)node) >= _ico_num_nodes)  {
         uifw_trace("uifw_set_positionsize: node=%d dose not exist(max=%d)",
                    node, _ico_num_nodes);
+        if ((ico_ivi_debugflag() & ICO_IVI_DEBUG_SHOW_SURFACE) == 0)    {
+            usurf->disable = 1;
+        }
         node = 0;
     }
-    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
+    usurf->node_tbl = &_ico_node_table[node];
 
-    if (usurf && (usurf->surface))  {
+    es = usurf->surface;
+    if (es)  {
         /* weston surface exist             */
-        usurf->node_tbl = &_ico_node_table[node];
         es = usurf->surface;
         retanima = ICO_WINDOW_MGR_ANIMATION_RET_NOANIMA;
 
@@ -1523,9 +1592,9 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
             return;
         }
 
-        uclient = find_client_from_client(client);
         if (uclient)    {
-            if (! uclient->manager) uclient = NULL;
+            if ((surfaceid != ICO_WINDOW_MGR_V_MAINSURFACE) &&
+                (uclient->manager == 0)) uclient = NULL;
         }
         if (! uclient)  {
             if ((usurf->width > 0) && (usurf->height > 0))  {
@@ -1601,7 +1670,11 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
         uifw_trace("uifw_set_positionsize: Leave(OK,output=%08x)", (int)es->output);
     }
     else    {
-        uifw_trace("uifw_set_positionsize: Leave(surf=%08x NOT Found)", surfaceid);
+        usurf->x = x;
+        usurf->y = y;
+        usurf->width = width;
+        usurf->height = height;
+        uifw_trace("uifw_set_positionsize: Leave(OK,but no buffer)");
     }
 }
 
@@ -1630,9 +1703,16 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_visible: Enter(surf=%08x,%d,%d,%x)",
                surfaceid, visible, raise, flags);
 
+    usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
+    if ((! usurf) || (! usurf->surface))    {
+        uifw_trace("uifw_set_visible: Leave(Surface Not Exist)");
+        return;
+    }
+
     uclient = find_client_from_client(client);
     if (uclient)    {
-        if (! uclient->manager) {
+        if ((surfaceid != ICO_WINDOW_MGR_V_MAINSURFACE) &&
+            (uclient->manager == 0))    {
             uifw_trace("uifw_set_visible: Request from App(%s), not Manager",
                        uclient->appid);
             uclient = NULL;
@@ -1645,15 +1725,9 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
         uifw_trace("uifw_set_visible: Request from Unknown App, not Manager");
     }
 
-    usurf = ico_window_mgr_get_usurf(surfaceid);
-
-    if ((! usurf) || (! usurf->surface))    {
-        uifw_trace("uifw_set_visible: Leave(Surface Not Exist)");
-        return;
-    }
     restack = 0;
 
-    if (visible == ICO_WINDOW_MGR_VISIBLE_SHOW) {
+    if ((usurf->disable == 0) && (visible == ICO_WINDOW_MGR_VISIBLE_SHOW))  {
 
         if (! usurf->visible)  {
             usurf->visible = 1;
@@ -1791,7 +1865,7 @@ uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
                    uint32_t surfaceid, int32_t type, const char *animation, int32_t time)
 {
     int animaid;
-    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     uifw_trace("uifw_set_transition: Enter(surf=%08x,type=%x,anim=%s,time=%d)",
                surfaceid, type, animation, time);
@@ -1870,7 +1944,7 @@ static void
 uifw_set_attributes(struct wl_client *client, struct wl_resource *resource,
                     uint32_t surfaceid, uint32_t attributes)
 {
-    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf(surfaceid);
+    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     uifw_trace("uifw_set_attributes: Enter(surf=%08x,attributes=%x)", surfaceid, attributes);
 
@@ -1915,7 +1989,7 @@ uifw_visible_animation(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_visible_animation: Enter(%08x,%d,x/y=%d/%d,w/h=%d/%d)",
                surfaceid, visible, x, y, width, height);
 
-    usurf = ico_window_mgr_get_usurf(surfaceid);
+    usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     if ((! usurf) || (! usurf->surface))    {
         uifw_trace("uifw_visible_animation: Leave(Surface Not Exist)");
@@ -1957,7 +2031,7 @@ uifw_set_active(struct wl_client *client, struct wl_resource *resource,
 
     if ((surfaceid > 0) &&
         ((active & (ICO_WINDOW_MGR_ACTIVE_POINTER|ICO_WINDOW_MGR_ACTIVE_KEYBOARD)) != 0)) {
-        usurf = ico_window_mgr_get_usurf(surfaceid);
+        usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
     }
     else    {
         usurf = NULL;
@@ -2357,7 +2431,7 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
     es = usurf->surface;
 
     /* check if buffered        */
-    if (es == NULL) {
+    if ((es == NULL) || (es->buffer_ref.buffer == NULL))    {
         /* surface has no buffer, error         */
         ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
                                         surfaceid, 3, 0, 0, 0, 0, 0);
@@ -2367,15 +2441,13 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
 
     /* check buffer type        */
     gl_state = (struct uifw_gl_surface_state *)es->renderer_state;
-    if (gl_state) {
-        if (gl_state->buffer_type == BUFFER_TYPE_SHM)   {
-            /* wl_shm_buffer not support    */
-            ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
-                                            surfaceid, 4, 0, 0, 0, 0, 0);
-            uifw_trace("uifw_map_surface: Leave(surface(%08x) is wl_shm_buffer, "
-                       "not support)", surfaceid);
-            return;
-        }
+    if ((gl_state == NULL) || (gl_state->buffer_type == BUFFER_TYPE_SHM))   {
+        /* wl_shm_buffer not support    */
+        ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
+                                        surfaceid, 4, 0, 0, 0, 0, 0);
+        uifw_trace("uifw_map_surface: Leave(surface(%08x) is wl_shm_buffer, "
+                   "not support)", surfaceid);
+        return;
     }
 
     /* create map table         */
@@ -2405,8 +2477,7 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
     wl_list_insert(usurf->surf_map.prev, &sm->surf_link);
 
     buffer = es->buffer_ref.buffer;
-    if ((buffer != NULL) && (gl_state != NULL) &&
-        (gl_state->buffer_type == BUFFER_TYPE_EGL)) {
+    if (gl_state->buffer_type == BUFFER_TYPE_EGL) {
         sm->width = buffer->width;
         sm->height = buffer->height;
         drm_buffer = (struct uifw_drm_buffer *)buffer->legacy_buffer;

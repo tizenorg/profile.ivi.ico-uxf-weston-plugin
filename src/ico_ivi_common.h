@@ -58,6 +58,7 @@
 
 /* Debug flags                          */
 #define ICO_IVI_DEBUG_SHOW_SURFACE  0x01    /* new surface show on create           */
+#define ICO_IVI_DEBUG_SHOW_NODISP   0x02    /* show if display not exist            */
 
 /* Function prototype                   */
 int ico_ivi_get_mynode(void);               /* Get my node numner                   */

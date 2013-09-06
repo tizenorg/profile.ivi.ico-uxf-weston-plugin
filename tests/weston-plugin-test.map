@@ -13,6 +13,7 @@ rm -fr ../tests/testlog/* 2> /dev/null
 sleep 1
 
 # 3 Weston/Wayland Envionment
+export XDG_RUNTIME_DIR=/run/user/5000
 export QT_QPA_PLATFORM=wayland
 export ELM_ENGINE=wayland_egl
 export ECORE_EVAS_ENGINE=wayland_egl
