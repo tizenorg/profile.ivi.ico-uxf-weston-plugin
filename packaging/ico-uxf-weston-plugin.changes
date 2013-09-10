@@ -1,10 +1,3 @@
-* Fri Sep 06 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130828.211548@1c6b247
-- 0.9.02 release.
--- Fix for TIVI-1693 - Wayland Terminal is not visibile in application layer or on-screen layer.
-   It was not visible if application did not create EGL buffer at the time of wayland surface creation.
--- fix for - Indication to the second display is impossible.
--- fix for - Some examination scripts do not work.
-
 * Fri Aug 30 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130828.211548@4cf16ef
 - 0.9.01 release
 -- The change of the configuration(weston.ini) with the version up of HomeScreen(0.7.x->0.9.x).
