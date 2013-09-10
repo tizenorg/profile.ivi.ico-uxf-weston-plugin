@@ -1471,9 +1471,11 @@ uifw_declare_manager(struct wl_client *client, struct wl_resource *resource, int
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_set_layer: set(or change) surface layer
+ * @brief   uifw_set_window_layer: set layer id to surface
  *
- * @param[in]   usurf       UIFW surface
+ * @param[in]   client      Weyland client
+ * @param[in]   resource    resource of request
+ * @param[in]   surfaceid   UIFW surface id
  * @param[in]   layer       layer id
  * @return      none
  */
@@ -1482,8 +1484,8 @@ static void
 uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
                       uint32_t surfaceid, uint32_t layer)
 {
-    struct uifw_win_layer *el;
-    struct uifw_win_layer *new_el;
+    uifw_trace("uifw_set_window_layer: Enter res=%08x surfaceid=%08x layer=%d",
+               (int)resource, surfaceid, layer);
 
     struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
@@ -1496,28 +1498,7 @@ uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
 
         win_mgr_change_surface(usurf->surface, -1, 1);
     }
-
-    if (&el->link == &_ico_win_mgr->ivi_layer_list)    {
-        /* layer not exist, create new layer    */
-        uifw_trace("win_mgr_set_layer: New Layer %d", layer);
-        new_el = win_mgr_create_layer(usurf, layer);
-        if (! new_el)   {
-            uifw_trace("win_mgr_set_layer: Leave(No Memory)");
-            return;
-        }
-    }
-    else    {
-        uifw_trace("win_mgr_set_layer: Add surface to Layer %d", layer);
-        wl_list_remove(&usurf->ivi_layer);
-        wl_list_insert(&el->surface_list, &usurf->ivi_layer);
-        usurf->win_layer = el;
-    }
-
-    /* rebild compositor surface list       */
-    if (usurf->visible) {
-        ico_window_mgr_restack_layer(usurf, 0);
-    }
-    uifw_trace("win_mgr_set_layer: Leave");
+    uifw_trace("uifw_set_window_layer: Leave");
 }
 
 /*--------------------------------------------------------------------------*/
