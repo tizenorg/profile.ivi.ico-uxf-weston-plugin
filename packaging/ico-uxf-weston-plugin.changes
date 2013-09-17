@@ -1,3 +1,7 @@
+* Tue Sep 17 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20130911.005338@e0a9c2f
+- 0.9.03 release.
+-- Clean up configuration entries.
+
 * Fri Sep 06 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130828.211548@1c6b247
 - 0.9.02 release.
 -- Fix for TIVI-1693 - Wayland Terminal is not visibile in application layer or on-screen layer.
