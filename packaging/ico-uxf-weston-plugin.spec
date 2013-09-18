@@ -48,8 +48,8 @@ make %{?_smp_mflags}
 mkdir -p %{buildroot}%{weston_conf} > /dev/null 2>&1
 install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 mkdir -p %{buildroot}%{_sysconfdir}/profile.d/
-install -m 0644 settings/ico_weston.sh  %{buildroot}%{_sysconfdir}/profile.d/
-install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
+#install -m 0644 settings/ico_weston.sh  %{buildroot}%{_sysconfdir}/profile.d/
+#install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
 
 %post -p /sbin/ldconfig
 
@@ -62,8 +62,8 @@ install -m 0644 settings/ico_weston.csh  %{buildroot}%{_sysconfdir}/profile.d/
 %{_libdir}/weston/*.so
 %{_libdir}/libico-uxf-weston-plugin.so.*
 %{weston_conf}/weston.ini
-%{_sysconfdir}/profile.d/ico_weston.sh
-%{_sysconfdir}/profile.d/ico_weston.csh
+#%{_sysconfdir}/profile.d/ico_weston.sh
+#%{_sysconfdir}/profile.d/ico_weston.csh
 
 %files devel
 %defattr(-,root,root,-)
