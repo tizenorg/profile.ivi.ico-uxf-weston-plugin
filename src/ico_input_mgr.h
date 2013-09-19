@@ -30,8 +30,11 @@
 
 /* Input Region struct for Haptic Device Controller */
 struct ico_uifw_input_region    {
+    uint16_t    change;                 /* change method                        */
+                                        /*   ICO_INPUT_MGR_DEVICE_REGION_ADD    */
+                                        /*   ICO_INPUT_MGR_DEVICE_REGION_REMOVE */
+                                        /*   ICO_INPUT_MGR_DEVICE_REGION_REMOVEALL*/
     uint16_t    node;                   /* display node                         */
-    uint16_t    res;                    /* (unused)                             */
     uint32_t    surfaceid;              /* surface Id                           */
     uint16_t    surface_x;              /* surface absolute X coordinate        */
     uint16_t    surface_y;              /* surface absolute Y coordinate        */
@@ -39,7 +42,13 @@ struct ico_uifw_input_region    {
     uint16_t    y;                      /* input region relative Y coordinate   */
     uint16_t    width;                  /* input region width                   */
     uint16_t    height;                 /* input region height                  */
-    int32_t     attr;                   /* input region attribute               */
+    int16_t     hotspot_x;              /* hotspot of X relative coordinate     */
+    int16_t     hotspot_y;              /* hotspot of Y relative coordinate     */
+    uint16_t    cursor_x;               /* cursor region X coordinate           */
+    uint16_t    cursor_y;               /* cursor region Y coordinate           */
+    uint16_t    cursor_width;           /* cursor region width                  */
+    uint16_t    cursor_height;          /* cursor region height                 */
+    uint32_t    attr;                   /* input region attribute               */
 };
 
 #endif  /*_ICO_INPUT_MGR_H_*/

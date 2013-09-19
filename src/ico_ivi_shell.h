@@ -32,9 +32,21 @@
 
 struct shell_surface;
 
+/* surface type                         */
+enum shell_surface_type {
+    SHELL_SURFACE_NONE,
+    SHELL_SURFACE_TOPLEVEL,
+    SHELL_SURFACE_TRANSIENT,
+    SHELL_SURFACE_FULLSCREEN,
+    SHELL_SURFACE_MAXIMIZED,
+    SHELL_SURFACE_POPUP,
+    SHELL_SURFACE_XWAYLAND
+};
+
 /* Prototype for get/set function       */
-struct weston_layer *ico_ivi_shell_current_layer(void);
+struct weston_layer *ico_ivi_shell_weston_layer(void);
 void ico_ivi_shell_set_toplevel(struct shell_surface *shsurf);
+int ico_ivi_shell_get_surfacetype(struct shell_surface *shsurf);
 void ico_ivi_shell_set_surface_type(struct shell_surface *shsurf);
 void ico_ivi_shell_send_configure(struct weston_surface *surface,
                                   const uint32_t edges, const int width, const int height);

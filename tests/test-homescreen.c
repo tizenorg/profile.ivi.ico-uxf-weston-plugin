@@ -46,6 +46,7 @@
 #include <wayland-client.h>
 #include "ico_window_mgr-client-protocol.h"
 #include "ico_input_mgr-client-protocol.h"
+#include "ico_input_mgr.h"
 #include "test-common.h"
 
 #define MAX_APPID   128
@@ -481,10 +482,14 @@ search_surface(struct display *display, const char *surfname)
     }
 
     if (p)  {
-        return(p->surfaceid);
+        return p->surfaceid;
     }
     else    {
-        return(-1);
+        if ((strcasecmp(surfname, "all") == 0) ||
+            (strcasecmp(surfname, "main") == 0))    {
+            return ICO_WINDOW_MGR_V_MAINSURFACE;
+        }
+        return -1;
     }
 }
 
@@ -501,7 +506,7 @@ search_surfacename(struct display *display, const char *surfname)
     if (! p)    {
         print_log("HOMESCREEN: app(%s) dose not exist", surfname);
     }
-    return(p);
+    return p;
 }
 
 static struct surface_name *
@@ -512,11 +517,11 @@ search_surfaceid(struct display *display, const int surfaceid)
     p = display->surface_name;
     while (p)   {
         if (p->surfaceid == surfaceid)  {
-            return(p);
+            return p;
         }
         p = p->next;
     }
-    return(NULL);
+    return NULL;
 }
 
 static void
@@ -720,7 +725,8 @@ window_map(void *data, struct ico_window_mgr *ico_window_mgr,
     if ((event == ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP) ||
         (event == ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS))   {
         opengl_thumbnail(display->display, surfaceid, display->surface->dpy,
-                         display->surface->ctx, target, width, height, stride, format);             
+                         display->surface->conf, display->surface->egl_surface,
+                         display->surface->ctx, target, width, height, stride, format);
     }
 }
 
@@ -766,6 +772,56 @@ static const struct ico_exinput_listener exinput_listener = {
     cb_input_code,
     cb_input_input
 };
+
+static void
+cb_input_regions(void *data, struct ico_input_mgr_device *ico_input_mgr_device,
+                 struct wl_array *regions)
+{
+    struct ico_uifw_input_region    *region;
+    int     n;
+    char    schange[16];
+
+    n = 0;
+    if (regions)    {
+        wl_array_for_each(region, regions)  {
+            n ++;
+            print_log("HOMESCREEN: Event[input_regions] number of regions=%d", n);
+        }
+        n = 0;
+        wl_array_for_each(region, regions)  {
+            n ++;
+            switch (region->change) {
+            case ICO_INPUT_MGR_DEVICE_REGION_ADD:
+                strcpy(schange, "Add");
+                break;
+            case ICO_INPUT_MGR_DEVICE_REGION_REMOVE:
+                strcpy(schange, "Remove");
+                break;
+            case ICO_INPUT_MGR_DEVICE_REGION_REMOVEALL:
+                strcpy(schange, "RemoveAll");
+                break;
+            default:
+                sprintf(schange, "?%d?", region->change);
+                break;
+            }
+            print_log("HOMESCREEN:%2d. %s %d.%08(%d/%d) &d/%d-%d/%d "
+                      "hot=%d/%d cur=%d/%d-%d/%d attr=%x",
+                      n, schange, region->node, region->surfaceid, region->surface_x,
+                      region->surface_y, region->x, region->y, region->width,
+                      region->height, region->hotspot_x, region->hotspot_y,
+                      region->cursor_x, region->cursor_y, region->cursor_width,
+                      region->cursor_height, region->attr);
+        }
+    }
+    else    {
+        print_log("HOMESCREEN: Event[input_regions] no region");
+    }
+}
+
+static const struct ico_input_mgr_device_listener device_listener = {
+    cb_input_regions
+};
+
 
 static void
 handle_global(void *data, struct wl_registry *registry, uint32_t id,
@@ -824,6 +880,8 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
     else if (strcmp(interface, "ico_input_mgr_device") == 0)   {
         display->ico_input_device = wl_registry_bind(display->registry, id,
                                                      &ico_input_mgr_device_interface, 1);
+        ico_input_mgr_device_add_listener(display->ico_input_device,
+                                          &device_listener, display);
         print_log("HOMESCREEN: created input_device global %p", display->ico_input_device);
     }
     else if (strcmp(interface, "ico_exinput") == 0)   {
@@ -842,41 +900,6 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
 static const struct wl_registry_listener registry_listener = {
     handle_global
 };
-
-static char *
-skip_spaces(char *buf)
-{
-    while ((*buf == ' ') || (*buf == '\t')) {
-        buf++;
-    }
-    return(buf);
-}
-
-static int
-pars_command(char *buf, char *pt[], const int len)
-{
-    char    *p;
-    int     narg;
-
-    memset(pt, 0, sizeof(int *)*10);
-    p = buf;
-    for (narg = 0; narg < len; narg++)  {
-        p = skip_spaces(p);
-        if (*p == 0)    break;
-        pt[narg] = p;
-        for (; *p; p++) {
-            if ((*p == ' ') || (*p == '\t') ||
-                (*p == '=') || (*p == ',')) break;
-        }
-        if (*p == 0)    {
-            narg++;
-            break;
-        }
-        *p = 0;
-        p++;
-    }
-    return (narg);
-}
 
 static void
 launch_app(struct display *display, char *buf)
@@ -1695,6 +1718,88 @@ send_event(const char *cmd)
     }
 }
 
+static void
+set_region(struct display *display, char *buf)
+{
+    char    *args[10];
+    int     narg;
+    int     x, y, width, height;
+    int     hot_x, hot_y;
+    int     c_x, c_y, c_width, c_height;
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 5)  {
+        x = strtol(args[1], (char **)0, 0);
+        y = strtol(args[2], (char **)0, 0);
+        width = strtol(args[3], (char **)0, 0);
+        height = strtol(args[4], (char **)0, 0);
+        hot_x = x + (width / 2);
+        hot_y = y + (height / 2);
+        c_x = x + 5;
+        c_y = y + 5;
+        c_width = width - 10;
+        if (c_width <= 0)   c_width = 2;
+        c_height = height - 10;
+        if (c_height <= 0)  c_height = 2;
+        print_log("HOMESCREEN: ico_exinput_set_input_region(%s,%d,%d-%d,%d,"
+                  "hot=%d,%d,cur=%d,%d-%d,%d,attr=0)",
+                  args[0] ? args[0] : "(null)", x, y, width, height,
+                  hot_x, hot_y, c_x, c_y, c_width, c_height);
+        if (strcasecmp(args[0], "NULL") == 0)   {
+            ico_exinput_set_input_region(display->ico_exinput, "", x, y,
+                                         width, height, hot_x, hot_y, c_x, c_y,
+                                         c_width, c_height, 0);
+        }
+        else    {
+            ico_exinput_set_input_region(display->ico_exinput, args[0], x, y,
+                                         width, height, hot_x, hot_y, c_x, c_y,
+                                         c_width, c_height, 0);
+        }
+    }
+    else    {
+        print_log("HOMESCREEN: set_region command[set_region winname@appid x y "
+                  "width height] has no argument");
+    }
+}
+
+static void
+unset_region(struct display *display, char *buf)
+{
+    char    *args[10];
+    int     narg;
+    int     x, y, width, height;
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 1)  {
+        if (narg >= 5) {
+            x = strtol(args[1], (char **)0, 0);
+            y = strtol(args[2], (char **)0, 0);
+            width = strtol(args[3], (char **)0, 0);
+            height = strtol(args[4], (char **)0, 0);
+        }
+        else    {
+            x = 0;
+            y = 0;
+            width = 0;
+            height = 0;
+        }
+        print_log("HOMESCREEN: ico_exinput_unset_input_region(%s,08x,%d,%d-%d,%d)",
+                  args[0] ? args[0] : "(null)", x, y, width, height);
+        if (strcasecmp(args[0], "NULL") == 0)   {
+            ico_exinput_unset_input_region(display->ico_exinput, "", x, y,
+                                           width, height);
+        }
+        else    {
+            ico_exinput_unset_input_region(display->ico_exinput, args[0],
+                                           x, y, width, height);
+        }
+    }
+    else    {
+        print_log("HOMESCREEN: unset_region command[unset_region winname@appid x y "
+                  "width height] has no argument");
+    }
+}
+
 /*
  * Main Program
  *
@@ -1856,6 +1961,18 @@ int main(int argc, char *argv[])
             /* input switch event               */
             input_sw(display, &buf[8]);
         }
+        else if (strncasecmp(buf, "set_region", 10) == 0) {
+            /* set input region                 */
+            set_region(display, &buf[10]);
+        }
+        else if (strncasecmp(buf, "unset_region", 12) == 0) {
+            /* unset input region               */
+            unset_region(display, &buf[12]);
+        }
+        else if (strncasecmp(buf, "input_sw", 8) == 0) {
+            /* input switch event               */
+            input_sw(display, &buf[8]);
+        }
         else if (strncasecmp(buf, "sleep", 5) == 0) {
             /* Sleep                            */
             msec = sec_str_2_value(&buf[6]);
@@ -1885,6 +2002,6 @@ int main(int argc, char *argv[])
 
     send_event(NULL);
 
-    return(0);
+    return 0;
 }
 

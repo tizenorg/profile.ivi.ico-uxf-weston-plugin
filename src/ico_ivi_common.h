@@ -42,9 +42,9 @@
 
 /* System limit                         */
 #define ICO_IVI_MAX_DISPLAY      (8)        /* Maximum numer of displays in a ECU   */
-#define ICO_IVI_APPID_LENGTH     (128)      /* Maximum length of applicationId(AppCore) */
+#define ICO_IVI_APPID_LENGTH     (80)       /* Maximum length of applicationId(AppCore) */
                                             /* (with terminate NULL)                */
-#define ICO_IVI_WINNAME_LENGTH   (32)       /* Maximum length of window name (with NULL)*/
+#define ICO_IVI_WINNAME_LENGTH   (40)       /* Maximum length of window name (with NULL)*/
 #define ICO_IVI_ANIMATION_LENGTH (16)       /* Maximum length of animation name (w NULL)*/
 #define ICO_IVI_MAX_COORDINATE   (16383)    /* Maximum X or Y coordinate            */
 

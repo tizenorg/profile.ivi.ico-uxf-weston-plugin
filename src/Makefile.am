@@ -9,7 +9,7 @@ pkginclude_HEADERS =               \
 	ico_input_mgr.h
 
 libico_uxf_weston_plugin_la_LIBADD = -lrt -lm
-libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:7:0
+libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:9:0
 libico_uxf_weston_plugin_la_SOURCES =          \
 	desktop-shell-protocol.c		\
 	input-method-protocol.c			\

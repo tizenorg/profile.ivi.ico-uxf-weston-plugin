@@ -63,7 +63,7 @@ getdata(void *window_mgr, const char *prompt, int fd, char *buf, const int size)
         ret = read(fd, &buf[i], 1);
 
         if (ret < 0)    {
-            return(ret);
+            return ret;
         }
 
         if ((buf[i] == '\n') || (buf[i] == '\r'))   break;
@@ -94,7 +94,7 @@ getdata(void *window_mgr, const char *prompt, int fd, char *buf, const int size)
         strcpy( buf, &buf[j] );
         i -= j;
     }
-    return(i);
+    return i;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -128,6 +128,59 @@ print_log(const char *fmt, ...)
     fprintf(stderr, "[%02d:%02d:%02d.%03d@%d] %s\n", (int)((NowTime.tv_sec/3600) % 24),
             (int)((NowTime.tv_sec/60) % 60), (int)(NowTime.tv_sec % 60),
             (int)NowTime.tv_usec/1000, getpid(), log);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   skip_spaces: skip spaces in command input
+ *
+ * @param[in]   buf         input command string
+ * @return      character pointer of not space character
+ */
+/*--------------------------------------------------------------------------*/
+char *
+skip_spaces(char *buf)
+{
+    while ((*buf == ' ') || (*buf == '\t')) {
+        buf++;
+    }
+    return buf;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   pars_command: The word division of the command line
+ *
+ * @param[in]   buf         input command string
+ * @param[in]   pt          word pointers (maximum len words)
+ * @param[in]   len         maximum number of words
+ * @return      number of words
+ */
+/*--------------------------------------------------------------------------*/
+int
+pars_command(char *buf, char *pt[], const int len)
+{
+    char    *p;
+    int     narg;
+
+    memset(pt, 0, sizeof(int *)*10);
+    p = buf;
+    for (narg = 0; narg < len; narg++)  {
+        p = skip_spaces(p);
+        if (*p == 0)    break;
+        pt[narg] = p;
+        for (; *p; p++) {
+            if ((*p == ' ') || (*p == '\t') ||
+                (*p == '=') || (*p == ',')) break;
+        }
+        if (*p == 0)    {
+            narg++;
+            break;
+        }
+        *p = 0;
+        p++;
+    }
+    return narg;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -262,7 +315,7 @@ sec_str_2_value(const char *ssec)
         if (n == 2)     msec *= 10;
         sec += msec;
     }
-    return(sec);
+    return sec;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -331,7 +384,7 @@ opengl_init(struct wl_display *display, EGLConfig *rconf, EGLContext *rctx)
 
     wayland_dispatch_nonblock(display);
 
-    return(dpy);
+    return dpy;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -375,7 +428,7 @@ opengl_create_window(struct wl_display *display, struct wl_surface *surface,
 
     opengl_swap_buffer(display, dpy, egl_surface);
 
-    return(egl_surface);
+    return egl_surface;
 }
 
 /*--------------------------------------------------------------------------*/

@@ -166,6 +166,7 @@ struct desktop_shell {
     enum animation_type win_animation_type;
 };
 
+#if 0           /* move to ico_ivi_shell.h  */
 enum shell_surface_type {
     SHELL_SURFACE_NONE,
     SHELL_SURFACE_TOPLEVEL,
@@ -175,6 +176,7 @@ enum shell_surface_type {
     SHELL_SURFACE_POPUP,
     SHELL_SURFACE_XWAYLAND
 };
+#endif
 
 struct ping_timer {
     struct wl_event_source *source;
@@ -1280,13 +1282,15 @@ shell_surface_move(struct wl_client *client, struct wl_resource *resource,
     struct shell_surface *shsurf = wl_resource_get_user_data(resource);
     struct weston_surface *surface;
 
-    surface = weston_surface_get_main_surface(seat->pointer->focus);
-    if (seat->pointer->button_count > 0 && seat->pointer->grab_serial == serial) {
+    if (seat->pointer &&
+        seat->pointer->button_count > 0 &&
+        seat->pointer->grab_serial == serial) {
         surface = weston_surface_get_main_surface(seat->pointer->focus);
         if ((surface == shsurf->surface) &&
             (surface_move(shsurf, seat) < 0))
             wl_resource_post_no_memory(resource);
-    } else if (seat->touch->grab_serial == serial) {
+    } else if (seat->touch &&
+           seat->touch->grab_serial == serial) {
         surface = weston_surface_get_main_surface(seat->touch->focus);
         if ((surface == shsurf->surface) &&
             (surface_touch_move(shsurf, seat) < 0))
@@ -2477,6 +2481,10 @@ create_shell_surface(void *shell, struct weston_surface *surface,
     shsurf->fullscreen.framerate = 0;
     shsurf->fullscreen.black_surface = NULL;
     shsurf->ping_timer = NULL;
+
+    /* set default color and shader because weston original bug(some time crash weston) */
+    weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1);
+
     wl_list_init(&shsurf->fullscreen.transform.link);
 
     wl_signal_init(&shsurf->destroy_signal);
@@ -3221,10 +3229,7 @@ click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t butt
     struct weston_surface *focus;
     struct weston_surface *main_surface;
 
-    if (button == BTN_LEFT)
-        focus = (struct weston_surface *) seat->pointer->focus;
-    else
-        focus = (struct weston_surface *) seat->touch->focus;
+    focus = (struct weston_surface *) seat->pointer->focus;
     if (!focus)
         return;
 
@@ -4637,9 +4642,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
     weston_compositor_add_button_binding(ec, BTN_LEFT, 0,
                          click_to_activate_binding,
                          shell);
-    weston_compositor_add_button_binding(ec, BTN_TOUCH, 0,
-                         click_to_activate_binding,
-                         shell);
     weston_compositor_add_axis_binding(ec, WL_POINTER_AXIS_VERTICAL_SCROLL,
                            MODIFIER_SUPER | MODIFIER_ALT,
                            surface_opacity_binding, NULL);
@@ -4812,7 +4814,7 @@ module_init(struct weston_compositor *ec,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   ico_ivi_shell_current_layer: get current weston layer
+ * @brief   ico_ivi_shell_weston_layer: get weston layer
  *
  * @param       none
  * @return      current weston layer
@@ -4822,11 +4824,9 @@ module_init(struct weston_compositor *ec,
 /*--------------------------------------------------------------------------*/
 /* API for other plugin         */
 WL_EXPORT struct weston_layer *
-ico_ivi_shell_current_layer(void)
+ico_ivi_shell_weston_layer(void)
 {
-    struct workspace *ws = get_current_workspace(_ico_ivi_shell);
-
-    return (ws != NULL) ? &ws->layer : NULL;
+    return(&_ico_ivi_shell->panel_layer);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -4841,6 +4841,20 @@ WL_EXPORT void
 ico_ivi_shell_set_toplevel(struct shell_surface *shsurf)
 {
     set_toplevel(shsurf);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_ivi_shell_get_surfacetype: get surface type
+ *
+ * @param[in]   shsurf          shell surface
+ * @return      surface type
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT int
+ico_ivi_shell_get_surfacetype(struct shell_surface *shsurf)
+{
+    return (shsurf ? (int)shsurf->type : -1);
 }
 
 /*--------------------------------------------------------------------------*/

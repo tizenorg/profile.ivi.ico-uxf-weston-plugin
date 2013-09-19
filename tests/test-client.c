@@ -577,6 +577,88 @@ clear_surface(struct display *display)
     }
 }
 
+static void
+set_region(struct display *display, char *buf)
+{
+    char    *args[10];
+    int     narg;
+    int     x, y, width, height;
+    int     hot_x, hot_y;
+    int     c_x, c_y, c_width, c_height;
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 5)  {
+        x = strtol(args[1], (char **)0, 0);
+        y = strtol(args[2], (char **)0, 0);
+        width = strtol(args[3], (char **)0, 0);
+        height = strtol(args[4], (char **)0, 0);
+        hot_x = x + (width / 2);
+        hot_y = y + (height / 2);
+        c_x = x + 5;
+        c_y = y + 5;
+        c_width = width - 10;
+        if (c_width <= 0)   c_width = 2;
+        c_height = height - 10;
+        if (c_height <= 0)  c_height = 2;
+        print_log("CLIENT: ico_exinput_set_input_region(%s,%d,%d-%d,%d,"
+                  "hot=%d,%d,cur=%d,%d-%d,%d,attr=0)",
+                  args[0] ? args[0] : "(null)", x, y, width, height,
+                  hot_x, hot_y, c_x, c_y, c_width, c_height);
+        if (strcasecmp(args[0], "NULL") == 0)   {
+            ico_exinput_set_input_region(display->ico_exinput, "", x, y,
+                                         width, height, hot_x, hot_y, c_x, c_y,
+                                         c_width, c_height, 0);
+        }
+        else    {
+            ico_exinput_set_input_region(display->ico_exinput, args[0], x, y,
+                                         width, height, hot_x, hot_y, c_x, c_y,
+                                         c_width, c_height, 0);
+        }
+    }
+    else    {
+        print_log("CLIENT: set_region command[set_region winname@appid x y "
+                  "width height] has no argument");
+    }
+}
+
+static void
+unset_region(struct display *display, char *buf)
+{
+    char    *args[10];
+    int     narg;
+    int     x, y, width, height;
+
+    narg = pars_command(buf, args, 10);
+    if (narg >= 1)  {
+        if (narg >= 5) {
+            x = strtol(args[1], (char **)0, 0);
+            y = strtol(args[2], (char **)0, 0);
+            width = strtol(args[3], (char **)0, 0);
+            height = strtol(args[4], (char **)0, 0);
+        }
+        else    {
+            x = 0;
+            y = 0;
+            width = 0;
+            height = 0;
+        }
+        print_log("CLIENT: ico_exinput_unset_input_region(%s,08x,%d,%d-%d,%d)",
+                  args[0] ? args[0] : "(null)", x, y, width, height);
+        if (strcasecmp(args[0], "NULL") == 0)   {
+            ico_exinput_unset_input_region(display->ico_exinput, "", x, y,
+                                           width, height);
+        }
+        else    {
+            ico_exinput_unset_input_region(display->ico_exinput, args[0],
+                                           x, y, width, height);
+        }
+    }
+    else    {
+        print_log("CLIENT: unset_region command[unset_region winname@appid x y "
+                  "width height] has no argument");
+    }
+}
+
 int main(int argc, char *argv[])
 {
     struct display *display;
@@ -663,6 +745,14 @@ int main(int argc, char *argv[])
             display->init_color = strtoul(&buf[14], (char **)0, 0);
             clear_surface(display);
         }
+        else if (strncasecmp(buf, "set_region", 10) == 0) {
+            /* set input region                 */
+            set_region(display, &buf[10]);
+        }
+        else if (strncasecmp(buf, "unset_region", 12) == 0) {
+            /* unset input region               */
+            unset_region(display, &buf[12]);
+        }
         else if (strncasecmp(buf, "send-state", ret) == 0) {
             send_state(display);
         }
@@ -678,7 +768,7 @@ int main(int argc, char *argv[])
         }
         else {
             print_log("CLIENT: unknown command[%s]", buf);
-            return(-1);
+            return -1;
         }
     }
     if (postsec > 0)    {

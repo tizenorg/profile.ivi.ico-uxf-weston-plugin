@@ -1,0 +1,40 @@
+#	Test for Weston IVI Plugin for HomeScreen(SystemController)
+#	Input region Test
+#
+#
+#	1. Make surfaces
+#
+launch ../tests/test-client < ../tests/testdata/cl_inputregion.dat 2> ../tests/testlog/test-client01.log 1>&2
+waitcreate 2
+show test-client
+sleep 1
+# set region
+## set_region test-client@test-client 50 100 30 60  # request from application
+set_region test-client@test-client 70 200 50 80
+sleep 1
+# unset region
+## unset_region test-client@test-client 50 100 30 60  # request from application
+unset_region test-client@ 70 200 50 80
+sleep 1
+#
+launch ../tests/test-eflapp @1 -color=0xe02040ff 2> ../tests/testlog/test-eflapp.log 1>&2
+waitcreate 2
+move test-eflapp@1 100 150
+show test-eflapp@1
+sleep 1
+#
+# set region
+set_region test-eflapp@@1@test-eflapp@@1 60 90 40 70
+set_region test-eflapp@@1@test0eflapp@@1 80 190 60 100
+sleep 1
+# unset region
+unset_region test-eflapp@@1 main 0 0 0 0
+#
+sleep 2
+kill test-client
+kill test-eflapp@1
+sleep 1
+#
+#	2. End of Test
+bye
+

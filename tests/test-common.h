@@ -37,6 +37,8 @@
 /* Function prototype           */
 int getdata(void *window_mgr, const char *prompt, int fd, char *buf, const int size);
 void print_log(const char *fmt, ...);
+char *skip_spaces(char *buf);
+int pars_command(char *buf, char *pt[], const int len);
 void wayland_dispatch_nonblock(struct wl_display *display);
 void sleep_with_wayland(struct wl_display *display, int msec);
 void wait_with_wayland(struct wl_display *display, int msec, int *endflag);
@@ -48,8 +50,8 @@ EGLSurface opengl_create_window(struct wl_display *display, struct wl_surface *s
 void opengl_clear_window(const unsigned int color);
 void opengl_swap_buffer(struct wl_display *display, EGLDisplay dpy, EGLSurface egl_surface);
 void opengl_thumbnail(struct wl_display *display, uint32_t surfaceid, EGLDisplay dpy,
-                      EGLContext ctx, uint32_t name, int width, int height, int stride,
-                      uint32_t format);
+                      EGLConfig conf, EGLSurface egl_surface, EGLContext ctx, uint32_t name,
+                      int width, int height, int stride, uint32_t format);
 
 #endif /*_TEST_COMMON_H_*/
 

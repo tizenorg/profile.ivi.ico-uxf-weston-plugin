@@ -26,7 +26,8 @@ test_send_event_SOURCES = test-send_event.c $(test_common_src)
 test_send_event_LDADD = $(SIMPLE_CLIENT_LIBS) $(test_wayland_client)
 
 test_homescreen_SOURCES = test-homescreen.c $(test_common_src) test-thumbnail.c
-test_homescreen_LDADD = $(SIMPLE_CLIENT_LIBS) $(test_protocol_lib) $(test_wayland_client)
+test_homescreen_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
+test_homescreen_LDADD = $(SIMPLE_CLIENT_LIBS) $(test_protocol_lib) $(test_wayland_client) $(PLUGIN_LIBS)
 
 test_client_SOURCES = test-client.c $(test_common_src)
 test_client_LDADD = $(SIMPLE_CLIENT_LIBS) $(test_protocol_lib) $(test_wayland_client)

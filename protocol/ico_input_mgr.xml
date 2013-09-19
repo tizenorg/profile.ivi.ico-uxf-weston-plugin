@@ -46,16 +46,22 @@
     </description>
 
     <request name="set_input_region">
-      <arg name="surfaceid" type="uint" summary="target surface"/>
+      <arg name="target" type="string" summary="target surface@application"/>
       <arg name="x" type="int" summary="input region X coordinate"/>
       <arg name="y" type="int" summary="input region Y coordinate"/>
       <arg name="width" type="int" summary="input region width"/>
       <arg name="height" type="int" summary="input region height"/>
-      <arg name="attr" type="int"/>
+      <arg name="hotspot_x" type="int" summary="hotspot of X relative coordinate"/>
+      <arg name="hotspot_y" type="int" summary="hotspot of Y relative coordinate"/>
+      <arg name="cursor_x" type="int" summary="cursor region X coordinate"/>
+      <arg name="cursor_y" type="int" summary="cursor region Y coordinate"/>
+      <arg name="cursor_width" type="int" summary="cursor region width"/>
+      <arg name="cursor_height" type="int" summary="cursor region height"/>
+      <arg name="attr" type="uint" summary="region attributes(unused)"/>
     </request>
 
-    <request name="reset_input_region">
-      <arg name="surfaceid" type="uint" summary="target surface"/>
+    <request name="unset_input_region">
+      <arg name="target" type="string" summary="target surface@application"/>
       <arg name="x" type="int" summary="input region X coordinate"/>
       <arg name="y" type="int" summary="input region Y coordinate"/>
       <arg name="width" type="int" summary="input region width"/>
@@ -113,6 +119,15 @@
       <entry name="haptic" value="16" summary="haptic"/>
     </enum>
 
+    <enum name="region">
+      <description summary="input region change method">
+       Input region change method for input region change event.
+      </description>
+      <entry name="add" value="1" summary="add input region"/>
+      <entry name="remove" value="2" summary="remove input region"/>
+      <entry name="removeall" value="4" summary="remove all input region"/>
+    </enum>
+
     <request name="configure_input">
       <description summary="input controller define input switch">
         Define input switch from Input Controller
@@ -146,11 +161,11 @@
       <arg name="state" type="int" summary="Of/Off status"/>
     </request>
 
-    <event name="input_region">
-      <description summary="event to application for change input region">
-        Send input region to haptic controller.
+    <event name="input_regions">
+      <description summary="event to application for change input regions">
+        Send input regions to haptic controller.
       </description>
-      <arg name="region" type="array" summary="input regions"/>
+      <arg name="regions" type="array" summary="input regions"/>
     </event>
   </interface>
 

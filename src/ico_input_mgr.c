@@ -45,6 +45,7 @@
 #include "ico_ivi_shell.h"
 #include "ico_window_mgr.h"
 #include "ico_input_mgr.h"
+#include "ico_window_mgr-server-protocol.h"
 #include "ico_input_mgr-server-protocol.h"
 
 /* degine maximum length                */
@@ -156,6 +157,18 @@ static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *
 static void ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                                      const char *appid, uint32_t surfaceid, int32_t type,
                                      int32_t deviceno, int32_t code, int32_t value);
+                                            /* set input region                     */
+static void ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
+                                     const char *target, int32_t x, int32_t y,
+                                     int32_t width, int32_t height, int32_t hotspot_x,
+                                     int32_t hotspot_y, int32_t cursor_x, int32_t cursor_y,
+                                     int32_t cursor_width, int32_t cursor_height,
+                                     uint32_t attr);
+                                            /* unset input region                   */
+static void ico_mgr_unset_input_region(struct wl_client *client,
+                                       struct wl_resource *resource,
+                                       const char *taret, int32_t x, int32_t y,
+                                       int32_t width, int32_t height);
                                             /* create and regist Input Controller table*/
 static void ico_device_configure_input(struct wl_client *client,
                                        struct wl_resource *resource, const char *device,
@@ -171,14 +184,20 @@ static void ico_device_input_event(struct wl_client *client, struct wl_resource 
                                    int32_t input, int32_t code, int32_t state);
 
 /* definition of Wayland protocol       */
-/* mgr interface                */
+/* Input Manager Control interface      */
 static const struct ico_input_mgr_control_interface ico_input_mgr_implementation = {
     ico_mgr_add_input_app,
     ico_mgr_del_input_app,
     ico_mgr_send_input_event
 };
 
-/* Input Controller interface */
+/* Extended Input interface             */
+static const struct ico_exinput_interface ico_exinput_implementation = {
+    ico_mgr_set_input_region,
+    ico_mgr_unset_input_region
+};
+
+/* Input Controller Device interface    */
 static const struct ico_input_mgr_device_interface input_mgr_ictl_implementation = {
     ico_device_configure_input,
     ico_device_configure_code,
@@ -679,6 +698,66 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_mgr_set_input_region: set input region for haptic devcie
+ *
+ * @param[in]   client          client(Device Input Controller)
+ * @param[in]   resource        resource of request
+ * @param[in]   target          target window (winname@appid)
+ * @param[in]   x               input region X coordinate
+ * @param[in]   y               input region X coordinate
+ * @param[in]   width           input region width
+ * @param[in]   height          input region height
+ * @param[in]   hotspot_x       hotspot of X relative coordinate
+ * @param[in]   hotspot_y       hotspot of Y relative coordinate
+ * @param[in]   cursor_x        cursor region X coordinate
+ * @param[in]   cursor_y        cursor region X coordinate
+ * @param[in]   cursor_width    cursor region width
+ * @param[in]   cursor_height   cursor region height
+ * @param[in]   attr            region attributes(currently unused)
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
+                         const char *target, int32_t x, int32_t y,
+                         int32_t width, int32_t height, int32_t hotspot_x,
+                         int32_t hotspot_y, int32_t cursor_x, int32_t cursor_y,
+                         int32_t cursor_width, int32_t cursor_height, uint32_t attr)
+{
+    uifw_trace("ico_mgr_set_input_region: Enter(%s %d/%d-%d/%d(%d/%d) %d/%d-%d/%d)",
+               target, x, y, width, height, hotspot_x, hotspot_y,
+               cursor_x, cursor_y, cursor_width, cursor_height);
+
+    uifw_trace("ico_mgr_set_input_region: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_mgr_unset_input_region: unset input region for haptic devcie
+ *
+ * @param[in]   client          client(Device Input Controller)
+ * @param[in]   resource        resource of request
+ * @param[in]   target          target window (winname@appid)
+ * @param[in]   x               input region X coordinate
+ * @param[in]   y               input region X coordinate
+ * @param[in]   width           input region width
+ * @param[in]   height          input region height
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_mgr_unset_input_region(struct wl_client *client, struct wl_resource *resource,
+                           const char *target, int32_t x, int32_t y,
+                           int32_t width, int32_t height)
+{
+    uifw_trace("ico_mgr_unset_input_region: Enter(%s %d/%d-%d/%d)",
+               target, x, y, width, height);
+
+    uifw_trace("ico_mgr_unset_input_region: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   ico_device_configure_input: configure input device and input switch
  *          from Device Input Controller.
  *
@@ -1004,7 +1083,7 @@ ico_device_bind(struct wl_client *client, void *data, uint32_t version, uint32_t
     mgr_resource = wl_resource_create(client, &ico_input_mgr_device_interface, 1, id);
     if (mgr_resource)   {
         wl_resource_set_implementation(mgr_resource, &input_mgr_ictl_implementation,
-                                       NULL, ico_device_unbind);
+                                       pInputMgr, ico_device_unbind);
     }
     uifw_trace("ico_device_bind: Leave");
 }
@@ -1072,7 +1151,7 @@ ico_exinput_bind(struct wl_client *client, void *data, uint32_t version, uint32_
     if (! pAppMgr->resource)    {
         pAppMgr->resource = wl_resource_create(client, &ico_exinput_interface, 1, id);
         if (pAppMgr->resource)  {
-            wl_resource_set_implementation(pAppMgr->resource, NULL,
+            wl_resource_set_implementation(pAppMgr->resource, &ico_exinput_implementation,
                                            pInputMgr, ico_exinput_unbind);
         }
     }

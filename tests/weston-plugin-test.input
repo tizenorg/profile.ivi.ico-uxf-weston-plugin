@@ -12,34 +12,28 @@ mkdir ../tests/testlog
 ../tests/test-send_event -d -mq=5551 2> ../tests/testlog/event_log.log &
 sleep 1
 
-# 3 Weston/Wayland Envionment
-export XDG_RUNTIME_DIR=/run/user/5000
-export QT_QPA_PLATFORM=wayland
-export ELM_ENGINE=wayland_egl
-export ECORE_EVAS_ENGINE=wayland_egl
-
-# 4 Set Environment for Test
+# 3 Set Environment for Test
 export WESTON_IVI_PLUGIN_DIR="../src/.libs"
 
-# 5 Start Weston
+# 4 Start Weston
 export XDG_CONFIG_HOME="../tests"
 MOD_DIR="$PWD/../src/.libs"
-/usr/bin/weston --backend=drm-backend.so --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 --log=../tests/testlog/weston.log &
+/usr/bin/weston --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 $WESTON_BACKEND --log=../tests/testlog/weston.log &
 sleep 1
 
-# 6 Set library path
+# 5 Set library path
 export LD_LIBRARY_PATH=../src/.libs:$LD_LIBRARY_PATH
 
-# 7 Start test-homescreen
+# 6 Start test-homescreen
 ../tests/test-homescreen < ../tests/testdata/hs_inputtest.dat 2> ../tests/testlog/test-homescreen.log
 
-# 8 End of Test
+# 7 End of Test
 sleep 1
 /usr/bin/killall weston
 /usr/bin/killall test-send_event
 sleep 1
 
-# 9 Check Error
+# 8 Check Error
 FOUND_ERR=0
 /bin/grep "ERR>" testlog/*
 if [ "$?" != "1" ] ; then
