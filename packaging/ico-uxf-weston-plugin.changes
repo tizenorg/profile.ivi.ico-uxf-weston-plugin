@@ -1,3 +1,7 @@
+* Thu Sep 19 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20130911.005338@d5948b7
+- 0.9.03-2.1 release
+-- Remove the installation to /etc/profile.d/* .
+
 * Tue Sep 17 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20130911.005338@e0a9c2f
 - 0.9.03 release.
 -- Clean up configuration entries.
