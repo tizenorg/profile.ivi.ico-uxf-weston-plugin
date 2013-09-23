@@ -19,6 +19,7 @@ BuildRequires: mesa-devel
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
 Requires: weston >= 1.2.1
+Requires: weekeyboard
 
 %description
 Weston Plugins for IVI
