@@ -1,0 +1,10 @@
+Code-Review+1: Ulf Hofemeier <ulf.hofemeier@linux.intel.com>
+Verified+1: Ulf Hofemeier <ulf.hofemeier@linux.intel.com>
+Code-Review+2: Ryota Okubi <ryota.okubi@mail.toyota-td.jp>
+Code-Review+1: Kevron Rees <kevron.m.rees@intel.com>
+Verified+1: Kevron Rees <kevron.m.rees@intel.com>
+Submitted-by: Ryota Okubi <ryota.okubi@mail.toyota-td.jp>
+Submitted-at: Mon, 23 Sep 2013 17:20:55 -0700
+Reviewed-on: https://review.tizen.org/gerrit/10175
+Project: profile/ivi/ico-uxf-weston-plugin
+Branch: refs/heads/tizen
