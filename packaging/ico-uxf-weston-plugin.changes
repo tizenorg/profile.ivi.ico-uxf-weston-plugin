@@ -1,13 +1,23 @@
+* Thu Sep 26 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20130919.204240@80cee2e
+- 0.9.05 release
+-- fix for - surface of the fullscreen is not displayed.
+-- fix for - sometimes a cursor layer is not made rendering.
+-- fix for - switch input event from GtForce is abandoned in EFL(ecore) application.
+-- change /etc/xdg/weston/weston.ini for weekeyboard and HDMI3.
+-- change of the interface of the multi-input-manager plugin.
+-- Fix for - TIVI-1834 Homescreen resizes windows too small
+--           When configure came from application, ico-window-mgr does not handle indication ratio recomputation
+-- fix for - weston crashed when System Controller exit
+-- fix for - The position of the slide(to left) animation is wrong
+
 * Thu Sep 19 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> submit/tizen/20130919.011341@e71fb82
 - 0.9.04 release.
 -- fix for - Weston sometimes crashes at the time of surface creation.
 --   Weston crashes when an event comes from DRM just after shell surface creation, because shader is
 --   unestablished, it is necessary to set default shader at the time of shell surface creation.
--- fix for - Remove /etc/profile.d/ico_weston.sh
 -- The change of the interface of the input region for haptic device.
 -- internal bug fix.
 -- Deletion of an unnecessary files.
-
 
 * Thu Sep 19 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20130911.005338@d5948b7
 - 0.9.03-2.1 release

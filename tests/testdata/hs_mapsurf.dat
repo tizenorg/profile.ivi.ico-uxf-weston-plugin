@@ -25,7 +25,6 @@ sleep 2
 # unmap surface
 unmap test-eflapp@1
 unmap test-client
-sleep 2
 #
 sleep 2
 kill test-client

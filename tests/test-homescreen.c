@@ -1544,7 +1544,7 @@ input_send(struct display *display, char *buf)
         print_log("HOMESCREEN: input_send(%s.%x,%d,%d,%x,%d)",
                   appid, surfaceid, type, no, code, value);
         ico_input_mgr_control_send_input_event(display->ico_input_mgr,
-                                               appid, surfaceid, type, no, code, value);
+                                               appid, surfaceid, type, no, 0, code, value);
     }
     else    {
         print_log("HOMESCREEN: input_send command[input_send {@app/serface} type no code "

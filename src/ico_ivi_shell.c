@@ -197,6 +197,8 @@ struct shell_surface {
     int32_t saved_x, saved_y;
     bool saved_position_valid;
     bool saved_rotation_valid;
+    char layer_type;                /* surface layer type   */
+    int layer_serial;
     int unresponsive;
 
     struct {
@@ -299,6 +301,7 @@ shell_fade_startup(struct desktop_shell *shell);
 
 /* shell management table           */
 static struct desktop_shell *_ico_ivi_shell = NULL;
+static int  _layer_serial = 0;
 /* shell program path for ico-ivi   */
 static char *shell_exe = NULL;
 #define DEFAULT_DEBUG_LEVEL 4
@@ -4901,6 +4904,90 @@ WL_EXPORT void
 ico_ivi_shell_startup(void *shell)
 {
     shell_fade_startup((struct desktop_shell *)shell);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_ivi_shell_set_layertype: set layer type
+ *
+ * @param       none
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ico_ivi_shell_set_layertype(void)
+{
+    struct weston_surface   *es;
+
+    _layer_serial ++;
+    wl_list_for_each(es, &_ico_ivi_shell->panel_layer.surface_list, layer_link) {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_PANEL;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+    wl_list_for_each(es, &_ico_ivi_shell->fullscreen_layer.surface_list, layer_link)    {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_FULLSCREEN;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+    wl_list_for_each(es, &_ico_ivi_shell->background_layer.surface_list, layer_link)    {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_BACKGROUND;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+    wl_list_for_each(es, &_ico_ivi_shell->compositor->cursor_layer.link, layer_link)    {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_CURSOR;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+    wl_list_for_each(es, &_ico_ivi_shell->compositor->fade_layer.link, layer_link)  {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_FADE;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+    wl_list_for_each(es, &_ico_ivi_shell->lock_layer.surface_list, layer_link)  {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_LOCK;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+    wl_list_for_each(es, &_ico_ivi_shell->input_panel_layer.surface_list, layer_link)   {
+        if (es->configure == shell_surface_configure)   {
+            ((struct shell_surface *)es->configure_private)->layer_type
+                = LAYER_TYPE_INPUTPANEL;
+            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
+        }
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_ivi_shell_layertype: get layer type
+ *
+ * @param[in]   surface     weston surface
+ * @return      layer type
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT int
+ico_ivi_shell_layertype(struct weston_surface *surface)
+{
+    if ((surface->configure == shell_surface_configure) &&
+        (((struct shell_surface *)surface->configure_private)->layer_serial
+            == _layer_serial)) {
+        return ((struct shell_surface *)surface->configure_private)->layer_type;
+    }
+    return LAYER_TYPE_UNKNOWN;
 }
 
 /*--------------------------------------------------------------------------*/

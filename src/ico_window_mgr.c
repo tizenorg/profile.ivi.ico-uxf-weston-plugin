@@ -631,6 +631,26 @@ ico_window_mgr_get_appid(struct wl_client* client)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_get_display_coordinate: get display coordinate
+ *
+ * @param[in]   displayno   display number
+ * @param[out]  x           relative X coordinate
+ * @param[out]  y           relative Y coordinate
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   void
+ico_window_mgr_get_display_coordinate(int displayno, int *x, int *y)
+{
+    if ((displayno <= _ico_num_nodes) || (displayno < 0))   {
+        displayno = 0;
+    }
+    *x = _ico_node_table[displayno].disp_x;
+    *y = _ico_node_table[displayno].disp_y;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   generate_id: generate uniq id for UIFW surface id
  *
  * @param       none
@@ -1109,13 +1129,17 @@ win_mgr_map_surface(struct weston_surface *surface, int32_t *width, int32_t *hei
 WL_EXPORT   void
 ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch)
 {
-    struct uifw_win_surface  *es;
+    struct uifw_win_surface  *eu;
     struct uifw_win_layer *el;
     int32_t buf_width, buf_height;
     float   new_x, new_y;
     struct weston_layer *wlayer;
     struct weston_surface  *surface, *surfacetmp;
     int     num_visible = 0;
+    int     layer_type;
+
+    /* set layer type                   */
+    ico_ivi_shell_set_layertype();
 
     /* make compositor surface list     */
     wlayer = ico_ivi_shell_weston_layer();
@@ -1131,62 +1155,65 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touc
     wl_list_init(&wlayer->surface_list);
 
     wl_list_for_each (el, &_ico_win_mgr->ivi_layer_list, link)  {
-        wl_list_for_each (es, &el->surface_list, ivi_layer) {
-            /* if surface not exist or surface type is not TopLevel, Skip   */
-            if ((es->surface == NULL) ||
-                (ico_ivi_shell_get_surfacetype(es->shsurf) != SHELL_SURFACE_TOPLEVEL))  {
+        if (el->layer_type == ICO_WINDOW_MGR_LAYER_TYPE_CURSOR) continue;
+        wl_list_for_each (eu, &el->surface_list, ivi_layer) {
+            if (eu->surface == NULL)    continue;
+
+            /* target only panel or unknown layer   */
+            layer_type = ico_ivi_shell_layertype(eu->surface);
+            if ((layer_type != LAYER_TYPE_PANEL) && (layer_type != LAYER_TYPE_UNKNOWN)) {
                 continue;
             }
-            wl_list_remove(&es->surface->layer_link);
-            wl_list_init(&es->surface->layer_link);
+            wl_list_remove(&eu->surface->layer_link);
+            wl_list_init(&eu->surface->layer_link);
 
-            if (es->mapped != 0)    {
-                if ((el->visible == FALSE) || (es->visible == FALSE) ||
+            if (eu->mapped != 0)    {
+                if ((el->visible == FALSE) || (eu->visible == FALSE) ||
                     ((omit_touch != FALSE) &&
-                     ((el->layer_type == ICO_WINDOW_MGR_LAYER_TYPE_INPUT) ||
-                      (el->layer_type == ICO_WINDOW_MGR_LAYER_TYPE_CURSOR))))   {
+                     (el->layer_type == ICO_WINDOW_MGR_LAYER_TYPE_INPUT)))  {
                     new_x = (float)(ICO_IVI_MAX_COORDINATE+1);
                     new_y = (float)(ICO_IVI_MAX_COORDINATE+1);
                 }
-                else if (es->surface->buffer_ref.buffer)    {
-                    buf_width = weston_surface_buffer_width(es->surface);
-                    buf_height = weston_surface_buffer_height(es->surface);
-                    if (es->width > buf_width) {
-                        new_x = (float)(es->x +
-                                (es->width - es->surface->geometry.width)/2);
+                else if (eu->surface->buffer_ref.buffer)    {
+                    buf_width = weston_surface_buffer_width(eu->surface);
+                    buf_height = weston_surface_buffer_height(eu->surface);
+                    if (eu->width > buf_width) {
+                        new_x = (float)(eu->x +
+                                (eu->width - eu->surface->geometry.width)/2);
                     }
                     else    {
-                        new_x = (float)es->x;
+                        new_x = (float)eu->x;
                     }
-                    if (es->height > buf_height)    {
-                        new_y = (float) (es->y +
-                                (es->height - es->surface->geometry.height)/2);
+                    if (eu->height > buf_height)    {
+                        new_y = (float) (eu->y +
+                                (eu->height - eu->surface->geometry.height)/2);
                     }
                     else    {
-                        new_y = (float)es->y;
+                        new_y = (float)eu->y;
                     }
-                    new_x += es->node_tbl->disp_x + es->xadd;
-                    new_y += es->node_tbl->disp_y + es->yadd;
+                    new_x += eu->node_tbl->disp_x + eu->xadd;
+                    new_y += eu->node_tbl->disp_y + eu->yadd;
                     num_visible ++;
                 }
                 else    {
-                    new_x = (float)(es->x + es->node_tbl->disp_x + es->xadd);
-                    new_y = (float)(es->y + es->node_tbl->disp_y + es->yadd);
+                    new_x = (float)(eu->x + eu->node_tbl->disp_x + eu->xadd);
+                    new_y = (float)(eu->y + eu->node_tbl->disp_y + eu->yadd);
                 }
-                wl_list_insert(wlayer->surface_list.prev, &es->surface->layer_link);
-                if ((new_x != es->surface->geometry.x) ||
-                    (new_y != es->surface->geometry.y)) {
-                    weston_surface_damage_below(es->surface);
-                    weston_surface_set_position(es->surface, (float)new_x, (float)new_y);
-                    weston_surface_damage(es->surface);
+                wl_list_insert(wlayer->surface_list.prev, &eu->surface->layer_link);
+                if ((eu->restrain_configure == 0) &&
+                    ((new_x != eu->surface->geometry.x) ||
+                     (new_y != eu->surface->geometry.y)))   {
+                    weston_surface_damage_below(eu->surface);
+                    weston_surface_set_position(eu->surface, (float)new_x, (float)new_y);
+                    weston_surface_damage(eu->surface);
                 }
 #if 0           /* too many debug log   */
                 uifw_trace("ico_window_mgr_restack_layer:%3d(%d).%08x(%08x:%d) "
                            "x/y=%d/%d w/h=%d/%d",
-                           el->layer, el->visible, es->surfaceid, (int)es->surface,
-                           es->visible, (int)es->surface->geometry.x,
-                           (int)es->surface->geometry.y, es->surface->geometry.width,
-                           es->surface->geometry.height);
+                           el->layer, el->visible, eu->surfaceid, (int)eu->surface,
+                           eu->visible, (int)eu->surface->geometry.x,
+                           (int)eu->surface->geometry.y, eu->surface->geometry.width,
+                           eu->surface->geometry.height);
 #endif
             }
         }
@@ -1422,6 +1449,22 @@ win_mgr_set_active(struct uifw_win_surface *usurf, const int target)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_ismykeyboard: check active keyboard
+ *
+ * @param[in]   usurf       UIFW surface
+ * @return      check result
+ * @retval      =1          usurf is active keyboard surface
+ * @retval      =0          usurf is not active
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   int
+ico_window_mgr_ismykeyboard(struct uifw_win_surface *usurf)
+{
+    return (_ico_win_mgr->active_keyboard_usurf == usurf) ? 1 : 0;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   uifw_declare_manager: declare manager(ex.SystemController) client
  *
  * @param[in]   client      Weyland client
@@ -1500,6 +1543,13 @@ static void
 uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
                       uint32_t surfaceid, uint32_t layer)
 {
+    if (layer == ICO_WINDOW_MGR_V_LAYER_INPUT)  {
+        layer = _ico_ivi_input_layer;
+    }
+    else if (layer == ICO_WINDOW_MGR_V_LAYER_CURSOR)    {
+        layer = _ico_ivi_cursor_layer;
+    }
+
     uifw_trace("uifw_set_window_layer: Enter res=%08x surfaceid=%08x layer=%d",
                (int)resource, surfaceid, layer);
 
@@ -1509,9 +1559,9 @@ uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
         uifw_trace("uifw_set_window_layer: Leave(No Surface(id=%08x))", surfaceid);
         return;
     }
+
     if (usurf->win_layer->layer != layer) {
         win_mgr_set_layer(usurf, layer);
-
         win_mgr_change_surface(usurf->surface, -1, 1);
     }
     uifw_trace("uifw_set_window_layer: Leave");
@@ -1826,11 +1876,7 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
         raise = ICO_WINDOW_MGR_V_NOCHANGE;
     }
 
-    if ((restack == 1) && (usurf->surface) &&
-        (usurf->surface->buffer_ref.buffer) && (usurf->surface->output))   {
-        weston_surface_damage(usurf->surface);
-    }
-    else if(restack & 2)    {
+    if (restack)    {
         ico_window_mgr_restack_layer(usurf, 0);
     }
 
@@ -2136,6 +2182,13 @@ uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
     struct uifw_win_layer   *el;
     struct uifw_win_layer   *new_el;
     struct uifw_win_surface *usurf;
+
+    if (layer == ICO_WINDOW_MGR_V_LAYER_INPUT)  {
+        layer = _ico_ivi_input_layer;
+    }
+    else if (layer == ICO_WINDOW_MGR_V_LAYER_CURSOR)    {
+        layer = _ico_ivi_cursor_layer;
+    }
 
     uifw_trace("uifw_set_layer_visible: Enter(layer=%d, visilbe=%d)", layer, visible);
 
@@ -2648,26 +2701,26 @@ win_mgr_change_surface(struct weston_surface *surface, const int to, const int m
         return;
     }
 
-    /* if not configure surface, set surface size   */
-    if ((usurf->width <= 0) || (usurf->height <= 0))  {
-        uifw_trace("win_mgr_change_surface: set surface x/y=%d/%d=>%d/%d w/h=%d/%d=>%d/%d",
-                   (int)es->geometry.x, (int)es->geometry.y, usurf->x, usurf->y,
-                   usurf->width, usurf->height, es->geometry.width, es->geometry.height);
+    /* set surface size     */
+    uifw_debug("win_mgr_change_surface: set surface x/y=%d/%d=>%d/%d w/h=%d/%d=>%d/%d",
+               (int)es->geometry.x, (int)es->geometry.y, usurf->x, usurf->y,
+               usurf->width, usurf->height, es->geometry.width, es->geometry.height);
+    if ((usurf->width <= 0) || (usurf->height <= 0))    {
         usurf->width = es->geometry.width;
         usurf->height = es->geometry.height;
-        win_mgr_set_scale(usurf);
-        if (usurf->visible) {
-            weston_surface_set_position(usurf->surface,
-                                        (float)(usurf->node_tbl->disp_x +
-                                                usurf->x + usurf->xadd),
-                                        (float)(usurf->node_tbl->disp_y +
-                                                usurf->y + usurf->yadd));
-            ico_window_mgr_restack_layer(usurf, 0);
-        }
-        else    {
-            weston_surface_set_position(usurf->surface, (float)(ICO_IVI_MAX_COORDINATE+1),
-                                        (float)(ICO_IVI_MAX_COORDINATE+1));
-        }
+    }
+    win_mgr_set_scale(usurf);
+    if (usurf->visible) {
+        weston_surface_set_position(usurf->surface,
+                                    (float)(usurf->node_tbl->disp_x +
+                                            usurf->x + usurf->xadd),
+                                    (float)(usurf->node_tbl->disp_y +
+                                            usurf->y + usurf->yadd));
+        ico_window_mgr_restack_layer(usurf, 0);
+    }
+    else    {
+        weston_surface_set_position(usurf->surface, (float)(ICO_IVI_MAX_COORDINATE+1),
+                                    (float)(ICO_IVI_MAX_COORDINATE+1));
     }
 
     /* send wayland event to client     */
@@ -3293,7 +3346,7 @@ win_mgr_set_scale(struct uifw_win_surface *usurf)
         if (usurf->client_height == 0)  usurf->client_height = es->geometry.height;
         scalex = (float)usurf->width / (float)usurf->client_width;
         scaley = (float)usurf->height / (float)usurf->client_height;
-        uifw_trace("win_mgr_set_scale: %08x X=%4.2f(%d/%d) Y=%4.2f(%d/%d)",
+        uifw_debug("win_mgr_set_scale: %08x X=%4.2f(%d/%d) Y=%4.2f(%d/%d)",
                    usurf->surfaceid, scalex, usurf->width, usurf->client_width,
                    scaley, usurf->height, usurf->client_height);
         usurf->xadd = 0;
@@ -3375,23 +3428,57 @@ ico_window_mgr_get_uclient(const char *appid)
 /**
  * @brief   ico_window_mgr_get_client_usurf: get client UIFW surface table
  *
- * @param[in]   appid       application Id
- * @param[in]   winname     window name
+ * @param[in]   target      surface window name and application Id(winname@appid)
  * @return      UIFW surface table
  * @retval      !=NULL      success(UIFW surface table address)
  * @retval      = NULL      error(appid or winname not exist)
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT   struct uifw_win_surface *
-ico_window_mgr_get_client_usurf(const char *appid, const char *winname)
+ico_window_mgr_get_client_usurf(const char *target)
 {
     struct uifw_client      *uclient;
     struct uifw_win_surface *usurf;
+    int     i, j;
+    char    winname[ICO_IVI_WINNAME_LENGTH];
+    char    appid[ICO_IVI_APPID_LENGTH];
+
+    /* get window name and application id   */
+    j = 0;
+    for (i = 0; target[i]; i++) {
+        if (target[i] == '@')   {
+            if (target[i+1] != '@') break;
+            i ++;
+        }
+        if (j < (ICO_IVI_WINNAME_LENGTH-1)) {
+            winname[j++] = target[i];
+        }
+    }
+    winname[j] = 0;
+    if (target[i] == '@')   {
+        i ++;
+    }
+    else    {
+        winname[0] = 0;
+        i = 0;
+    }
+    j = 0;
+    for ( ; target[i]; i++) {
+        if ((target[i] == '@') && (target[i+1] == '@')) i ++;
+        if (j < (ICO_IVI_APPID_LENGTH-1))  {
+            appid[j++] = target[i];
+        }
+    }
+    appid[j] = 0;
+#if 0           /* too many debug log   */
+    uifw_debug("ico_window_mgr_get_client_usurf: target=<%s> appid=<%s> win=<%s>",
+               target, appid, winname);
+#endif
 
     wl_list_for_each (uclient, &_ico_win_mgr->client_list, link)    {
         if (strcmp(uclient->appid, appid) == 0) {
             wl_list_for_each (usurf, &uclient->surface_link, client_link)   {
-                if ((winname == NULL) || (*winname == 0) ||
+                if ((winname[0] == 0) ||
                     (strcmp(winname, usurf->winname) == 0)) {
                     return usurf;
                 }
