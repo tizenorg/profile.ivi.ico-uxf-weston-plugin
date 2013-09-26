@@ -435,6 +435,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         weston_surface_geometry_dirty(usurf->surface);
     }
     if (disp)   {
+        usurf->restrain_configure = 0;
         if ((usurf->animation.visible == ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
             ico_window_mgr_set_visible(usurf, 0);
@@ -445,9 +446,8 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             ico_window_mgr_set_visible(usurf, 1);
             weston_surface_damage(usurf->surface);
         }
-        usurf->restrain_configure = 0;
         weston_surface_geometry_dirty(usurf->surface);
-        weston_compositor_schedule_repaint(weston_ec);
+        ico_window_mgr_restack_layer(usurf, 0);
     }
     usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
     if (usurf->animation.next_anima != ICO_WINDOW_MGR_ANIMATION_NONE)    {
@@ -477,6 +477,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         free_data = animadata;
     }
     usurf->animation.type = ICO_WINDOW_MGR_ANIMATION_OPNONE;
+    if (! disp) {
+        ico_window_mgr_restack_layer(usurf, 0);
+    }
 }
 
 /*--------------------------------------------------------------------------*/
@@ -512,7 +515,7 @@ animation_slide(struct weston_animation *animation,
     }
     par = usurf->animation.current;
 
-    uifw_trace("animation_slide: %08x count=%d %d%% anima=%d state=%d",
+    uifw_debug("animation_slide: %08x count=%d %d%% anima=%d state=%d",
                usurf->surfaceid, animation->frame_counter, par,
                usurf->animation.anima, usurf->animation.state);
 
@@ -573,6 +576,8 @@ animation_slide(struct weston_animation *animation,
         break;
     }
 
+    uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d)",
+               usurf->surfaceid, par, x, y, usurf->x, usurf->y);
     es->geometry.x = usurf->node_tbl->disp_x + x;
     es->geometry.y = usurf->node_tbl->disp_y + y;
     if ((es->output) && (es->buffer_ref.buffer) &&
@@ -625,7 +630,7 @@ animation_wipe(struct weston_animation *animation,
     }
     par = usurf->animation.current;
 
-    uifw_trace("animation_wipe: %08x count=%d %d%% anima=%d state=%d",
+    uifw_debug("animation_wipe: %08x count=%d %d%% anima=%d state=%d",
                usurf->surfaceid, animation->frame_counter, par,
                usurf->animation.anima, usurf->animation.state);
 
@@ -739,7 +744,7 @@ animation_swing(struct weston_animation *animation,
         return;
     }
 
-    uifw_trace("animation_swing: %08x count=%d %d%% anima=%d state=%d",
+    uifw_debug("animation_swing: %08x count=%d %d%% anima=%d state=%d",
                usurf->surfaceid, animation->frame_counter, par,
                usurf->animation.anima, usurf->animation.state);
 
@@ -943,7 +948,7 @@ animation_fade(struct weston_animation *animation,
     if (es->alpha < 0.0)        es->alpha = 0.0;
     else if (es->alpha > 1.0)   es->alpha = 1.0;
 
-    uifw_trace("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
+    uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
                usurf->surfaceid, animation->frame_counter, par, es->alpha,
                usurf->animation.anima, usurf->animation.state);
 

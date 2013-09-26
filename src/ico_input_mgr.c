@@ -114,6 +114,8 @@ struct uifw_input_device    {
     struct wl_list  link;                   /* link to next device                  */
     uint16_t    type;                       /* device type                          */
     uint16_t    no;                         /* device number                        */
+    int         disp_x;                     /* display X coordinate                 */
+    int         disp_y;                     /* display Y coordinate                 */
     int         x;                          /* current X coordinate                 */
     int         y;                          /* current Y coordinate                 */
     int         pend_x;                     /* pending X coordinate                 */
@@ -155,8 +157,9 @@ static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *
                                   const char *appid, const char *device, int32_t input);
                                             /* send input event from manager        */
 static void ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
-                                     const char *appid, uint32_t surfaceid, int32_t type,
-                                     int32_t deviceno, int32_t code, int32_t value);
+                                     const char *target, uint32_t surfaceid, int32_t type,
+                                     int32_t deviceno, uint32_t time,
+                                     int32_t code, int32_t value);
                                             /* set input region                     */
 static void ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                                      const char *target, int32_t x, int32_t y,
@@ -410,10 +413,11 @@ ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
  *
  * @param[in]   client          client(HomeScreen)
  * @param[in]   resource        resource of request
- * @param[in]   appid           target application id
+ * @param[in]   target          target window name and application id
  * @param[in]   surfaceid       target surface id
  * @param[in]   type            event device type
  * @param[in]   deviceno        device number
+ * @param[in]   time            event time (if 0, generate)
  * @param[in]   code            event code
  * @param[in]   value           event value
  * @return      none
@@ -421,20 +425,23 @@ ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
 /*--------------------------------------------------------------------------*/
 static void
 ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
-                         const char *appid, uint32_t surfaceid, int32_t type,
-                         int32_t deviceno, int32_t code, int32_t value)
+                         const char *target, uint32_t surfaceid, int32_t type,
+                         int32_t deviceno, uint32_t time, int32_t code, int32_t value)
 {
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
     struct uifw_input_device *dev;          /* device control table         */
     struct wl_resource      *cres;          /* event send client resource   */
+    struct wl_array dummy_array;            /* dummy array for wayland API  */
     uint32_t    ctime;                      /* current time(ms)             */
     uint32_t    serial;                     /* event serial number          */
     int         event;                      /* event flag                   */
     wl_fixed_t  fix_x;                      /* wayland X coordinate         */
     wl_fixed_t  fix_y;                      /* wayland Y coordinate         */
+    int         keyboard_active;            /* keyborad active surface flag */
 
-    uifw_trace("ico_mgr_send_input_event: Enter(app=%s surf=%08x dev=%d.%d code=%x value=%d)",
-               appid ? appid : "(NULL)", surfaceid, type, deviceno, code, value);
+    uifw_trace("ico_mgr_send_input_event: Enter(target=%s surf=%x dev=%d.%d "
+               "code=%x value=%d)",
+               target ? target : "(NULL)", surfaceid, type, deviceno, code, value);
 
     /* search pseudo input device           */
     wl_list_for_each (dev, &pInputMgr->dev_list, link)  {
@@ -451,6 +458,11 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
         memset(dev, 0, sizeof(struct uifw_input_device));
         dev->type = type;
         dev->no = deviceno;
+        if ((type == ICO_INPUT_MGR_DEVICE_TYPE_POINTER) ||
+            (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH) ||
+            (type == ICO_INPUT_MGR_DEVICE_TYPE_HAPTIC)) {
+            ico_window_mgr_get_display_coordinate(deviceno, &dev->disp_x, &dev->disp_y);
+        }
         wl_list_insert(pInputMgr->dev_list.prev, &dev->link);
     }
 
@@ -560,11 +572,16 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
-    ctime = weston_compositor_get_time();
-    fix_x = wl_fixed_from_int(dev->x);
-    fix_y = wl_fixed_from_int(dev->y);
+    if (time)   {
+        ctime = time;
+    }
+    else    {
+        ctime = weston_compositor_get_time();
+    }
+    fix_x = wl_fixed_from_int(dev->x + dev->disp_x);
+    fix_y = wl_fixed_from_int(dev->y + dev->disp_y);
 
-    if ((surfaceid == 0) && ((appid == NULL) || (*appid == 0) || (*appid == ' ')))  {
+    if ((surfaceid == 0) && ((target == NULL) || (*target == 0) || (*target == ' ')))  {
         /* send event to surface via weston */
 
         /* disable the event transmission to a touch layer  */
@@ -613,13 +630,14 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
         ico_window_mgr_restack_layer(NULL, FALSE);
     }
     else    {
-        if ((appid != NULL) && (*appid != 0) && (*appid != ' '))    {
+        if ((target != NULL) && (*target != 0) && (*target != ' '))    {
             /* send event to fixed application  */
 
             /* get application surface       */
-            usurf = ico_window_mgr_get_client_usurf(appid, NULL);
+            usurf = ico_window_mgr_get_client_usurf(target);
             if (! usurf)  {
-                uifw_trace("ico_mgr_send_input_event: Leave(app=%s dose not exist)", appid);
+                uifw_trace("ico_mgr_send_input_event: Leave(window=%s dose not exist)",
+                           target);
                 return;
             }
         }
@@ -683,10 +701,21 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                                 &pInputMgr->seat->keyboard->resource_list,
                                 wl_resource_get_client(usurf->surface->resource));
             if (cres)   {
+                keyboard_active = ico_window_mgr_ismykeyboard(usurf);
+                if (! keyboard_active)  {
+                    wl_array_init(&dummy_array);
+                    serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                    wl_keyboard_send_enter(cres, serial,
+                                           usurf->surface->resource, &dummy_array);
+                }
                 serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
                 wl_keyboard_send_key(cres, serial, ctime, code,
                                      value ? WL_KEYBOARD_KEY_STATE_PRESSED :
                                              WL_KEYBOARD_KEY_STATE_RELEASED);
+                if (! keyboard_active)  {
+                    serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                    wl_keyboard_send_leave(cres, serial, usurf->surface->resource);
+                }
             }
             break;
         default:

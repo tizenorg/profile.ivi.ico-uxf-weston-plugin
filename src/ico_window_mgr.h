@@ -195,12 +195,16 @@ struct uifw_win_surface {
 void ico_window_mgr_set_visible(struct uifw_win_surface *usurf, const int visible);
                                             /* get client applicationId             */
 char *ico_window_mgr_get_appid(struct wl_client* client);
+                                            /* get display coordinate               */
+void ico_window_mgr_get_display_coordinate(int displayno, int *x, int *y);
                                             /* change weston surface                */
 void ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf, int x, int y,
                                        int width, int height);
                                             /* surface change                       */
 void ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
                                    const int to, const int manager);
+                                            /* check active keyboard surface        */
+int ico_window_mgr_ismykeyboard(struct uifw_win_surface *usurf);
                                             /* get UIFW client table                */
 struct uifw_client *ico_window_mgr_get_uclient(const char *appid);
                                             /* get UIFW surface table               */
@@ -209,8 +213,7 @@ struct uifw_win_surface *ico_window_mgr_get_usurf(const uint32_t surfaceid);
 struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfaceid,
                                                          struct wl_client *client);
                                             /* get application surface              */
-struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *appid,
-                                                         const char *winname);
+struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
                                             /* rebuild surface layer list           */
 void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch);
                                             /* set window animation hook            */

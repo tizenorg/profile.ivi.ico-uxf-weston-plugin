@@ -43,6 +43,16 @@ enum shell_surface_type {
     SHELL_SURFACE_XWAYLAND
 };
 
+/* weston layer type            */
+#define LAYER_TYPE_UNKNOWN      0
+#define LAYER_TYPE_LOCK         1
+#define LAYER_TYPE_BACKGROUND   2
+#define LAYER_TYPE_PANEL        3
+#define LAYER_TYPE_FULLSCREEN   4
+#define LAYER_TYPE_INPUTPANEL   5
+#define LAYER_TYPE_CURSOR       6
+#define LAYER_TYPE_FADE         7
+
 /* Prototype for get/set function       */
 struct weston_layer *ico_ivi_shell_weston_layer(void);
 void ico_ivi_shell_set_toplevel(struct shell_surface *shsurf);
@@ -51,6 +61,8 @@ void ico_ivi_shell_set_surface_type(struct shell_surface *shsurf);
 void ico_ivi_shell_send_configure(struct weston_surface *surface,
                                   const uint32_t edges, const int width, const int height);
 void ico_ivi_shell_startup(void *shell);
+void ico_ivi_shell_set_layertype(void);
+int ico_ivi_shell_layertype(struct weston_surface *surface);
 
 /* Prototypr for hook routine           */
 void ico_ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client, void *shell));
