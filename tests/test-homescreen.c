@@ -785,8 +785,8 @@ cb_input_regions(void *data, struct ico_input_mgr_device *ico_input_mgr_device,
     if (regions)    {
         wl_array_for_each(region, regions)  {
             n ++;
-            print_log("HOMESCREEN: Event[input_regions] number of regions=%d", n);
         }
+        print_log("HOMESCREEN: Event[input_regions] number of regions=%d", n);
         n = 0;
         wl_array_for_each(region, regions)  {
             n ++;
@@ -804,7 +804,7 @@ cb_input_regions(void *data, struct ico_input_mgr_device *ico_input_mgr_device,
                 sprintf(schange, "?%d?", region->change);
                 break;
             }
-            print_log("HOMESCREEN:%2d. %s %d.%08(%d/%d) &d/%d-%d/%d "
+            print_log("HOMESCREEN:%2d. %s %d.%08x(%d/%d) %d/%d-%d/%d "
                       "hot=%d/%d cur=%d/%d-%d/%d attr=%x",
                       n, schange, region->node, region->surfaceid, region->surface_x,
                       region->surface_y, region->x, region->y, region->width,

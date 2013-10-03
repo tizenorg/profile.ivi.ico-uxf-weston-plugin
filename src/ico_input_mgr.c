@@ -54,12 +54,15 @@
 #define ICO_MINPUT_MAX_CODES            20
 
 /* structure definition */
+struct uifw_region_mng;
+
 /* working table of Multi Input Manager */
 struct ico_input_mgr {
     struct weston_compositor *compositor;   /* Weston Compositor                    */
     struct wl_list  ictl_list;              /* Input Controller List                */
     struct wl_list  app_list;               /* application List                     */
     struct wl_list  dev_list;               /* pseudo device List                   */
+    struct wl_list  free_region;            /* free input region table list         */
     struct weston_seat *seat;               /* input seat                           */
     struct wl_resource *inputmgr;
 };
@@ -84,7 +87,7 @@ struct ico_ictl_input {
 struct ico_ictl_mgr {
     struct wl_list link;                    /* link                                 */
     struct wl_client    *client;            /* client                               */
-    struct wl_resource  *resource;          /* resource                             */
+    struct wl_resource  *mgr_resource;      /* resource as manager                  */
     char    device[ICO_MINPUT_DEVICE_LEN];  /* device name                          */
     int     type;                           /* device type                          */
     struct wl_list ico_ictl_input;          /* list of input switchs                */
@@ -122,6 +125,12 @@ struct uifw_input_device    {
     int         pend_y;                     /* pending Y coordinate                 */
     uint16_t    pending;                    /* pending flag                         */
     char        res[2];                     /* (unused)                             */
+};
+
+/* Input Region Table           */
+struct uifw_region_mng  {
+    struct wl_list  link;                   /* link pointer                         */
+    struct ico_uifw_input_region region;    /* input region                         */
 };
 
 /* prototype of static function */
@@ -185,6 +194,7 @@ static void ico_device_configure_code(struct wl_client *client,
 static void ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                                    uint32_t time, const char *device,
                                    int32_t input, int32_t code, int32_t state);
+static void ico_input_send_region_event(struct wl_array *array);
 
 /* definition of Wayland protocol       */
 /* Input Manager Control interface      */
@@ -753,10 +763,78 @@ ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                          int32_t hotspot_y, int32_t cursor_x, int32_t cursor_y,
                          int32_t cursor_width, int32_t cursor_height, uint32_t attr)
 {
+    struct uifw_win_surface *usurf;         /* UIFW surface                 */
+    struct uifw_region_mng  *p;
+    struct ico_uifw_input_region *rp;
+    struct wl_array         array;
+    int     i;
+
     uifw_trace("ico_mgr_set_input_region: Enter(%s %d/%d-%d/%d(%d/%d) %d/%d-%d/%d)",
                target, x, y, width, height, hotspot_x, hotspot_y,
                cursor_x, cursor_y, cursor_width, cursor_height);
 
+    /* get target surface           */
+    usurf = ico_window_mgr_get_client_usurf(target);
+    if (! usurf)    {
+        uifw_warn("ico_mgr_set_input_region: Leave(target<%s> dose not exist)", target);
+        return;
+    }
+
+    if (wl_list_empty(&pInputMgr->free_region)) {
+        p = malloc(sizeof(struct uifw_region_mng)*50);
+        if (! p)    {
+            uifw_error("ico_mgr_set_input_region: No Memory");
+            return;
+        }
+        memset(p, 0, sizeof(struct uifw_region_mng)*50);
+        for (i = 0; i < 50; i++, p++)  {
+            wl_list_insert(pInputMgr->free_region.prev, &p->link);
+        }
+    }
+    p = container_of(pInputMgr->free_region.next, struct uifw_region_mng, link);
+    wl_list_remove(&p->link);
+    p->region.node = usurf->node_tbl->node;
+    p->region.surfaceid = usurf->surfaceid;
+    p->region.surface_x = usurf->x;
+    p->region.surface_y = usurf->y;
+    p->region.x = x;
+    p->region.y = y;
+    p->region.width = width;
+    p->region.height = height;
+    if ((hotspot_x <= 0) && (hotspot_y <= 0))   {
+        p->region.hotspot_x = width / 2;
+        p->region.hotspot_y = height / 2;
+    }
+    else    {
+        p->region.hotspot_x = hotspot_x;
+        p->region.hotspot_y = hotspot_y;
+    }
+    if ((cursor_width <= 0) && (cursor_height <= 0))    {
+        p->region.cursor_x = x;
+        p->region.cursor_y = y;
+        p->region.cursor_width = width;
+        p->region.cursor_height = height;
+    }
+    else    {
+        p->region.cursor_x = cursor_x;
+        p->region.cursor_y = cursor_y;
+        p->region.cursor_width = cursor_width;
+        p->region.cursor_height = cursor_height;
+    }
+    p->region.change = ico_window_mgr_is_visible(usurf);
+    wl_list_insert(usurf->input_region.prev, &p->link);
+
+    /* send input region to haptic device input controller  */
+    if (p->region.change > 0)   {
+        wl_array_init(&array);
+        rp = (struct ico_uifw_input_region *)
+                 wl_array_add(&array, sizeof(struct ico_uifw_input_region));
+        if (rp) {
+            memcpy(rp, &p->region, sizeof(struct ico_uifw_input_region));
+            rp->change = ICO_INPUT_MGR_DEVICE_REGION_ADD;
+            ico_input_send_region_event(&array);
+        }
+    }
     uifw_trace("ico_mgr_set_input_region: Leave");
 }
 
@@ -779,10 +857,171 @@ ico_mgr_unset_input_region(struct wl_client *client, struct wl_resource *resourc
                            const char *target, int32_t x, int32_t y,
                            int32_t width, int32_t height)
 {
+    struct uifw_win_surface     *usurf;     /* UIFW surface                 */
+    struct uifw_region_mng      *p;         /* input region mamagement table*/
+    struct uifw_region_mng      *np;        /* next region mamagement table */
+    struct ico_uifw_input_region *rp;       /* input region                 */
+    struct wl_array             array;
+    int                         alldel;
+    int                         delcount = 0;
+
     uifw_trace("ico_mgr_unset_input_region: Enter(%s %d/%d-%d/%d)",
                target, x, y, width, height);
 
+    /* get target surface           */
+    usurf = ico_window_mgr_get_client_usurf(target);
+    if (! usurf)    {
+        uifw_warn("ico_mgr_unset_input_region: Leave(target<%s> dose not exist)", target);
+        return;
+    }
+
+    if ((x <= 0) && (y <= 0) && (width <= 0) && (height <= 0))  {
+        alldel = 1;
+    }
+    else    {
+        alldel = 0;
+    }
+
+    wl_array_init(&array);
+
+    wl_list_for_each_safe(p, np, &usurf->input_region, link)    {
+        if ((alldel != 0) ||
+            ((x == p->region.x) && (y == p->region.y) &&
+             (width == p->region.width) && (height == p->region.height)))   {
+            if (p->region.change > 0)   {
+                /* visible, send remove event   */
+                rp = (struct ico_uifw_input_region *)
+                     wl_array_add(&array, sizeof(struct ico_uifw_input_region));
+                if (rp) {
+                    delcount ++;
+                    memcpy(rp, &p->region, sizeof(struct ico_uifw_input_region));
+                    rp->change = ICO_INPUT_MGR_DEVICE_REGION_REMOVE;
+                }
+            }
+            wl_list_remove(&p->link);
+            wl_list_insert(pInputMgr->free_region.prev, &p->link);
+        }
+    }
+    if (delcount > 0)   {
+        /* send region delete to haptic device input controller */
+        ico_input_send_region_event(&array);
+    }
     uifw_trace("ico_mgr_unset_input_region: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_input_hook_region_visible: change surface visibility
+ *
+ * @param[in]   usurf           UIFW surface
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_input_hook_region_visible(struct uifw_win_surface *usurf)
+{
+    struct uifw_region_mng      *p;         /* input region mamagement table*/
+    struct ico_uifw_input_region *rp;       /* input region                 */
+    struct wl_array             array;
+    int                         chgcount = 0;
+    int                         visible;
+
+    visible = ico_window_mgr_is_visible(usurf);
+
+    uifw_trace("ico_input_hook_region_visible: Entery(surf=%08x, visible=%d)",
+               usurf->surfaceid, visible);
+
+    wl_array_init(&array);
+
+    wl_list_for_each(p, &usurf->input_region, link) {
+        if (((p->region.change > 0) && (visible <= 0)) ||
+            ((p->region.change <= 0) && (visible > 0))) {
+            /* visible change, send remove event    */
+            rp = (struct ico_uifw_input_region *)
+                 wl_array_add(&array, sizeof(struct ico_uifw_input_region));
+            if (rp) {
+                chgcount ++;
+                memcpy(rp, &p->region, sizeof(struct ico_uifw_input_region));
+                if (visible > 0)    {
+                    rp->change = ICO_INPUT_MGR_DEVICE_REGION_ADD;
+                }
+                else    {
+                    rp->change = ICO_INPUT_MGR_DEVICE_REGION_REMOVE;
+                }
+            }
+        }
+        p->region.change = visible;
+    }
+    if (chgcount > 0)   {
+        /* send region delete to haptic device input controller */
+        ico_input_send_region_event(&array);
+    }
+
+    uifw_trace("ico_input_hook_region_visible: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_input_hook_region_destroy: destory surface
+ *
+ * @param[in]   usurf           UIFW surface
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_input_hook_region_destroy(struct uifw_win_surface *usurf)
+{
+    struct uifw_region_mng      *p;         /* input region mamagement table*/
+    struct uifw_region_mng      *np;        /* next region mamagement table */
+    struct ico_uifw_input_region *rp;       /* input region                 */
+    struct wl_array             array;
+    int                         delcount = 0;
+
+    uifw_trace("ico_input_hook_region_destroy: Entery(surf=%08x)", usurf->surfaceid);
+
+    wl_array_init(&array);
+
+    wl_list_for_each_safe(p, np, &usurf->input_region, link)    {
+        if (p->region.change > 0)   {
+            /* visible, send remove event   */
+            rp = (struct ico_uifw_input_region *)
+                 wl_array_add(&array, sizeof(struct ico_uifw_input_region));
+            if (rp) {
+                delcount ++;
+                memcpy(rp, &p->region, sizeof(struct ico_uifw_input_region));
+                rp->change = ICO_INPUT_MGR_DEVICE_REGION_REMOVE;
+            }
+        }
+        wl_list_remove(&p->link);
+        wl_list_insert(pInputMgr->free_region.prev, &p->link);
+    }
+    if (delcount > 0)   {
+        /* send region delete to haptic device input controller */
+        ico_input_send_region_event(&array);
+    }
+    uifw_trace("ico_input_hook_region_destroy: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_input_send_region_event: send region event to Haptic dic
+ *
+ * @param[in]   usurf           UIFW surface
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_input_send_region_event(struct wl_array *array)
+{
+    struct ico_ictl_mgr     *pIctlMgr;
+
+    wl_list_for_each (pIctlMgr, &pInputMgr->ictl_list, link)   {
+        if ((pIctlMgr->type == ICO_INPUT_MGR_DEVICE_TYPE_HAPTIC) &&
+            (pIctlMgr->mgr_resource != NULL))   {
+            uifw_trace("ico_input_send_region_event: send event to Hapfic");
+            ico_input_mgr_device_send_input_regions(pIctlMgr->mgr_resource, array);
+        }
+    }
 }
 
 /*--------------------------------------------------------------------------*/
@@ -816,23 +1055,21 @@ ico_device_configure_input(struct wl_client *client, struct wl_resource *resourc
 
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
-        /* create ictl mgr table */
-        pIctlMgr = (struct ico_ictl_mgr *)malloc(sizeof(struct ico_ictl_mgr));
-        if (pIctlMgr == NULL) {
-            uifw_error("ico_device_configure_input: Leave(No Memory)");
+        /* search binded table      */
+        wl_list_for_each (pIctlMgr, &pInputMgr->ictl_list, link)    {
+            if (pIctlMgr->client == client) {
+                uifw_trace("ico_device_configure_input: setup pIctlMgr(mgr=%08x,input=%d)",
+                           (int)pIctlMgr, input);
+                strncpy(pIctlMgr->device, device, sizeof(pIctlMgr->device)-1);
+                break;
+            }
+        }
+        if (&pIctlMgr->link == &pInputMgr->ictl_list)   {
+            uifw_error("ico_device_configure_input: Leave(not found client)");
             return;
         }
-        uifw_trace("ico_device_configure_input: create pIctlMgr(mgr=%08x,input=%d)",
-                   (int)pIctlMgr, input);
-        memset(pIctlMgr, 0, sizeof(struct ico_ictl_mgr));
-        wl_list_init(&pIctlMgr->ico_ictl_input);
-        strncpy(pIctlMgr->device, device, sizeof(pIctlMgr->device)-1);
-
-        /* add list */
-        wl_list_insert(pInputMgr->ictl_list.prev, &pIctlMgr->link);
     }
-    pIctlMgr->client = client;
-    pIctlMgr->resource = resource;
+
     if (type)   {
         pIctlMgr->type = type;
     }
@@ -1077,7 +1314,7 @@ ico_control_bind(struct wl_client *client, void *data, uint32_t version, uint32_
 static void
 ico_control_unbind(struct wl_resource *resource)
 {
-    struct ico_app_mgr      *pAppMgr;
+    struct ico_app_mgr  *pAppMgr;
 
     uifw_trace("ico_control_unbind: Enter(resource=%08x)", (int)resource);
 
@@ -1105,14 +1342,29 @@ ico_control_unbind(struct wl_resource *resource)
 static void
 ico_device_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
-    struct wl_resource *mgr_resource;
+    struct ico_ictl_mgr *pIctlMgr;
+    struct wl_resource  *mgr_resource;
 
     uifw_trace("ico_device_bind: Enter(client=%08x)", (int)client);
 
+    /* create ictl mgr table */
+    pIctlMgr = (struct ico_ictl_mgr *)malloc(sizeof(struct ico_ictl_mgr));
+    if (pIctlMgr == NULL) {
+        uifw_error("ico_device_bind: Leave(No Memory)");
+        return;
+    }
+    memset(pIctlMgr, 0, sizeof(struct ico_ictl_mgr));
+    wl_list_init(&pIctlMgr->ico_ictl_input);
+    pIctlMgr->client = client;
+
+    /* add list */
+    wl_list_insert(pInputMgr->ictl_list.prev, &pIctlMgr->link);
+
     mgr_resource = wl_resource_create(client, &ico_input_mgr_device_interface, 1, id);
     if (mgr_resource)   {
+        pIctlMgr->mgr_resource = mgr_resource;
         wl_resource_set_implementation(mgr_resource, &input_mgr_ictl_implementation,
-                                       pInputMgr, ico_device_unbind);
+                                       pIctlMgr, ico_device_unbind);
     }
     uifw_trace("ico_device_bind: Leave");
 }
@@ -1355,6 +1607,9 @@ find_app_by_appid(const char *appid)
 WL_EXPORT int
 module_init(struct weston_compositor *ec, int *argc, char *argv[])
 {
+    struct uifw_region_mng  *p;
+    int     i;
+
     uifw_info("ico_input_mgr: Enter(module_init)");
 
     /* initialize management table */
@@ -1391,9 +1646,21 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     wl_list_init(&pInputMgr->ictl_list);
     wl_list_init(&pInputMgr->app_list);
     wl_list_init(&pInputMgr->dev_list);
+    wl_list_init(&pInputMgr->free_region);
+    p = malloc(sizeof(struct uifw_region_mng)*100);
+    if (p)  {
+        memset(p, 0, sizeof(struct uifw_region_mng)*100);
+        for (i = 0; i < 100; i++, p++)  {
+            wl_list_insert(pInputMgr->free_region.prev, &p->link);
+        }
+    }
 
     /* found input seat */
     pInputMgr->seat = container_of(ec->seat_list.next, struct weston_seat, link);
+
+    /* set hook for input region control    */
+    ico_window_mgr_set_hook_visible(ico_input_hook_region_visible);
+    ico_window_mgr_set_hook_destory(ico_input_hook_region_destroy);
 
     uifw_info("ico_input_mgr: Leave(module_init)");
     return 0;

@@ -4,6 +4,9 @@
 #
 #	1. Make surfaces
 #
+# set input device for Haptic
+input_conf Haptic 16 switch 1 code 2
+#
 launch ../tests/test-client < ../tests/testdata/cl_inputregion.dat 2> ../tests/testlog/test-client01.log 1>&2
 waitcreate 2
 show test-client
@@ -14,8 +17,20 @@ set_region test-client@test-client 70 200 50 80
 sleep 1
 # unset region
 ## unset_region test-client@test-client 50 100 30 60  # request from application
-unset_region test-client@ 70 200 50 80
+unset_region @test-client 70 200 50 80
 sleep 1
+set_region test-client@test-client 10 20 40 30
+set_region test-client@test-client 80 120 50 60
+set_region test-client@test-client 120 60 20 20
+sleep 1
+unset_region test-client@test-client 80 120 50 60
+sleep 1
+hide test-client
+sleep 1
+show test-client
+sleep 1
+kill test-client
+sleep 2
 #
 launch ../tests/test-eflapp @1 -color=0xe02040ff 2> ../tests/testlog/test-eflapp.log 1>&2
 waitcreate 2
@@ -24,14 +39,13 @@ show test-eflapp@1
 sleep 1
 #
 # set region
-set_region test-eflapp@@1@test-eflapp@@1 60 90 40 70
-set_region test-eflapp@@1@test0eflapp@@1 80 190 60 100
+set_region EFL_Native_Application_1@test-eflapp@@1 60 90 40 70
+set_region EFL_Native_Application_1@test-eflapp@@1 80 190 60 100
 sleep 1
 # unset region
-unset_region test-eflapp@@1 main 0 0 0 0
+unset_region @test-eflapp@@1 main 0 0 0 0
 #
 sleep 2
-kill test-client
 kill test-eflapp@1
 sleep 1
 #

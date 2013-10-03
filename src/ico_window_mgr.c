@@ -282,6 +282,9 @@ static int win_mgr_set_scale(struct uifw_win_surface *usurf);
 static int ico_get_animation_name(const char *animation);
                                             /* hook for animation                   */
 static int  (*win_mgr_hook_animation)(const int op, void *data) = NULL;
+                                            /* hook for input region                */
+static void (*win_mgr_hook_visible)(struct uifw_win_surface *usurf) = NULL;
+static void (*win_mgr_hook_destory)(struct uifw_win_surface *usurf) = NULL;
 
 /* static tables                        */
 /* Multi Window Manager interface       */
@@ -968,6 +971,7 @@ win_mgr_register_surface(struct wl_client *client, struct wl_resource *resource,
     wl_list_init(&usurf->client_link);
     wl_list_init(&usurf->animation.animation.link);
     wl_list_init(&usurf->surf_map);
+    wl_list_init(&usurf->input_region);
     usurf->animation.hide_anima = ico_get_animation_name(ico_ivi_default_animation_name());
     usurf->animation.hide_time = ico_ivi_default_animation_time();;
     usurf->animation.show_anima = usurf->animation.hide_anima;
@@ -1137,6 +1141,12 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touc
     struct weston_surface  *surface, *surfacetmp;
     int     num_visible = 0;
     int     layer_type;
+    int     old_visible;
+
+    /* save current visible             */
+    if (usurf)  {
+        old_visible = ico_window_mgr_is_visible(usurf);
+    }
 
     /* set layer type                   */
     ico_ivi_shell_set_layertype();
@@ -1233,6 +1243,13 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touc
             /* start shell fade         */
             _ico_win_mgr->shell_init = 1;
             ico_ivi_shell_startup(_ico_win_mgr->shell);
+        }
+    }
+
+    /* if visible change, call hook for input region    */
+    if ((usurf != NULL) && (win_mgr_hook_visible != NULL)) {
+        if (old_visible != ico_window_mgr_is_visible(usurf))    {
+            (*win_mgr_hook_visible)(usurf);
         }
     }
     uifw_trace("ico_window_mgr_restack_layer: Leave");
@@ -2598,7 +2615,7 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
         uclient = NULL;
         wl_list_for_each(sm, &usurf->surf_map, surf_link) {
             if (sm->uclient->mgr != NULL) {
-                uifw_trace("uifw_unmap_surface: send MAP event(ev=%d surf=%08x name=%08x "
+                uifw_trace("uifw_unmap_surface: send UNMAP event(ev=%d surf=%08x name=%08x "
                            "w/h/s=%d/%d/%d format=%x",
                            ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP, surfaceid,
                            sm->eglname, sm->width, sm->height, sm->stride, sm->format);
@@ -2614,7 +2631,7 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
         if (((uclient != NULL) && (sm->uclient != uclient)))   continue;
         /* send unmap event                     */
         if ((uclient != NULL) && (uclient->mgr != NULL))    {
-            uifw_trace("uifw_unmap_surface: send MAP event(ev=%d surf=%08x name=%08x "
+            uifw_trace("uifw_unmap_surface: send UNMAP event(ev=%d surf=%08x name=%08x "
                        "w/h/s=%d/%d/%d format=%x",
                        ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP, surfaceid,
                        sm->eglname, sm->width, sm->height, sm->stride, sm->format);
@@ -3064,6 +3081,11 @@ win_mgr_destroy_surface(struct weston_surface *surface)
     }
     uifw_trace("win_mgr_destroy_surface: Enter(%08x) %08x", (int)surface, usurf->surfaceid);
 
+    /* destory input region         */
+    if (win_mgr_hook_destory)   {
+        (*win_mgr_hook_destory)(usurf);
+    }
+
     /* unmap surface                */
     if (&usurf->surf_map != usurf->surf_map.next)   {
         uifw_unmap_surface(NULL, NULL, usurf->surfaceid);
@@ -3490,6 +3512,31 @@ ico_window_mgr_get_client_usurf(const char *target)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_is_visible: check surface visible
+ *
+ * @param[in]   usurf       UIFW surface
+ * @return      visibility
+ * @retval      =1          visible
+ * @retval      =0          not visible
+ * @retval      =-1         surface visible but layer not vlsible
+ * @retval      =-2         surface visible but lower
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   int
+ico_window_mgr_is_visible(struct uifw_win_surface *usurf)
+{
+    if ((usurf->visible == 0) || (usurf->surface == NULL) ||
+        (usurf->mapped == 0) || (usurf->surface->buffer_ref.buffer == NULL))    {
+        return 0;
+    }
+    if (usurf->win_layer->visible == 0) {
+        return -1;
+    }
+    return 1;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   ico_window_mgr_set_hook_animation: set animation hook routine
  *
  * @param[in]   hook_animation  hook routine
@@ -3500,6 +3547,34 @@ WL_EXPORT   void
 ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data))
 {
     win_mgr_hook_animation = hook_animation;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_window_mgr_set_hook_visible: set input region hook routine
+ *
+ * @param[in]   hook_visible    hook routine
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   void
+ico_window_mgr_set_hook_visible(void (*hook_visible)(struct uifw_win_surface *usurf))
+{
+    win_mgr_hook_visible = hook_visible;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_window_mgr_set_hook_destory: set input region hook routine
+ *
+ * @param[in]   hook_destroy    hook routine
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   void
+ico_window_mgr_set_hook_destory(void (*hook_destroy)(struct uifw_win_surface *usurf))
+{
+    win_mgr_hook_destory = hook_destroy;
 }
 
 /*--------------------------------------------------------------------------*/

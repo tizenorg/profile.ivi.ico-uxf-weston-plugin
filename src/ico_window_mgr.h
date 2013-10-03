@@ -152,6 +152,7 @@ struct uifw_win_surface {
     struct wl_list          ivi_layer;      /* surface list of same layer           */
     struct wl_list          client_link;    /* surface list of same client          */
     struct wl_list          surf_map;       /* surface map list                     */
+    struct wl_list          input_region;   /* surface input region list            */
     struct uifw_win_surface *next_idhash;   /* UIFW SurfaceId hash list             */
     struct uifw_win_surface *next_wshash;   /* Weston SurfaceId hash list           */
 };
@@ -216,8 +217,14 @@ struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfacei
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
                                             /* rebuild surface layer list           */
 void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch);
+                                            /* chek surface visibility              */
+int ico_window_mgr_is_visible(struct uifw_win_surface *usurf);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
+                                            /* set surface visible change hook      */
+void ico_window_mgr_set_hook_visible(void (*hook_visible)(struct uifw_win_surface *usurf));
+                                            /* set surface destory hook             */
+void ico_window_mgr_set_hook_destory(void (*hook_destroy)(struct uifw_win_surface *usurf));
 
 #endif  /*_ICO_WINDOW_MGR_H_*/
 
