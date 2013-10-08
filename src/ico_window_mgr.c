@@ -147,6 +147,8 @@ struct ico_win_mgr {
     struct wl_list  manager_list;           /* Manager(ex.HomeScreen) list          */
     int             num_manager;            /* Number of managers                   */
     struct wl_list  ivi_layer_list;         /* Layer management table list          */
+    struct uifw_win_layer *input_layer;     /* layer table for input layer          */
+    struct uifw_win_layer *cursor_layer;    /* layer table for cursor layer         */
     struct wl_list  map_list;               /* surface map list                     */
     struct uifw_surface_map *free_maptable; /* free maped surface table list        */
     struct weston_animation map_animation[ICO_IVI_MAX_DISPLAY];
@@ -1257,6 +1259,42 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touc
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_input_layer: input layer control
+ *
+ * @param[in]   omit        omit input layer flag (TRUE=omit/FALSE=not omit)
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   void
+ico_window_mgr_input_layer(int omit)
+{
+    struct uifw_win_surface  *eu;
+
+    /* check current input layer mode   */
+    if ((_ico_win_mgr->input_layer == NULL) ||
+        ((omit != FALSE) && (_ico_win_mgr->input_layer->visible == FALSE))) {
+        uifw_trace("ico_window_mgr_input_layer: input layer not exist or hide");
+        return;
+    }
+
+    wl_list_for_each (eu, &_ico_win_mgr->input_layer->surface_list, ivi_layer) {
+        if ((eu->surface == NULL) || (eu->mapped == 0)) continue;
+
+        if (omit != FALSE)  {
+            eu->animation.pos_x = (int)eu->surface->geometry.x;
+            eu->animation.pos_y = (int)eu->surface->geometry.y;
+            eu->surface->geometry.x = (float)(ICO_IVI_MAX_COORDINATE+1);
+            eu->surface->geometry.y = (float)(ICO_IVI_MAX_COORDINATE+1);
+        }
+        else    {
+            eu->surface->geometry.x = (float)eu->animation.pos_x;
+            eu->surface->geometry.y = (float)eu->animation.pos_y;
+        }
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   win_mgr_create_layer: create new layer
  *
  * @param[in]   usurf       UIFW surface, (if need)
@@ -1285,9 +1323,11 @@ win_mgr_create_layer(struct uifw_win_surface *usurf, const uint32_t layer)
     }
     else if ((int)layer == _ico_ivi_input_layer )   {
         new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_INPUT;
+        _ico_win_mgr->input_layer = new_el;
     }
     else if ((int)layer == _ico_ivi_cursor_layer )  {
         new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_CURSOR;
+        _ico_win_mgr->cursor_layer = new_el;
     }
     else    {
         new_el->layer_type = ICO_WINDOW_MGR_LAYER_TYPE_NORMAL;
@@ -1565,6 +1605,9 @@ uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
     }
     else if (layer == ICO_WINDOW_MGR_V_LAYER_CURSOR)    {
         layer = _ico_ivi_cursor_layer;
+    }
+    else if (layer == ICO_WINDOW_MGR_V_LAYER_STARTUP)    {
+        layer = _ico_ivi_startup_layer;
     }
 
     uifw_trace("uifw_set_window_layer: Enter res=%08x surfaceid=%08x layer=%d",
@@ -2205,6 +2248,9 @@ uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
     }
     else if (layer == ICO_WINDOW_MGR_V_LAYER_CURSOR)    {
         layer = _ico_ivi_cursor_layer;
+    }
+    else if (layer == ICO_WINDOW_MGR_V_LAYER_STARTUP)    {
+        layer = _ico_ivi_startup_layer;
     }
 
     uifw_trace("uifw_set_layer_visible: Enter(layer=%d, visilbe=%d)", layer, visible);

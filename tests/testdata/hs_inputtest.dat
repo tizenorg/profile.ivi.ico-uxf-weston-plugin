@@ -3,19 +3,19 @@
 #
 #	1. Input test (touch each window)
 launch ../tests/test-client @1 -color=0xffff2020 -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client1.log
-sleep 0.5
+waitcreate 2
 layer test-client@1 101
 move test-client@1 100 200
 show test-client@1
 
 launch ../tests/test-client @2 -color=0xff20ff20 -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client2.log
-sleep 0.5
+waitcreate 2
 layer test-client@2 101
 move test-client@2 250 300
 show test-client@2
 
 launch ../tests/test-client @3 -color=0xff2020ff -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client3.log
-sleep 0.5
+waitcreate 2
 layer test-client@3 101
 move test-client@3 400 400
 show test-client@3
@@ -107,7 +107,7 @@ kill test-client@1
 sleep 0.5
 #
 launch ../tests/test-client @1 -color=0xffff2020 -postsleep=90 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client4.log
-sleep 0.5
+waitcreate 2
 layer test-client@1 101
 move test-client@1 100 200
 show test-client@1

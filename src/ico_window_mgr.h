@@ -217,6 +217,8 @@ struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfacei
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
                                             /* rebuild surface layer list           */
 void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch);
+                                            /* input layer ccontrol for input manager*/
+void ico_window_mgr_input_layer(int omit);
                                             /* chek surface visibility              */
 int ico_window_mgr_is_visible(struct uifw_win_surface *usurf);
                                             /* set window animation hook            */

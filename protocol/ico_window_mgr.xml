@@ -11,8 +11,9 @@
       </description>
       <entry name="nochange" value="0x8000" summary="no change value"/>
       <entry name="mainsurface" value="0x8000" summary="main serface id"/>
-      <entry name="layer_input" value="0x2000" summary="input layer id"/>
+      <entry name="layer_input" value="0x2000" summary="cursor layer id"/>
       <entry name="layer_cursor" value="0x3000" summary="cursor layer id"/>
+      <entry name="layer_startup" value="0x4000" summary="startup layer id"/>
     </enum>
 
     <enum name="declare_manager">

@@ -1,6 +1,6 @@
 Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
-Version:    0.9.05
+Version:    0.9.06
 Release:    1.1
 Group:      Graphics & UI Framework/Automotive UI
 License:    MIT

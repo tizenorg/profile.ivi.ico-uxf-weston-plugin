@@ -447,11 +447,15 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
     int         event;                      /* event flag                   */
     wl_fixed_t  fix_x;                      /* wayland X coordinate         */
     wl_fixed_t  fix_y;                      /* wayland Y coordinate         */
+    wl_fixed_t  dx, dy;                     /* relative coordinate (dummy)  */
+    struct weston_surface   *grabnew;       /* new grab surface             */
+    struct weston_surface   *grabsave;      /* real grab surface            */
     int         keyboard_active;            /* keyborad active surface flag */
 
     uifw_trace("ico_mgr_send_input_event: Enter(target=%s surf=%x dev=%d.%d "
-               "code=%x value=%d)",
-               target ? target : "(NULL)", surfaceid, type, deviceno, code, value);
+               "time=%d code=%x value=%d)",
+               target ? target : "(NULL)", surfaceid, type, deviceno,
+               time, code, value);
 
     /* search pseudo input device           */
     wl_list_for_each (dev, &pInputMgr->dev_list, link)  {
@@ -594,36 +598,85 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
     if ((surfaceid == 0) && ((target == NULL) || (*target == 0) || (*target == ' ')))  {
         /* send event to surface via weston */
 
-        /* disable the event transmission to a touch layer  */
-        ico_window_mgr_restack_layer(NULL, TRUE);
+        /* disable the event transmission to a input layer  */
+        if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
+            ico_window_mgr_input_layer(TRUE);
+        }
+
+		if ((event == EVENT_TOUCH) && (pInputMgr->seat->touch == NULL))	{
+			/* system has no touch, change to pointer event	*/
+			if (pInputMgr->seat->pointer == NULL)	{
+        		uifw_trace("ico_mgr_send_input_event: Leave(no touch & no pointerr)");
+        		return;
+			}
+			event = EVENT_BUTTON;
+			code = BTN_LEFT;
+		}
+		else if ((event == EVENT_BUTTON) && (pInputMgr->seat->pointer == NULL))	{
+			/* system has no pointer, change to touch event	*/
+			if (pInputMgr->seat->touch == NULL)	{
+        		uifw_trace("ico_mgr_send_input_event: Leave(no touch & no pointerr)");
+        		return;
+			}
+			event = EVENT_TOUCH;
+		}
 
         switch (event)    {
         case EVENT_MOTION:
-            if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
-                uifw_trace("ico_mgr_send_input_event: notify_touch(%d,%d)", fix_x, fix_y);
+            if ((type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH) &&
+				(pInputMgr->seat->touch))	{
+                uifw_trace("ico_mgr_send_input_event: notify_touch(MOTION=%d/%d)",
+                           fix_x/256, fix_y/256);
+                grabsave = pInputMgr->seat->touch->focus;
+                weston_touch_set_focus(pInputMgr->seat,
+                                       weston_compositor_pick_surface(
+                                           pInputMgr->compositor, fix_x, fix_y, &dx, &dy));
                 notify_touch(pInputMgr->seat, ctime, 0, fix_x, fix_y, WL_TOUCH_MOTION);
+                weston_touch_set_focus(pInputMgr->seat, grabsave);
             }
-            else    {
-                uifw_trace("ico_mgr_send_input_event: notify_motion_absolute(%d,%d)",
-                           fix_x, fix_y);
+            else if (pInputMgr->seat->pointer)	{
+                uifw_trace("ico_mgr_send_input_event: notify_motion_absolute(%d/%d)",
+                           fix_x/256, fix_y/256);
+                grabsave = pInputMgr->seat->pointer->focus;
+                grabnew = weston_compositor_pick_surface(
+                              pInputMgr->compositor, fix_x, fix_y, &dx, &dy);
+                weston_pointer_set_focus(pInputMgr->seat->pointer, grabnew, dx, dy);
                 notify_motion_absolute(pInputMgr->seat, ctime, fix_x, fix_y);
+                weston_pointer_set_focus(pInputMgr->seat->pointer, grabsave, dx, dy);
             }
             break;
         case EVENT_BUTTON:
             uifw_trace("ico_mgr_send_input_event: notify_button(%d,%d)", code, value);
-            notify_button(pInputMgr->seat, ctime, code,
-                          value ? WL_POINTER_BUTTON_STATE_PRESSED :
-                                  WL_POINTER_BUTTON_STATE_RELEASED);
+            if (pInputMgr->seat->pointer)	{
+	            grabsave = pInputMgr->seat->pointer->focus;
+	            grabnew = weston_compositor_pick_surface(
+	                          pInputMgr->compositor, fix_x, fix_y, &dx, &dy);
+	            weston_pointer_set_focus(pInputMgr->seat->pointer, grabnew, dx, dy);
+	            notify_button(pInputMgr->seat, ctime, code,
+	                          value ? WL_POINTER_BUTTON_STATE_PRESSED :
+	                                  WL_POINTER_BUTTON_STATE_RELEASED);
+	            weston_pointer_set_focus(pInputMgr->seat->pointer, grabsave, dx, dy);
+			}
             break;
         case EVENT_TOUCH:
             if (value)  {
-                uifw_trace("ico_mgr_send_input_event: notify_touch(%d,%d,DOWN)",
-                           fix_x, fix_y);
+                uifw_trace("ico_mgr_send_input_event: notify_touch(DOWN=%d/%d)",
+                           fix_x/256, fix_y/256);
+                grabsave = pInputMgr->seat->touch->focus;
+                weston_touch_set_focus(pInputMgr->seat,
+                                       weston_compositor_pick_surface(
+                                           pInputMgr->compositor, fix_x, fix_y, &dx, &dy));
                 notify_touch(pInputMgr->seat, ctime, 0, fix_x, fix_y, WL_TOUCH_DOWN);
+                weston_touch_set_focus(pInputMgr->seat, grabsave);
             }
             else    {
                 uifw_trace("ico_mgr_send_input_event: notify_touch(UP)");
+                grabsave = pInputMgr->seat->touch->focus;
+                weston_touch_set_focus(pInputMgr->seat,
+                                       weston_compositor_pick_surface(
+                                           pInputMgr->compositor, fix_x, fix_y, &dx, &dy));
                 notify_touch(pInputMgr->seat, ctime, 0, 0, 0, WL_TOUCH_UP);
+                weston_touch_set_focus(pInputMgr->seat, grabsave);
             }
             break;
         case EVENT_KEY:
@@ -636,8 +689,10 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
             uifw_trace("ico_mgr_send_input_event: unknown event=%d", event);
             break;
         }
-        /* enable the event transmission to a touch layer   */
-        ico_window_mgr_restack_layer(NULL, FALSE);
+        /* enable the event transmission to a input layer   */
+        if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
+            ico_window_mgr_input_layer(FALSE);
+        }
     }
     else    {
         if ((target != NULL) && (*target != 0) && (*target != ' '))    {
