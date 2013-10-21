@@ -7,7 +7,7 @@ License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(weston) >= 1.2.1
+BuildRequires: pkgconfig(weston) >= 1.3
 BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(xkbcommon) >= 0.0.578
 BuildRequires: pkgconfig(eina)
@@ -18,7 +18,7 @@ BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: mesa-devel
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
-Requires: weston >= 1.2.1
+Requires: weston >= 1.3
 Requires: weekeyboard
 
 %description

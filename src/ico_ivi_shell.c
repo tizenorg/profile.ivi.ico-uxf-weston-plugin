@@ -1692,11 +1692,12 @@ get_default_output(struct weston_compositor *compositor)
 static void
 restore_output_mode(struct weston_output *output)
 {
-    if (output->current != output->origin ||
-        (int32_t)output->scale != output->origin_scale)
+    if (output->current_mode != output->original_mode ||
+        (int32_t)output->current_scale != output->original_scale)
         weston_output_switch_mode(output,
-                      output->origin,
-                      output->origin_scale);
+                                  output->original_mode,
+                                  output->original_scale,
+                                  WESTON_MODE_SWITCH_RESTORE_NATIVE);
 }
 
 static void
@@ -2028,7 +2029,8 @@ shell_configure_fullscreen(struct shell_surface *shsurf)
                 surf_height * surface->buffer_scale,
                 shsurf->fullscreen.framerate};
 
-            if (weston_output_switch_mode(output, &mode, surface->buffer_scale) == 0) {
+            if (weston_output_switch_mode(output, &mode, surface->buffer_scale,
+                                          WESTON_MODE_SWITCH_SET_TEMPORARY) == 0) {
                 weston_surface_set_position(surface,
                                 output->x - surf_x,
                                 output->y - surf_y);
@@ -2233,13 +2235,14 @@ static void
 popup_grab_motion(struct weston_pointer_grab *grab, uint32_t time)
 {
     struct weston_pointer *pointer = grab->pointer;
+    struct wl_resource *resource;
     wl_fixed_t sx, sy;
 
-    if (pointer->focus_resource) {
+    wl_resource_for_each(resource, &pointer->focus_resource_list) {
         weston_surface_from_global_fixed(pointer->focus,
-                         pointer->x, pointer->y,
-                         &sx, &sy);
-        wl_pointer_send_motion(pointer->focus_resource, time, sx, sy);
+                                         pointer->x, pointer->y,
+                                         &sx, &sy);
+        wl_pointer_send_motion(resource, time, sx, sy);
     }
 }
 
@@ -2250,18 +2253,21 @@ popup_grab_button(struct weston_pointer_grab *grab,
     struct wl_resource *resource;
     struct shell_seat *shseat =
         container_of(grab, struct shell_seat, popup_grab.grab);
-    struct wl_display *display;
+    struct wl_display *display = shseat->seat->compositor->wl_display;
     enum wl_pointer_button_state state = state_w;
     uint32_t serial;
+    struct wl_list *resource_list;
 
-    resource = grab->pointer->focus_resource;
-    if (resource) {
-        display = wl_client_get_display(wl_resource_get_client(resource));
+    resource_list = &grab->pointer->focus_resource_list;
+    if (!wl_list_empty(resource_list)) {
         serial = wl_display_get_serial(display);
-        wl_pointer_send_button(resource, serial, time, button, state);
+        wl_resource_for_each(resource, resource_list) {
+            wl_pointer_send_button(resource, serial,
+                                   time, button, state);
+        }
     } else if (state == WL_POINTER_BUTTON_STATE_RELEASED &&
-           (shseat->popup_grab.initial_up ||
-            time - shseat->seat->pointer->grab_time > 500)) {
+               (shseat->popup_grab.initial_up ||
+                time - shseat->seat->pointer->grab_time > 500)) {
         popup_grab_end(grab->pointer);
     }
 
@@ -4398,12 +4404,14 @@ debug_binding_key(struct weston_keyboard_grab *grab, uint32_t time,
           uint32_t key, uint32_t state)
 {
     struct debug_binding_grab *db = (struct debug_binding_grab *) grab;
+    struct weston_compositor *ec = db->seat->compositor;
+    struct wl_display *display = ec->wl_display;
     struct wl_resource *resource;
-    struct wl_display *display;
     uint32_t serial;
     int send = 0, terminate = 0;
     int check_binding = 1;
     int i;
+    struct wl_list *resource_list;
 
     if (state == WL_KEYBOARD_KEY_STATE_RELEASED) {
         /* Do not run bindings on key releases */
@@ -4434,10 +4442,8 @@ debug_binding_key(struct weston_keyboard_grab *grab, uint32_t time,
     }
 
     if (check_binding) {
-        struct weston_compositor *ec = db->seat->compositor;
-
         if (weston_compositor_run_debug_binding(ec, db->seat, time,
-                            key, state)) {
+                                                key, state)) {
             /* We ran a binding so swallow the press and keep the
              * grab to swallow the released too. */
             send = 0;
@@ -4452,11 +4458,9 @@ debug_binding_key(struct weston_keyboard_grab *grab, uint32_t time,
     }
 
     if (send) {
-        resource = grab->keyboard->focus_resource;
-
-        if (resource) {
-            display = wl_client_get_display(wl_resource_get_client(resource));
-            serial = wl_display_next_serial(display);
+        serial = wl_display_next_serial(display);
+        resource_list = &grab->keyboard->focus_resource_list;
+        wl_resource_for_each(resource, resource_list) {
             wl_keyboard_send_key(resource, serial, time, key, state);
         }
     }
@@ -4475,13 +4479,14 @@ debug_binding_modifiers(struct weston_keyboard_grab *grab, uint32_t serial,
             uint32_t mods_locked, uint32_t group)
 {
     struct wl_resource *resource;
+    struct wl_list *resource_list;
 
-    resource = grab->keyboard->focus_resource;
-    if (!resource)
-        return;
+    resource_list = &grab->keyboard->focus_resource_list;
 
-    wl_keyboard_send_modifiers(resource, serial, mods_depressed,
-                   mods_latched, mods_locked, group);
+    wl_resource_for_each(resource, resource_list) {
+        wl_keyboard_send_modifiers(resource, serial, mods_depressed,
+                                   mods_latched, mods_locked, group);
+    }
 }
 
 struct weston_keyboard_grab_interface debug_binding_keyboard_grab = {
