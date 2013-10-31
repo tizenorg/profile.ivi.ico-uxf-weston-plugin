@@ -44,6 +44,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <wayland-server.h>
+#include <dirent.h>
 #include <aul/aul.h>
 #include <bundle.h>
 
@@ -893,6 +894,63 @@ win_mgr_get_client_appid(struct uifw_client *uclient)
         uifw_trace("win_mgr_get_client_appid: aul_app_get_appid_bypid ret=%d "
                    "pid=%d appid=<%s>", status, pid, uclient->appid);
 
+    }
+
+    /*
+     * Walk the child process chain as well since app ID was not yet found
+     */
+    if (status != AUL_R_OK) {
+
+	DIR *dr;
+	struct dirent *de;
+	struct stat ps;
+	pid_t   tpid;
+	uid_t   uid;
+	gid_t   gid;
+
+	dr = opendir("/proc/");
+
+	/* get uid */
+	wl_client_get_credentials(uclient->client, &tpid, &uid, &gid);
+
+	while(((de = readdir(dr)) != NULL) && (status != AUL_R_OK)) {
+
+	    char fullpath[PATH_MAX] = { 0 };
+	    int is_child = 0;
+	    int tmppid;
+
+	    snprintf(fullpath, sizeof(fullpath)-1, "/proc/%s", de->d_name);
+
+	    if (stat(fullpath, &ps) == -1) {
+		continue;
+	    }
+
+	    /* find pid dirs for this user (uid) only */
+	    if (ps.st_uid != uid)
+		continue;
+
+	    pid = atoi(de->d_name);
+
+	    /* check if it's a valid child */
+	    if (pid < uclient->pid)
+		continue;
+
+	    /* scan up to pid to find if a chain exists */
+	    for (tmppid = pid; tmppid > uclient->pid;) {
+		tmppid = win_mgr_get_ppid(tmppid);
+		if (tmppid == uclient->pid)
+		    is_child = 1;
+	    }
+
+	    if (is_child) {
+		status = aul_app_get_appid_bypid(pid, uclient->appid,
+						      ICO_IVI_APPID_LENGTH);
+
+		uifw_trace("win_mgr_get_client_appid: aul_app_get_appid_bypid "
+			   "ret=%d pid=%d appid=<%s>", status, pid,
+			   uclient->appid);
+	    }
+	}
     }
 
     if (uclient->appid[0] != 0) {
