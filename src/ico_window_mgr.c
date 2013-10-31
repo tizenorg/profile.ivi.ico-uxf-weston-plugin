@@ -42,6 +42,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <wayland-server.h>
 #include <aul/aul.h>
 #include <bundle.h>
@@ -818,6 +819,49 @@ win_mgr_unbind_client(struct wl_client *client)
     uifw_trace("win_mgr_unbind_client: Leave");
 }
 
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   win_mgr_get_client_appid: Get parent process ID.
+ *
+ * Similar to getppid(), except that this implementation accepts an
+ * arbitrary process ID.
+ *
+ * @param[in]   pid     Process ID of child process
+ * @return      parent process ID on success, -1 on failure
+ */
+/*--------------------------------------------------------------------------*/
+static pid_t
+win_mgr_get_ppid(pid_t pid)
+{
+    pid_t ppid = -1;
+    char procpath[PATH_MAX] = { 0 };
+
+    snprintf(procpath, sizeof(procpath)-1, "/proc/%d/status", pid);
+
+    /* We better have read permissions! */
+    int const fd = open(procpath, O_RDONLY);
+
+    if (fd < 0)
+        return ppid;
+
+    char buffer[1024] = { 0 };
+
+    ssize_t const size = read(fd, buffer, sizeof(buffer));
+    close(fd);
+
+    if (size <= 0)
+        return ppid;
+
+    /* Find line containing the parent process ID. */
+    char const * const ppid_line = strstr(buffer, "PPid");
+
+    if (ppid_line != NULL)
+        sscanf(ppid_line, "PPid:	%d", &ppid);
+
+    return ppid;
+}
+
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   win_mgr_get_client_appid: get applicationId from pid
@@ -829,22 +873,41 @@ win_mgr_unbind_client(struct wl_client *client)
 static void
 win_mgr_get_client_appid(struct uifw_client *uclient)
 {
-    int     fd;
-    int     size;
-    int     i;
-    int     j;
-    char    procpath[128];
+    int status = AUL_R_ERROR;
+    int pid;
 
     memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
-    i = aul_app_get_appid_bypid(uclient->pid, uclient->appid, ICO_IVI_APPID_LENGTH);
-    uifw_trace("win_mgr_get_client_appid: aul_app_get_appid_bypid ret=%d "
-               "pid=%d appid=<%s>", i, uclient->pid, uclient->appid);
+
+    /*
+     * Walk the parent process chain until we find a parent process
+     * with an app ID.
+     */
+    for (pid = uclient->pid;
+         pid > 1 && status != AUL_R_OK;
+         pid = win_mgr_get_ppid(pid)) {
+
+        status = aul_app_get_appid_bypid(pid,
+                                         uclient->appid,
+                                         ICO_IVI_APPID_LENGTH);
+
+        uifw_trace("win_mgr_get_client_appid: aul_app_get_appid_bypid ret=%d "
+                   "pid=%d appid=<%s>", status, pid, uclient->appid);
+
+    }
+
     if (uclient->appid[0] != 0) {
         /* OK, end of get appid         */
         uclient->fixed_appid = ICO_WINDOW_MGR_APPID_FIXCOUNT;
     }
     else    {
-        /* client dose not exist in AppCore, search Linux process table */
+        /* client does not exist in AppCore, search Linux process table */
+
+        int     fd;
+        int     size;
+        int     i;
+        int     j;
+        char    procpath[128];
+
         uclient->fixed_appid ++;
         memset(uclient->appid, 0, ICO_IVI_APPID_LENGTH);
         snprintf(procpath, sizeof(procpath)-1, "/proc/%d/cmdline", uclient->pid);
