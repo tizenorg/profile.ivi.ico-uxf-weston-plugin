@@ -822,7 +822,7 @@ win_mgr_unbind_client(struct wl_client *client)
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_get_client_appid: Get parent process ID.
+ * @brief   win_mgr_get_ppid: Get parent process ID.
  *
  * Similar to getppid(), except that this implementation accepts an
  * arbitrary process ID.
