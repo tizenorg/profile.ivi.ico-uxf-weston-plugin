@@ -11,9 +11,6 @@
       </description>
       <entry name="nochange" value="0x8000" summary="no change value"/>
       <entry name="mainsurface" value="0x8000" summary="main serface id"/>
-      <entry name="layer_input" value="0x2000" summary="cursor layer id"/>
-      <entry name="layer_cursor" value="0x3000" summary="cursor layer id"/>
-      <entry name="layer_startup" value="0x4000" summary="startup layer id"/>
     </enum>
 
     <enum name="declare_manager">
@@ -106,6 +103,19 @@
       <entry name="hint" value="1" summary="hint, not change"/>
     </enum>
 
+    <enum name="layertype">
+      <description summary="surface layer type">
+       Surafce layer type.
+      </description>
+      <entry name="background" value="0x1000" summary="background layer"/>
+      <entry name="normal" value="0x2000" summary="normal(panel) layer"/>
+      <entry name="fullscreen" value="0x3000" summary="input pancreen layer"/>
+      <entry name="inputpanel" value="0x4000" summary="input panel layer"/>
+      <entry name="touch" value="0xa000" summary="touch panel input layer"/>
+      <entry name="cursor" value="0xb000" summary="cursor layer"/>
+      <entry name="startup" value="0xc000" summary="startup application layer"/>
+    </enum>
+
     <request name="declare_manager">
       <description summary="declare manager application">
        Set manager application(ex.SystemController).
@@ -195,6 +205,7 @@
        Get surfaces of the application.
       </description>
       <arg name="appid" type="string"/>
+      <arg name="pid" type="int"/>
     </request>
 
     <request name="map_surface">
@@ -220,6 +231,7 @@
       <arg name="winname" type="string"/>
       <arg name="pid" type="int"/>
       <arg name="appid" type="string"/>
+      <arg name="layertype" type="int"/>
     </event>
 
     <event name="window_name">
@@ -253,6 +265,7 @@
       </description>
       <arg name="surfaceid" type="uint"/>
       <arg name="node" type="uint"/>
+      <arg name="layertype" type="int"/>
       <arg name="layer" type="uint"/>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -282,6 +295,7 @@
        Reply of app_surfaces request.
       </description>
       <arg name="appid" type="string"/>
+      <arg name="pid" type="int"/>
       <arg name="surfaces" type="array"/>
     </event>
 

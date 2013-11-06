@@ -197,8 +197,7 @@ struct shell_surface {
     int32_t saved_x, saved_y;
     bool saved_position_valid;
     bool saved_rotation_valid;
-    char layer_type;                /* surface layer type   */
-    int layer_serial;
+    char layertype;                 /* surface layer type   */
     int unresponsive;
 
     struct {
@@ -301,11 +300,14 @@ shell_fade_startup(struct desktop_shell *shell);
 
 /* shell management table           */
 static struct desktop_shell *_ico_ivi_shell = NULL;
-static int  _layer_serial = 0;
+
 /* shell program path for ico-ivi   */
 static char *shell_exe = NULL;
 #define DEFAULT_DEBUG_LEVEL 4
 static int  ico_debug_level = DEFAULT_DEBUG_LEVEL;  /* Debug Level                  */
+
+/* default display                  */
+static struct weston_output *default_inputpanel = NULL;
 
 /* debug log macros         */
 #define uifw_debug(fmt,...)  \
@@ -322,7 +324,8 @@ static int  ico_debug_level = DEFAULT_DEBUG_LEVEL;  /* Debug Level              
 /* hook functions           */
 static void (*shell_hook_bind)(struct wl_client *client, void *shell) = NULL;
 static void (*shell_hook_unbind)(struct wl_client *client) = NULL;
-static void (*shell_hook_create)(struct wl_client *client, struct wl_resource *resource,
+static void (*shell_hook_create)(int layertype,
+                                 struct wl_client *client, struct wl_resource *resource,
                                  struct weston_surface *surface,
                                  struct shell_surface *shsurf) = NULL;
 static void (*shell_hook_destroy)(struct weston_surface *surface) = NULL;
@@ -332,15 +335,22 @@ static void (*shell_hook_configure)(struct weston_surface *surface) = NULL;
 static void (*shell_hook_select)(struct weston_surface *surface) = NULL;
 static void (*shell_hook_title)(struct weston_surface *surface, const char *title) = NULL;
 static void (*shell_hook_move)(struct weston_surface *surface, int *dx, int *dy) = NULL;
+static void (*shell_hook_show_layer)(int layertype, int show, void *data) = NULL;
+static int (*shell_hook_fullscreen)(int event, struct weston_surface *surface) = NULL;
 
 static bool
 shell_surface_is_top_fullscreen(struct shell_surface *shsurf)
 {
+    if (shell_hook_fullscreen)  {
+        return (*shell_hook_fullscreen)(SHELL_FULLSCREEN_ISTOP, shsurf->surface);
+    }
+
     struct desktop_shell *shell;
     struct weston_surface *top_fs_es;
 
     shell = shell_surface_get_shell(shsurf);
 
+    uifw_debug("shell_surface_is_top_fullscreen: ");
     if (wl_list_empty(&shell->fullscreen_layer.surface_list))
         return false;
 
@@ -501,7 +511,7 @@ shell_configuration(struct desktop_shell *shell)
     weston_log("ws=%d exe=%s\n", shell->workspaces.num, shell_exe);
 
     /* get debug level for ivi debug    */
-    section = weston_config_get_section(shell->compositor->config, "ivi-debug", NULL, NULL);
+    section = weston_config_get_section(shell->compositor->config, "ivi-option", NULL, NULL);
     if (section)    {
         weston_config_section_get_int(section, "log",
                                       &ico_debug_level, DEFAULT_DEBUG_LEVEL);
@@ -1685,6 +1695,10 @@ shell_surface_set_class(struct wl_client *client,
 static struct weston_output *
 get_default_output(struct weston_compositor *compositor)
 {
+    /* support multi display, default fullscreen output display */
+    if (default_inputpanel) {
+        return default_inputpanel;
+    }
     return container_of(compositor->output_list.next,
                 struct weston_output, link);
 }
@@ -1712,6 +1726,9 @@ static void
 shell_unset_fullscreen(struct shell_surface *shsurf)
 {
     struct workspace *ws;
+
+    uifw_debug("shell_unset_fullscreen: ");
+
     /* undo all fullscreen things here */
     if (shsurf->fullscreen.type == WL_SHELL_SURFACE_FULLSCREEN_METHOD_DRIVER &&
         shell_surface_is_top_fullscreen(shsurf)) {
@@ -1742,6 +1759,9 @@ static void
 shell_unset_maximized(struct shell_surface *shsurf)
 {
     struct workspace *ws;
+
+    uifw_debug("shell_unset_maximized: ");
+
     /* undo all maximized things here */
     shsurf->output = get_default_output(shsurf->surface->compositor);
     weston_surface_set_position(shsurf->surface,
@@ -1812,6 +1832,12 @@ set_surface_type(struct shell_surface *shsurf)
             wl_list_init(&shsurf->rotation.transform.link);
             weston_surface_geometry_dirty(shsurf->surface);
             shsurf->saved_rotation_valid = true;
+        }
+        if (shsurf->type == SHELL_SURFACE_FULLSCREEN)   {
+            uifw_debug("set_surface_type: set fullscreen");
+            if (shell_hook_fullscreen)  {
+                (*shell_hook_fullscreen)(SHELL_FULLSCREEN_SET, surface);
+            }
         }
         break;
 
@@ -1907,9 +1933,9 @@ shell_surface_set_maximized(struct wl_client *client,
         shsurf->output = wl_resource_get_user_data(output_resource);
     else if (es->output)
         shsurf->output = es->output;
-    else
+    else    {
         shsurf->output = get_default_output(es->compositor);
-
+    }
     shell = shell_surface_get_shell(shsurf);
     panel_height = get_output_panel_height(shell, shsurf->output);
     edges = WL_SHELL_SURFACE_RESIZE_TOP|WL_SHELL_SURFACE_RESIZE_LEFT;
@@ -1934,6 +1960,7 @@ create_black_surface(struct weston_compositor *ec,
 {
     struct weston_surface *surface = NULL;
 
+    uifw_debug("create_black_surface: fullscreen");
     surface = weston_surface_create(ec);
     if (surface == NULL) {
         weston_log("no memory\n");
@@ -1959,6 +1986,13 @@ create_black_surface(struct weston_compositor *ec,
 static void
 shell_configure_fullscreen(struct shell_surface *shsurf)
 {
+    uifw_debug("shell_configure_fullscreen: ");
+
+    if (shell_hook_fullscreen)  {
+        (*shell_hook_fullscreen)(SHELL_FULLSCREEN_CONF, shsurf->surface);
+        return;
+    }
+
     struct weston_output *output = shsurf->fullscreen_output;
     struct weston_surface *surface = shsurf->surface;
     struct weston_matrix *matrix;
@@ -2059,6 +2093,13 @@ shell_configure_fullscreen(struct shell_surface *shsurf)
 static void
 shell_stack_fullscreen(struct shell_surface *shsurf)
 {
+    uifw_debug("shell_stack_fullscreen: ");
+
+    if (shell_hook_fullscreen)  {
+        (*shell_hook_fullscreen)(SHELL_FULLSCREEN_STACK, shsurf->surface);
+        return;
+    }
+
     struct weston_output *output = shsurf->fullscreen_output;
     struct weston_surface *surface = shsurf->surface;
     struct desktop_shell *shell = shell_surface_get_shell(shsurf);
@@ -2085,6 +2126,7 @@ shell_stack_fullscreen(struct shell_surface *shsurf)
 static void
 shell_map_fullscreen(struct shell_surface *shsurf)
 {
+    uifw_debug("shell_map_fullscreen: ");
     shell_stack_fullscreen(shsurf);
     shell_configure_fullscreen(shsurf);
 }
@@ -2097,20 +2139,20 @@ set_fullscreen(struct shell_surface *shsurf,
 {
     struct weston_surface *es = shsurf->surface;
 
+    uifw_debug("set_fullscreen: ");
+
     if (output)
         shsurf->output = output;
     else if (es->output)
         shsurf->output = es->output;
-    else
+    else    {
         shsurf->output = get_default_output(es->compositor);
-
+    }
     shsurf->fullscreen_output = shsurf->output;
     shsurf->fullscreen.type = method;
     shsurf->fullscreen.framerate = framerate;
     shsurf->next_type = SHELL_SURFACE_FULLSCREEN;
 
-    uifw_debug("set_fullscreen: send %08x 0 w/h=%d/%d",
-               (int)shsurf->surface, shsurf->output->width, shsurf->output->height);
     shsurf->client->send_configure(shsurf->surface, 0,
                        shsurf->output->width,
                        shsurf->output->height);
@@ -2125,6 +2167,8 @@ shell_surface_set_fullscreen(struct wl_client *client,
 {
     struct shell_surface *shsurf = wl_resource_get_user_data(resource);
     struct weston_output *output;
+
+    uifw_debug("shell_surface_set_fullscreen: ");
 
     if (output_resource)
         output = wl_resource_get_user_data(output_resource);
@@ -2514,10 +2558,10 @@ create_shell_surface(void *shell, struct weston_surface *surface,
 }
 
 static void
-shell_get_shell_surface(struct wl_client *client,
-            struct wl_resource *resource,
-            uint32_t id,
-            struct wl_resource *surface_resource)
+shell_get_shell_surface_layertype(int layertype, struct wl_client *client,
+                                  struct wl_resource *resource,
+                                  uint32_t id,
+                                  struct wl_resource *surface_resource)
 {
     struct weston_surface *surface =
         wl_resource_get_user_data(surface_resource);
@@ -2538,7 +2582,7 @@ shell_get_shell_surface(struct wl_client *client,
                        "surface->configure already set");
         return;
     }
-
+    shsurf->layertype = layertype;
     shsurf->resource =
         wl_resource_create(client,
                    &wl_shell_surface_interface, 1, id);
@@ -2548,8 +2592,18 @@ shell_get_shell_surface(struct wl_client *client,
 
     /* if ico_window_mgr hook, call hook routine    */
     if (shell_hook_create)  {
-        (*shell_hook_create)(client, resource, surface, shsurf);
+        (*shell_hook_create)(layertype, client, resource, surface, shsurf);
     }
+}
+
+static void
+shell_get_shell_surface(struct wl_client *client,
+            struct wl_resource *resource,
+            uint32_t id,
+            struct wl_resource *surface_resource)
+{
+    shell_get_shell_surface_layertype(LAYER_TYPE_PANEL,
+                                      client, resource, id, surface_resource);
 }
 
 static const struct wl_shell_interface shell_implementation = {
@@ -2781,7 +2835,8 @@ resume_desktop(struct desktop_shell *shell)
                &shell->fullscreen_layer.link);
     wl_list_insert(&shell->fullscreen_layer.link,
                &shell->panel_layer.link);
-    if (shell->showing_input_panels) {
+    if ((! shell_hook_configure) &&
+        (shell->showing_input_panels)) {
         wl_list_insert(&shell->panel_layer.link,
                    &shell->input_panel_layer.link);
         wl_list_insert(&shell->input_panel_layer.link,
@@ -3157,6 +3212,11 @@ rotate_binding(struct weston_seat *seat, uint32_t time, uint32_t button,
 static void
 lower_fullscreen_layer(struct desktop_shell *shell)
 {
+    if (shell_hook_fullscreen)  {
+        (*shell_hook_fullscreen)(SHELL_FULLSCREEN_HIDEALL, NULL);
+        return;
+    }
+
     struct workspace *ws;
     struct weston_surface *surface, *prev;
 
@@ -3232,10 +3292,19 @@ click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t butt
     struct weston_surface *focus;
     struct weston_surface *main_surface;
 
-    focus = (struct weston_surface *) seat->pointer->focus;
-    if (!focus)
+    uifw_debug("click_to_activate_binding: mouse=%08x(%08x) touch=%08x(%08x)",
+               (int)seat->pointer, seat->pointer ? (int)seat->pointer->focus : 0,
+               (int)seat->touch, seat->touch ? (int)seat->touch->focus : 0);
+    if (seat->pointer == NULL)  {
+        uifw_debug("click_to_activate_binding: system has no mouse, Skip");
         return;
+    }
 
+    focus = (struct weston_surface *) seat->pointer->focus;
+    if (!focus) {
+        uifw_debug("click_to_activate_binding: no focus, Skip");
+        return;
+    }
     if (is_black_surface(focus, &main_surface))
         focus = main_surface;
 
@@ -3244,6 +3313,44 @@ click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t butt
         return;
 
     if (seat->pointer->grab == &seat->pointer->default_grab)
+        activate(shell, focus, ws);
+
+    /* if ico_window_mgr hook, call hook routine    */
+    if (shell_hook_select)  {
+        (*shell_hook_select)(focus);
+    }
+}
+
+static void
+touch_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t button,
+              void *data)
+{
+    struct weston_seat *ws = (struct weston_seat *) seat;
+    struct desktop_shell *shell = data;
+    struct weston_surface *focus;
+    struct weston_surface *main_surface;
+
+    uifw_debug("touch_to_activate_binding: mouse=%08x(%08x) touch=%08x(%08x)",
+               (int)seat->pointer, seat->pointer ? (int)seat->pointer->focus : 0,
+               (int)seat->touch, seat->touch ? (int)seat->touch->focus : 0);
+    if (seat->touch == NULL)    {
+        uifw_debug("touch_to_activate_binding: system has no touch panel, Skip");
+        return;
+    }
+
+    focus = (struct weston_surface *) seat->touch->focus;
+    if (!focus) {
+        uifw_debug("touch_to_activate_binding: no focus, Skip");
+        return;
+    }
+    if (is_black_surface(focus, &main_surface))
+        focus = main_surface;
+
+    main_surface = weston_surface_get_main_surface(focus);
+    if (get_shell_surface_type(main_surface) == SHELL_SURFACE_NONE)
+        return;
+
+    if (seat->touch->grab == &seat->touch->default_grab)
         activate(shell, focus, ws);
 
     /* if ico_window_mgr hook, call hook routine    */
@@ -3270,7 +3377,8 @@ lock(struct desktop_shell *shell)
 
     wl_list_remove(&shell->panel_layer.link);
     wl_list_remove(&shell->fullscreen_layer.link);
-    if (shell->showing_input_panels)
+    if ((! shell_hook_configure) &&
+        (shell->showing_input_panels))
         wl_list_remove(&shell->input_panel_layer.link);
     wl_list_remove(&ws->layer.link);
     wl_list_insert(&shell->compositor->cursor_layer.link,
@@ -3474,8 +3582,15 @@ show_input_panels(struct wl_listener *listener, void *data)
     if (shell->showing_input_panels)
         return;
 
+    uifw_debug("show_input_panels: input.surface=%08x", (int)shell->text_input.surface);
+
     shell->showing_input_panels = true;
 
+    /* if ico_window_mgr hook, call hook routine    */
+    if (shell_hook_show_layer)  {
+        (*shell_hook_show_layer)(LAYER_TYPE_INPUTPANEL, 1, data);
+        return;
+    }
     if (!shell->locked)
         wl_list_insert(&shell->panel_layer.link,
                    &shell->input_panel_layer.link);
@@ -3485,8 +3600,10 @@ show_input_panels(struct wl_listener *listener, void *data)
         ws = surface->surface;
         if (!ws->buffer_ref.buffer)
             continue;
-        wl_list_insert(&shell->input_panel_layer.surface_list,
-                   &ws->layer_link);
+        if (! shell_hook_configure) {
+            wl_list_insert(&shell->input_panel_layer.surface_list,
+                       &ws->layer_link);
+        }
         weston_surface_geometry_dirty(ws);
         weston_surface_update_transform(ws);
         weston_surface_damage(ws);
@@ -3505,7 +3622,15 @@ hide_input_panels(struct wl_listener *listener, void *data)
     if (!shell->showing_input_panels)
         return;
 
+    uifw_debug("hide_input_panels: input.surface=%08x", (int)shell->text_input.surface);
+
     shell->showing_input_panels = false;
+
+    /* if ico_window_mgr hook, call hook routine    */
+    if (shell_hook_show_layer)  {
+        (*shell_hook_show_layer)(LAYER_TYPE_INPUTPANEL, 0, NULL);
+        return;
+    }
 
     if (!shell->locked)
         wl_list_remove(&shell->input_panel_layer.link);
@@ -3575,6 +3700,7 @@ weston_surface_set_initial_position (struct weston_surface *surface,
     if (!target_output) {
         weston_surface_set_position(surface, 10 + random() % 400,
                        10 + random() % 400);
+        uifw_debug("weston_surface_set_initial_position: no tagret");
         return;
     }
 
@@ -3584,19 +3710,20 @@ weston_surface_set_initial_position (struct weston_surface *surface,
      */
     panel_height = get_output_panel_height(shell, target_output);
     range_x = target_output->width - surface->geometry.width;
-    range_y = (target_output->height - panel_height) -
-          surface->geometry.height;
+    range_y = target_output->height - surface->geometry.height;
 
-    if (range_x > 0)
+    if (range_x > 0)    {
         dx = random() % range_x;
-    else
+    }
+    else    {
         dx = 0;
-
-    if (range_y > 0)
+    }
+    if (range_y > 0)    {
         dy = panel_height + random() % range_y;
-    else
+    }
+    else    {
         dy = panel_height;
-
+    }
     x = target_output->x + dx;
     y = target_output->y + dy;
 
@@ -3616,21 +3743,27 @@ map(struct desktop_shell *shell, struct weston_surface *surface,
     int panel_height = 0;
     int32_t surf_x, surf_y;
 
-    uifw_trace("map: %08x sx/sy=%d/%d w/h=%d/%d", (int)surface, sx, sy, width, height);
+    uifw_trace("map: %08x sx/sy=%d/%d w/h=%d/%d type=%d",
+               (int)surface, sx, sy, width, height, (int)surface_type);
+
     surface->geometry.width = width;
     surface->geometry.height = height;
     weston_surface_geometry_dirty(surface);
 
     /* initial positioning, see also configure() */
+
     switch (surface_type) {
     case SHELL_SURFACE_TOPLEVEL:
+        uifw_debug("map: surface TOPLEVEL");
         weston_surface_set_initial_position(surface, shell);
         break;
     case SHELL_SURFACE_FULLSCREEN:
+        uifw_debug("map: surface FULLSCREEN");
         center_on_output(surface, shsurf->fullscreen_output);
         shell_map_fullscreen(shsurf);
         break;
     case SHELL_SURFACE_MAXIMIZED:
+        uifw_debug("map: surface MAXIMIZED");
         /* use surface configure to set the geometry */
         panel_height = get_output_panel_height(shell,surface->output);
         surface_subsurfaces_boundingbox(shsurf->surface, &surf_x, &surf_y,
@@ -3639,14 +3772,22 @@ map(struct desktop_shell *shell, struct weston_surface *surface,
                                     shsurf->output->y + panel_height - surf_y);
         break;
     case SHELL_SURFACE_POPUP:
+        uifw_debug("map: surface POPUP");
         shell_map_popup(shsurf);
         break;
     case SHELL_SURFACE_NONE:
-        weston_surface_set_position(surface,
-                        surface->geometry.x + sx,
-                        surface->geometry.y + sy);
+        uifw_debug("map: surface NONE");
+        if (shsurf->layertype == LAYER_TYPE_INPUTPANEL) {
+            weston_surface_set_initial_position(surface, shell);
+        }
+        else    {
+            weston_surface_set_position(surface,
+                            surface->geometry.x + sx,
+                            surface->geometry.y + sy);
+        }
         break;
     default:
+        uifw_debug("map: surface unknown type(%d)", surface_type);
         ;
     }
 
@@ -3708,6 +3849,8 @@ map(struct desktop_shell *shell, struct weston_surface *surface,
 
     /* if ico_window_mgr hook, call hook routine    */
     if (shell_hook_map)  {
+        sx = surface->geometry.x;
+        sy = surface->geometry.y;
         (*shell_hook_map)(surface, &width, &height, &sx, &sy);
     }
     if (shell_hook_configure)  {
@@ -4002,17 +4145,17 @@ input_panel_configure(struct weston_surface *surface, int32_t sx, int32_t sy, in
     float x, y;
     uint32_t show_surface = 0;
 
-    if (width == 0)
+    if (width == 0) {
+        uifw_debug("input_panel_configure: configure %08x width=0, Skip", (int)surface);
         return;
-
+    }
     if (!weston_surface_is_mapped(surface)) {
-        if (!shell->showing_input_panels)
+        if (!shell->showing_input_panels)   {
+            uifw_debug("input_panel_configure: configure %08x not show, Skip", (int)surface);
             return;
-
+        }
         show_surface = 1;
     }
-
-    fprintf(stderr, "%s panel: %d, output: %p\n", __FUNCTION__, ip_surface->panel, ip_surface->output);
 
     if (ip_surface->panel) {
         x = shell->text_input.surface->geometry.x + shell->text_input.cursor_rectangle.x2;
@@ -4020,6 +4163,9 @@ input_panel_configure(struct weston_surface *surface, int32_t sx, int32_t sy, in
     } else {
         x = ip_surface->output->x + (ip_surface->output->width - width) / 2;
         y = ip_surface->output->y + ip_surface->output->height - height;
+        if (! shell_hook_map)  {
+            y -= 132.0f;
+        }
     }
 
     uifw_debug("input_panel_configure: configure %08x x/y=%d/%d w/h=%d/%d",
@@ -4029,17 +4175,38 @@ input_panel_configure(struct weston_surface *surface, int32_t sx, int32_t sy, in
                  width, height);
 
     if (show_surface) {
-        wl_list_insert(&shell->input_panel_layer.surface_list,
-                   &surface->layer_link);
+        /* if ico_window_mgr hook, call hook routine    */
+        if (! shell_hook_configure)  {
+            wl_list_insert(&shell->input_panel_layer.surface_list,
+                       &surface->layer_link);
+        }
         weston_surface_update_transform(surface);
         weston_surface_damage(surface);
         weston_slide_run(surface, surface->geometry.height, 0, NULL, NULL);
+    }
+
+    /* if ico_window_mgr hook, call hook routine    */
+    /* set default color and shader because weston original bug(some time crash weston) */
+    weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1);
+    if (shell_hook_map)  {
+        int     wx, wy;
+        wx = (int)x;
+        wy = (int)y;
+        (*shell_hook_map)(surface, &width, &height, &wx, &wy);
+    }
+    if (shell_hook_configure)  {
+        (*shell_hook_configure)(surface);
     }
 }
 
 static void
 destroy_input_panel_surface(struct input_panel_surface *input_panel_surface)
 {
+    uifw_debug("destroy_input_panel_surface: ");
+    if (shell_hook_create)  {
+        return;
+    }
+
     wl_signal_emit(&input_panel_surface->destroy_signal, input_panel_surface);
 
     wl_list_remove(&input_panel_surface->surface_destroy_listener.link);
@@ -4063,6 +4230,11 @@ get_input_panel_surface(struct weston_surface *surface)
 static void
 input_panel_handle_surface_destroy(struct wl_listener *listener, void *data)
 {
+    uifw_debug("input_panel_handle_surface_destroy: ");
+    if (shell_hook_create)  {
+        return;
+    }
+
     struct input_panel_surface *ipsurface = container_of(listener,
                                  struct input_panel_surface,
                                  surface_destroy_listener);
@@ -4078,6 +4250,11 @@ static struct input_panel_surface *
 create_input_panel_surface(struct desktop_shell *shell,
                struct weston_surface *surface)
 {
+    uifw_debug("create_input_panel_surface: ");
+    if (shell_hook_create)  {
+        return NULL;
+    }
+
     struct input_panel_surface *input_panel_surface;
 
     input_panel_surface = calloc(1, sizeof *input_panel_surface);
@@ -4107,6 +4284,11 @@ input_panel_surface_set_toplevel(struct wl_client *client,
                  struct wl_resource *output_resource,
                  uint32_t position)
 {
+    uifw_debug("input_panel_surface_set_toplevel: ");
+    if (shell_hook_create)  {
+        return;
+    }
+
     struct input_panel_surface *input_panel_surface =
         wl_resource_get_user_data(resource);
     struct desktop_shell *shell = input_panel_surface->shell;
@@ -4122,6 +4304,11 @@ static void
 input_panel_surface_set_overlay_panel(struct wl_client *client,
                       struct wl_resource *resource)
 {
+    uifw_debug("input_panel_surface_set_overlay_panel: ");
+    if (shell_hook_create)  {
+        return;
+    }
+
     struct input_panel_surface *input_panel_surface =
         wl_resource_get_user_data(resource);
     struct desktop_shell *shell = input_panel_surface->shell;
@@ -4152,33 +4339,43 @@ input_panel_get_input_panel_surface(struct wl_client *client,
                     uint32_t id,
                     struct wl_resource *surface_resource)
 {
-    struct weston_surface *surface =
-        wl_resource_get_user_data(surface_resource);
-    struct desktop_shell *shell = wl_resource_get_user_data(resource);
-    struct input_panel_surface *ipsurf;
+    if (shell_hook_create)  {
+        uifw_debug("input_panel_get_input_panel_surface: weston_surface=%08x",
+                   (int)wl_resource_get_user_data(surface_resource));
 
-    if (get_input_panel_surface(surface)) {
-        wl_resource_post_error(surface_resource,
-                       WL_DISPLAY_ERROR_INVALID_OBJECT,
-                       "wl_input_panel::get_input_panel_surface already requested");
-        return;
+        shell_get_shell_surface_layertype(LAYER_TYPE_INPUTPANEL,
+                                          client, resource, id, surface_resource);
     }
+    else    {
+        struct weston_surface *surface =
+            wl_resource_get_user_data(surface_resource);
+        struct desktop_shell *shell = wl_resource_get_user_data(resource);
+        struct input_panel_surface *ipsurf;
 
-    ipsurf = create_input_panel_surface(shell, surface);
-    if (!ipsurf) {
-        wl_resource_post_error(surface_resource,
-                       WL_DISPLAY_ERROR_INVALID_OBJECT,
-                       "surface->configure already set");
-        return;
+        if (get_input_panel_surface(surface)) {
+            wl_resource_post_error(surface_resource,
+                           WL_DISPLAY_ERROR_INVALID_OBJECT,
+                           "wl_input_panel::get_input_panel_surface already requested");
+            return;
+        }
+
+        ipsurf = create_input_panel_surface(shell, surface);
+        if (!ipsurf) {
+            wl_resource_post_error(surface_resource,
+                           WL_DISPLAY_ERROR_INVALID_OBJECT,
+                           "surface->configure already set");
+            return;
+        }
+        uifw_debug("input_panel_get_input_panel_surface: weston_surface=%08x", (int)surface);
+
+        ipsurf->resource =
+            wl_resource_create(client,
+                       &wl_input_panel_surface_interface, 1, id);
+        wl_resource_set_implementation(ipsurf->resource,
+                           &input_panel_surface_implementation,
+                           ipsurf,
+                           destroy_input_panel_surface_resource);
     }
-
-    ipsurf->resource =
-        wl_resource_create(client,
-                   &wl_input_panel_surface_interface, 1, id);
-    wl_resource_set_implementation(ipsurf->resource,
-                       &input_panel_surface_implementation,
-                       ipsurf,
-                       destroy_input_panel_surface_resource);
 }
 
 static const struct wl_input_panel_interface input_panel_implementation = {
@@ -4645,6 +4842,9 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
     weston_compositor_add_button_binding(ec, BTN_LEFT, 0,
                          click_to_activate_binding,
                          shell);
+    weston_compositor_add_button_binding(ec, BTN_TOUCH, 0,
+                         touch_to_activate_binding,
+                         shell);
     weston_compositor_add_axis_binding(ec, WL_POINTER_AXIS_VERTICAL_SCROLL,
                            MODIFIER_SUPER | MODIFIER_ALT,
                            surface_opacity_binding, NULL);
@@ -4908,71 +5108,6 @@ ico_ivi_shell_startup(void *shell)
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   ico_ivi_shell_set_layertype: set layer type
- *
- * @param       none
- * @return      none
- */
-/*--------------------------------------------------------------------------*/
-WL_EXPORT void
-ico_ivi_shell_set_layertype(void)
-{
-    struct weston_surface   *es;
-
-    _layer_serial ++;
-    wl_list_for_each(es, &_ico_ivi_shell->panel_layer.surface_list, layer_link) {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_PANEL;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-    wl_list_for_each(es, &_ico_ivi_shell->fullscreen_layer.surface_list, layer_link)    {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_FULLSCREEN;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-    wl_list_for_each(es, &_ico_ivi_shell->background_layer.surface_list, layer_link)    {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_BACKGROUND;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-    wl_list_for_each(es, &_ico_ivi_shell->compositor->cursor_layer.link, layer_link)    {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_CURSOR;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-    wl_list_for_each(es, &_ico_ivi_shell->compositor->fade_layer.link, layer_link)  {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_FADE;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-    wl_list_for_each(es, &_ico_ivi_shell->lock_layer.surface_list, layer_link)  {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_LOCK;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-    wl_list_for_each(es, &_ico_ivi_shell->input_panel_layer.surface_list, layer_link)   {
-        if (es->configure == shell_surface_configure)   {
-            ((struct shell_surface *)es->configure_private)->layer_type
-                = LAYER_TYPE_INPUTPANEL;
-            ((struct shell_surface *)es->configure_private)->layer_serial = _layer_serial;
-        }
-    }
-}
-
-/*--------------------------------------------------------------------------*/
-/**
  * @brief   ico_ivi_shell_layertype: get layer type
  *
  * @param[in]   surface     weston surface
@@ -4982,12 +5117,37 @@ ico_ivi_shell_set_layertype(void)
 WL_EXPORT int
 ico_ivi_shell_layertype(struct weston_surface *surface)
 {
-    if ((surface->configure == shell_surface_configure) &&
-        (((struct shell_surface *)surface->configure_private)->layer_serial
-            == _layer_serial)) {
-        return ((struct shell_surface *)surface->configure_private)->layer_type;
+    if (surface->configure == shell_surface_configure)  {
+        return ((struct shell_surface *)surface->configure_private)->layertype;
     }
     return LAYER_TYPE_UNKNOWN;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ivi_shell_set_surface_initial_position: initialize surface position
+ *
+ * @param[in]   surface     weston surface
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ivi_shell_set_surface_initial_position(struct weston_surface *surface)
+{
+    weston_surface_set_initial_position (surface, _ico_ivi_shell);
+}
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ivi_shell_set_default_display: set default display
+ *
+ * @param[in]   inputpanel  default display of input panel surface
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ivi_shell_set_default_display(struct weston_output *inputpanel)
+{
+    default_inputpanel = inputpanel;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -5027,7 +5187,8 @@ ico_ivi_shell_hook_unbind(void (*hook_unbind)(struct wl_client *client))
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT void
-ico_ivi_shell_hook_create(void (*hook_create)(struct wl_client *client,
+ico_ivi_shell_hook_create(void (*hook_create)(int layertype,
+                                              struct wl_client *client,
                                               struct wl_resource *resource,
                                               struct weston_surface *surface,
                                               struct shell_surface *shsurf))
@@ -5122,5 +5283,34 @@ WL_EXPORT void
 ico_ivi_shell_hook_move(void (*hook_move)(struct weston_surface *surface, int *dx, int *dy))
 {
     shell_hook_move = hook_move;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_ivi_shell_hook_show_layer: layer visible control
+ *
+ * @param[in]       hook_show   hook function(if NULL, reset hook function)
+ * @return          none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ico_ivi_shell_hook_show_layer(void (*hook_show)(int layertype, int show, void *data))
+{
+    shell_hook_show_layer = hook_show;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_ivi_shell_hook_fullscreen: fullscreen surface control
+ *
+ * @param[in]       hook_fullscreen hook function(if NULL, reset hook function)
+ * @return          none
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT void
+ico_ivi_shell_hook_fullscreen(int (*hook_fullscreen)
+                                  (int event, struct weston_surface *surface))
+{
+    shell_hook_fullscreen = hook_fullscreen;
 }
 

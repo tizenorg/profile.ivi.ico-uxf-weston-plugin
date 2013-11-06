@@ -55,6 +55,7 @@ struct uifw_client  {
 struct uifw_node_table {
     uint16_t    node;                       /* node Id                              */
     uint16_t    displayno;                  /* weston display number                */
+    struct weston_output *output;           /* weston output                        */
     int         disp_x;                     /* display frame buffer X-coordinate    */
     int         disp_y;                     /* display frame buffer Y-coordinate    */
     int         disp_width;                 /* display width                        */
@@ -65,7 +66,7 @@ struct uifw_node_table {
 struct  uifw_win_layer  {
     uint32_t layer;                         /* Layer Id                             */
     char     visible;                       /* visibility                           */
-    char     layer_type;                    /* layer type                           */
+    char     layertype;                     /* layer type                           */
     char     res[2];                        /* (unused)                             */
     struct wl_list surface_list;            /* Surfacae list                        */
     struct wl_list link;                    /* Link pointer for layer list          */
@@ -83,10 +84,13 @@ struct uifw_surface_map {
     uint16_t    height;                     /* height                               */
     uint16_t    stride;                     /* stride                               */
     uint16_t    framerate;                  /* update frame rate (frame/sec)        */
+    uint16_t    interval;                   /* interval time (ms)                   */
+    uint32_t    lasttime;                   /* last event time (ms)                 */
     char        initflag;                   /* map event send flag(0=no/1=yes)      */
-    char        res;                        /* (unused)                             */
-    struct wl_list  map_link;               /* map list                             */
-    struct wl_list  surf_link;              /* map list from UIFW surface           */
+    char        eventque;                   /* send event queue flag                */
+    char        res[2];                     /* (unused)                             */
+    struct wl_list  map_link;               /* surface map list                     */
+    struct wl_list  surf_link;              /* surface map list from UIFW surface   */
 };
 
 /* UIFW surface                         */
@@ -95,6 +99,7 @@ struct uifw_win_surface {
     uint32_t surfaceid;                     /* UIFW SurfaceId                       */
     struct uifw_node_table *node_tbl;       /* Node manager of ico_window_mgr       */
     struct uifw_win_layer *win_layer;       /* surface layer                        */
+    struct uifw_win_layer *old_layer;       /* saved surface layer for change full screen*/
     struct weston_surface *surface;         /* Weston surface                       */
     struct shell_surface  *shsurf;          /* Shell(IVI-Shell) surface             */
     struct uifw_client    *uclient;         /* Client                               */
@@ -120,7 +125,9 @@ struct uifw_win_surface {
     char    mapped;                         /* end of map                           */
     char    restrain_configure;             /* restrant configure event             */
     char    set_transform;                  /* surface transform flag               */
-    char    res;                            /* (unused)                             */
+    char    layertype;                      /* surface layer type                   */
+    char    old_layertype;                  /* surface old layer type               */
+    char    res[3];                         /* (unused)                             */
     struct  _uifw_win_surface_animation {   /* wndow animation                      */
         struct weston_animation animation;  /* weston animation control             */
         uint16_t type;                      /* current animation type               */
@@ -216,11 +223,13 @@ struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfacei
                                             /* get application surface              */
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
                                             /* rebuild surface layer list           */
-void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf, const int omit_touch);
-                                            /* input layer ccontrol for input manager*/
-void ico_window_mgr_input_layer(int omit);
+void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf);
+                                            /* touch layer control for input manager*/
+void ico_window_mgr_touch_layer(int omit);
                                             /* chek surface visibility              */
 int ico_window_mgr_is_visible(struct uifw_win_surface *usurf);
+                                            /* set active surface                   */
+void ico_window_mgr_active_surface(struct weston_surface *surface);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
                                             /* set surface visible change hook      */

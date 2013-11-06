@@ -1,7 +1,18 @@
+* Wed Nov 06 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20131010.203258@58015fa
+- 0.9.07 release.
+-- fix for: TIVI-1758 - Weston VKB is not stable for MiniBrowser
+-- fix for: TIVI-1841 - virtual keyboard cannot triggered on ICO UI
+            Supported virtual keyboard(weekeyboard) which worked in input panel layer
+-- fix for: TIVI-1956 - Error occurs when running weston-plugin-test testing
+			Multi Input Manager was not able to use the plural logical devices in one Device Input Controller Daemon
+-- fix for: TIVI-1996 - App shortcut doesn't work after switching app for many times
+-- fix for: TIVI-1997 - Touch doesn't work in ico homescreen after some operations
+			When a history of application activity gesture was canceled, the liberation of the grab fell out
+-- support: Support of Mesa 9.2.1
+
 * Tue Oct 08 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20131004.165200@60ccba2
 - 0.9.06 release.
 -- addition: Notice of the operation event to application except the application history flick operation at HomeScreen.
-
 
 * Thu Sep 26 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20130919.204240@80cee2e
 - 0.9.05 release

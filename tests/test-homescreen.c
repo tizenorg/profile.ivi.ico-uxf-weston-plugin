@@ -526,7 +526,8 @@ search_surfaceid(struct display *display, const int surfaceid)
 
 static void
 window_created(void *data, struct ico_window_mgr *ico_window_mgr,
-               uint32_t surfaceid, const char *winname, int32_t pid, const char *appid)
+               uint32_t surfaceid, const char *winname, int32_t pid,
+               const char *appid, int32_t layertype)
 {
     struct display *display = data;
     struct surface_name     *p;
@@ -541,12 +542,14 @@ window_created(void *data, struct ico_window_mgr *ico_window_mgr,
         p = p->next;
     }
     if (p)  {
-        print_log("HOMESCREEN: Event[window_created] surface=%08x(app=%s,name=%s) exist",
-                  (int)surfaceid, appid, winname);
+        print_log("HOMESCREEN: Event[window_created] "
+                  "surface=%08x(app=%s,name=%s,type=%x) exist",
+                  (int)surfaceid, appid, winname, layertype);
     }
     else    {
-        print_log("HOMESCREEN: Event[window_created] new surface=%08x(app=%s) winname=%s",
-                  (int)surfaceid, appid, winname);
+        print_log("HOMESCREEN: Event[window_created] "
+                  "new surface=%08x(app=%s) winname=%s layertype=%x",
+                  (int)surfaceid, appid, winname, layertype);
         p = malloc(sizeof(struct surface_name));
         if (! p)    {
             return;
@@ -650,15 +653,15 @@ window_visible(void *data, struct ico_window_mgr *ico_window_mgr,
 
 static void
 window_configure(void *data, struct ico_window_mgr *ico_window_mgr,
-                 uint32_t surfaceid, uint32_t node, uint32_t layer,
+                 uint32_t surfaceid, uint32_t node, int32_t layertype, uint32_t layer,
                  int32_t x, int32_t y, int32_t width, int32_t height, int32_t hint)
 {
     struct display *display = data;
     struct surface_name     *p;
 
     print_log("HOMESCREEN: Event[window_configure] surface=%08x "
-              "node=%x x/y=%d/%d w/h=%d/%d hint=%d",
-              (int)surfaceid, node, x, y, width, height, hint);
+              "node=%x layer=%x.%x x/y=%d/%d w/h=%d/%d hint=%d",
+              (int)surfaceid, node, layertype, layer, x, y, width, height, hint);
 
     p = search_surfaceid(display, (int)surfaceid);
     if (! p)    {
@@ -692,9 +695,9 @@ window_active(void *data, struct ico_window_mgr *ico_window_mgr,
 
 static void
 window_surfaces(void *data, struct ico_window_mgr *ico_window_mgr,
-                const char *appid, struct wl_array *surfaces)
+                const char *appid, int32_t pid, struct wl_array *surfaces)
 {
-    print_log("HOMESCREEN: Event[app_surfaces] app=%s", appid);
+    print_log("HOMESCREEN: Event[app_surfaces] app=%s pid=%d", appid, pid);
 }
 
 static void

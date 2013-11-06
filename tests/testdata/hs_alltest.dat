@@ -4,6 +4,7 @@
 #	1. Launch Application (and app create surface)
 launch ../tests/test-client < ../tests/testdata/cl_surface1.dat 2> ../tests/testlog/test-client01.log 1>&2
 waitcreate 2
+move test-client 250 150
 show test-client
 sleep 4
 waitdestroy 60
@@ -87,20 +88,28 @@ sleep 1
 hide test-client 1
 sleep 2
 #
-### zoom and show/hide
-##animation test-client zoom 400
-##show test-client 1
-##sleep 1
-##hide test-client 1
-##sleep 3
-#
-# fade and move
+# zoom and show/hide
 show test-client
 sleep 1
-animation test-client fade 600
-move test-client 600 200 0 1
-sleep 1.5
-move test-client 500 300 0 1
+animation test-client zoom 600
+show test-client 1
+sleep 2
+hide test-client 1
+sleep 2
+#
+# zoom and move
+animation test-client zoom 1000
+show test-client
+sleep 1
+move test-client 100 50 0 1
+sleep 2
+move test-client 500 400 0 1
+sleep 2
+#
+# zoom and resize
+resize test-client 80 50 1
+sleep 2
+resize test-client 300 200 1
 sleep 2
 #
 # slide and move
@@ -122,9 +131,90 @@ animation test-client slide 600
 resize test-client 80 50 1
 sleep 1.5
 resize test-client 300 200 1
-sleep 3
+sleep 1
 #
-waitdestroy 60
+kill test-client
+waitdestroy 5
+sleep 1
+#
+launch ../tests/test-eflapp @1 -color=0xe02040ff 2> ../tests/testlog/test-eflapp.log 1>&2
+waitcreate 2
+#
+hide test-eflapp@1
+move test-eflapp@1 0 150
+sleep 1
+animation test-eflapp@1 wipe.toleft 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 920 250
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 wipe.toright 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 400 0
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 wipe.tobottom 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 400 520
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 wipe.totop 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 0 150
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 swing.toleft 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 920 250
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 swing.toright 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 400 0
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 swing.tobottom 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+move test-eflapp@1 400 520
+hide test-eflapp@1
+sleep 1
+animation test-eflapp@1 swing.totop 800
+show test-eflapp@1 1
+sleep 1
+hide test-eflapp@1 1
+sleep 1
+#
+kill test-eflapp@1
+sleep 1
+waitdestroy 5
 sleep 1
 #
 #	4. Launch Weston sample client
@@ -179,95 +269,95 @@ sleep 1
 #	5. Set Layer
 launch ../tests/test-eflapp @1 -color=0xe02040ff > ../tests/testlog/test-eflapp1.log 1>&2
 waitcreate 2
-layer test-eflapp@1 101
+layer test-eflapp@1 51
 move test-eflapp@1 100 200
 show test-eflapp@1
-sleep 0.5
+sleep 0.2
 
 launch ../tests/test-eflapp @2 -color=0xd020ff40 > ../tests/testlog/test-eflapp2.log 1>&2
 waitcreate 2
-layer test-eflapp@2 103
+layer test-eflapp@2 53
 move test-eflapp@2 200 300
 show test-eflapp@2
-sleep 0.5
+sleep 0.2
 
 launch ../tests/test-eflapp @3 -color=0xc0ff2040 > ../tests/testlog/test-eflapp3.log 1>&2
 waitcreate 2
-layer test-eflapp@3 102
+layer test-eflapp@3 52
 move test-eflapp@3 300 400
 show test-eflapp@3
-sleep 0.5
+sleep 0.2
 
 launch ../tests/test-eflapp @4 -color=0xb0808080 > ../tests/testlog/test-eflapp4.log 1>&2
 waitcreate 2
-layer test-eflapp@4 102
+layer test-eflapp@4 52
 move test-eflapp@4 400 500
 show test-eflapp@4
-sleep 0.5
+sleep 0.2
 
 launch ../tests/test-eflapp @5 -color=0xa040a060 > ../tests/testlog/test-eflapp5.log 1>&2
 waitcreate 2
-layer test-eflapp@5 102
+layer test-eflapp@5 52
 move test-eflapp@5 500 600
 show test-eflapp@5
 sleep 1
 hide test-eflapp@2
 sleep 1
 show test-eflapp@2
-sleep 2
+sleep 1
 #
 #	resize EFL application
 resize test-eflapp@2 300 300
-sleep 1
+sleep 0.5
 resize test-eflapp@3 720 520
-sleep 1
+sleep 0.5
 resize test-eflapp@3 520 380
-sleep 1
+sleep 0.5
 resize test-eflapp@2 520 380
-sleep 2
+sleep 1
 #
 #	6. Raise/Lower
 raise test-eflapp@3
-sleep 1
+sleep 0.5
 raise test-eflapp@4
-sleep 1
+sleep 0.5
 raise test-eflapp@5
-sleep 1
+sleep 0.5
 lower test-eflapp@5
-sleep 1
+sleep 0.5
 lower test-eflapp@4
-sleep 1
+sleep 0.5
 lower test-eflapp@3
-sleep 2
+sleep 1
 #
 #	7. Layer Change
-layer test-eflapp@1 100
+layer test-eflapp@1 50
+sleep 0.5
+layer test-eflapp@2 50
 sleep 1
-layer test-eflapp@2 100
-sleep 2
 #
 #	8. layer visibility control
-layer_visible 102 0
-sleep 1
-layer_visible 102 1
+layer_visible 52 0
+sleep 0.5
+layer_visible 52 1
 sleep 1
 #	9. kill eflapp's
 kill test-eflapp@1
-sleep 0.5
+sleep 0.3
 kill test-eflapp@2
-sleep 0.5
+sleep 0.3
 kill test-eflapp@3
-sleep 0.5
+sleep 0.3
 kill test-eflapp@4
-sleep 0.5
+sleep 0.3
 kill test-eflapp@5
-sleep 2
+sleep 1
 #
 #	10. Input test
 launch ../tests/test-client @1 -color=0xe0ff2020 -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client11.log 1>&2
 waitcreate 2
 sleep 0.3
-layer test-client@1 101
+layer test-client@1 51
 move test-client@1 100 200 1
 show test-client@1
 sleep 0.5
@@ -281,7 +371,7 @@ sleep 0.2
 launch ../tests/test-client @2 -color=0xc020ff20 -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client12.log 1>&2
 waitcreate 2
 sleep 0.3
-layer test-client@2 101
+layer test-client@2 51
 move test-client@2 250 300 1
 show test-client@2
 sleep 0.5
@@ -295,7 +385,7 @@ sleep 0.2
 launch ../tests/test-client @3 -color=0xa02020ff -postsleep=60 < ../tests/testdata/cl_surface3.dat 2> ../tests/testlog/test-client13.log 1>&2
 waitcreate 2
 sleep 0.3
-layer test-client@3 101
+layer test-client@3 51
 move test-client@3 400 400 1
 show test-client@3
 sleep 0.5

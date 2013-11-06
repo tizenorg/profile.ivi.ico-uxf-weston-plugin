@@ -30,6 +30,8 @@
 #ifndef _ICO_IVI_SHELL_H_
 #define _ICO_IVI_SHELL_H_
 
+#include "ico_window_mgr-server-protocol.h"
+
 struct shell_surface;
 
 /* surface type                         */
@@ -45,13 +47,23 @@ enum shell_surface_type {
 
 /* weston layer type            */
 #define LAYER_TYPE_UNKNOWN      0
-#define LAYER_TYPE_LOCK         1
-#define LAYER_TYPE_BACKGROUND   2
-#define LAYER_TYPE_PANEL        3
-#define LAYER_TYPE_FULLSCREEN   4
-#define LAYER_TYPE_INPUTPANEL   5
-#define LAYER_TYPE_CURSOR       6
-#define LAYER_TYPE_FADE         7
+#define LAYER_TYPE_BACKGROUND   (ICO_WINDOW_MGR_LAYERTYPE_BACKGROUND >> 12)
+#define LAYER_TYPE_PANEL        (ICO_WINDOW_MGR_LAYERTYPE_NORMAL >> 12)
+#define LAYER_TYPE_FULLSCREEN   (ICO_WINDOW_MGR_LAYERTYPE_FULLSCREEN >> 12)
+#define LAYER_TYPE_INPUTPANEL   (ICO_WINDOW_MGR_LAYERTYPE_INPUTPANEL >> 12)
+#define LAYER_TYPE_TOUCH        (ICO_WINDOW_MGR_LAYERTYPE_TOUCH >> 12)
+#define LAYER_TYPE_CURSOR       (ICO_WINDOW_MGR_LAYERTYPE_CURSOR >> 12)
+#define LAYER_TYPE_LOCK         0xe
+#define LAYER_TYPE_FADE         0xf
+
+/* fullscreen surface control   */
+enum shell_fullscreen_control   {
+    SHELL_FULLSCREEN_ISTOP,
+    SHELL_FULLSCREEN_SET,
+    SHELL_FULLSCREEN_STACK,
+    SHELL_FULLSCREEN_CONF,
+    SHELL_FULLSCREEN_HIDEALL
+};
 
 /* Prototype for get/set function       */
 struct weston_layer *ico_ivi_shell_weston_layer(void);
@@ -61,13 +73,14 @@ void ico_ivi_shell_set_surface_type(struct shell_surface *shsurf);
 void ico_ivi_shell_send_configure(struct weston_surface *surface,
                                   const uint32_t edges, const int width, const int height);
 void ico_ivi_shell_startup(void *shell);
-void ico_ivi_shell_set_layertype(void);
 int ico_ivi_shell_layertype(struct weston_surface *surface);
+void ivi_shell_set_surface_initial_position(struct weston_surface *surface);
+void ivi_shell_set_default_display(struct weston_output *inputpanel);
 
 /* Prototypr for hook routine           */
 void ico_ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client, void *shell));
 void ico_ivi_shell_hook_unbind(void (*hook_unbind)(struct wl_client *client));
-void ico_ivi_shell_hook_create(void (*hook_create)(struct wl_client *client,
+void ico_ivi_shell_hook_create(void (*hook_create)(int layertype, struct wl_client *client,
                             struct wl_resource *resource, struct weston_surface *surface,
                             struct shell_surface *shsurf));
 void ico_ivi_shell_hook_destroy(void (*hook_destroy)(struct weston_surface *surface));
@@ -79,6 +92,9 @@ void ico_ivi_shell_hook_title(void (*hook_title)(struct weston_surface *surface,
                             const char *title));
 void ico_ivi_shell_hook_move(void (*hook_move)(struct weston_surface *surface,
                             int *dx, int *dy));
+void ico_ivi_shell_hook_show_layer(void (*hook_show)(int layertype, int show, void *data));
+void ico_ivi_shell_hook_fullscreen(int (*hook_fullscreen)
+                            (int event, struct weston_surface *surface));
 
 #endif  /*_ICO_IVI_SHELL_H_*/
 

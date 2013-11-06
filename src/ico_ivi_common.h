@@ -57,8 +57,10 @@
 #endif
 
 /* Debug flags                          */
-#define ICO_IVI_DEBUG_SHOW_SURFACE  0x01    /* new surface show on create           */
-#define ICO_IVI_DEBUG_SHOW_NODISP   0x02    /* show if display not exist            */
+#define ICO_IVI_DEBUG_SHOW_SURFACE      0x0001  /* new surface show on create       */
+#define ICO_IVI_DEBUG_SHOW_NODISP       0x0002  /* show if display not exist        */
+#define ICO_IVI_DEBUG_SHOW_INPUTLAYER   0x0004  /* show input panel layer           */
+#define ICO_IVI_DEBUG_FIXED_ASPECT      0x0100  /* surface fixed aspect rate        */
 
 /* Function prototype                   */
 int ico_ivi_get_mynode(void);               /* Get my node numner                   */

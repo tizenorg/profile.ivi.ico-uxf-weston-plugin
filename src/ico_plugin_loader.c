@@ -156,7 +156,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     uifw_info("ico_plugin_loader: Enter(module_init)");
 
     /* get ivi debug level          */
-    section = weston_config_get_section(ec->config, "ivi-debug", NULL, NULL);
+    section = weston_config_get_section(ec->config, "ivi-option", NULL, NULL);
     if (section)    {
         weston_config_section_get_int(section, "log", &debug_level, 3);
     }

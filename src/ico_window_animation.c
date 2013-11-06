@@ -454,7 +454,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             weston_surface_damage(usurf->surface);
         }
         weston_surface_geometry_dirty(usurf->surface);
-        ico_window_mgr_restack_layer(usurf, 0);
+        ico_window_mgr_restack_layer(usurf);
     }
     usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
     if (usurf->animation.next_anima != ICO_WINDOW_MGR_ANIMATION_NONE)    {
@@ -485,7 +485,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
     }
     usurf->animation.type = ICO_WINDOW_MGR_ANIMATION_OPNONE;
     if (! disp) {
-        ico_window_mgr_restack_layer(usurf, 0);
+        ico_window_mgr_restack_layer(usurf);
     }
 }
 
@@ -944,6 +944,7 @@ animation_fade(struct weston_animation *animation,
                                                   usurf->width, usurf->height);
                 ico_window_mgr_change_surface(usurf,
                                               usurf->animation.no_configure ? -1 : 0, 1);
+                ico_window_mgr_restack_layer(usurf);
             }
         }
         else    {
@@ -954,8 +955,8 @@ animation_fade(struct weston_animation *animation,
     else if (es->alpha > 1.0)   es->alpha = 1.0;
 
     uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
-               usurf->surfaceid, animation->frame_counter, par, es->alpha,
-               usurf->animation.anima, usurf->animation.state);
+               usurf->surfaceid, animation->frame_counter, par,
+               es->alpha, usurf->animation.anima, usurf->animation.state);
 
     if ((es->output) && (es->buffer_ref.buffer) &&
         (es->geometry.width > 0) && (es->geometry.height > 0)) {

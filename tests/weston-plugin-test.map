@@ -26,6 +26,8 @@ export LD_LIBRARY_PATH=../src/.libs:$LD_LIBRARY_PATH
 
 # 6 Start test-homescreen
 ../tests/test-homescreen < ../tests/testdata/hs_mapsurf.dat 2> ../tests/testlog/test-homescreen.log
+##echo "../tests/test-homescreen < ../tests/testdata/hs_mapsurf.dat 2> ../tests/testlog/test-homescreen.log"
+##gdb test-homescreen
 
 # 7 End of Test
 sleep 2
