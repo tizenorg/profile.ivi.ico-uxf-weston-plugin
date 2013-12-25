@@ -1,3 +1,12 @@
+* Wed Dec 25 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20131122.001017@2122c69
+- 0.9.11 release.
+-- bug fix: A ivi cursor layer may pick up a touch event.
+-- bug fix: TIVI-1997 - Touch doesn't work in ico homescreen after some operations
+-- bug fix: TIVI-2244 - ico-uxf-weston-plugin depends on mesa/intel DRI
+-- bug fix: TIVI-2256 - Weston gonna crash when launching some apps
+-- revise: Correspondence to version up of Wayland 1.3.0 and Weston 1.3.1.
+-- revise: add manifest file for SMACK label setting.
+
 * Wed Nov 06 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20131010.203258@58015fa
 - 0.9.07 release.
 -- fix for: TIVI-1758 - Weston VKB is not stable for MiniBrowser

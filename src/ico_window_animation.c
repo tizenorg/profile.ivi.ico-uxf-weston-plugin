@@ -39,9 +39,10 @@
 #include <sys/stat.h>
 
 #include <weston/compositor.h>
-#include "ico_ivi_common.h"
-#include "ico_ivi_shell.h"
-#include "ico_window_mgr.h"
+#include <pixman.h>
+#include "ico_ivi_common_private.h"
+#include "ico_ivi_shell_private.h"
+#include "ico_window_mgr_private.h"
 
 /* Animation type               */
 #define ANIMA_ZOOM              1           /* ZoomIn/ZoomOut                       */
@@ -318,6 +319,12 @@ ico_window_animation(const int op, void *data)
             ret = ICO_WINDOW_MGR_ANIMATION_RET_NOANIMA;
         }
         usurf->animation.type = op;
+#if  PERFORMANCE_EVALUATIONS > 0
+        if (ret != ICO_WINDOW_MGR_ANIMATION_RET_NOANIMA)    {
+            uifw_perf("SWAP_BUFFER Start Animation appid=%s surface=%08x anima=%d",
+                      usurf->uclient->appid, usurf->surfaceid, usurf->animation.anima);
+        }
+#endif /*PERFORMANCE_EVALUATIONS*/
     }
     weston_compositor_schedule_repaint(weston_ec);
     return ret;
@@ -487,6 +494,10 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
     if (! disp) {
         ico_window_mgr_restack_layer(usurf);
     }
+#if  PERFORMANCE_EVALUATIONS > 0
+    uifw_perf("SWAP_BUFFER End Animation appid=%s surface=%08x anima=%d",
+              usurf->uclient->appid, usurf->surfaceid, usurf->animation.anima);
+#endif /*PERFORMANCE_EVALUATIONS*/
 }
 
 /*--------------------------------------------------------------------------*/

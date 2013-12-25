@@ -27,8 +27,11 @@
  * @date    Jul-26-2013
  */
 
-#ifndef _ICO_IVI_COMMON_H_
-#define _ICO_IVI_COMMON_H_
+#ifndef _ICO_IVI_COMMON_PRIVATE_H_
+#define _ICO_IVI_COMMON_PRIVATE_H_
+
+/* Log for performance evaluations      */
+#define PERFORMANCE_EVALUATIONS 1
 
 /* Macros                               */
 #define ICO_IVI_NODEID_2_HOSTID(nodeid)         (((unsigned int)nodeid) >> 8)
@@ -56,16 +59,22 @@
 #define FALSE   0
 #endif
 
+/* Option flags                         */
+#define ICO_IVI_OPTION_SHOW_SURFACE     0x0001  /* new surface show on create       */
+#define ICO_IVI_OPTION_SHOW_NODISP      0x0002  /* show if display not exist        */
+#define ICO_IVI_OPTION_SHOW_INPUTLAYER  0x0004  /* show input panel layer           */
+#define ICO_IVI_OPTION_FIXED_ASPECT     0x0080  /* surface fixed aspect rate        */
+#define ICO_IVI_OPTION_GPU_NODEPEND     0x8000  /* no use GPU dependent acceleration*/
+#define ICO_IVI_OPTION_GPU_DEPENDINTEL  0x1000  /* use Intel GPU dependent acceleration*/
+                                                /* depends for Intel GPU            */
 /* Debug flags                          */
-#define ICO_IVI_DEBUG_SHOW_SURFACE      0x0001  /* new surface show on create       */
-#define ICO_IVI_DEBUG_SHOW_NODISP       0x0002  /* show if display not exist        */
-#define ICO_IVI_DEBUG_SHOW_INPUTLAYER   0x0004  /* show input panel layer           */
-#define ICO_IVI_DEBUG_FIXED_ASPECT      0x0100  /* surface fixed aspect rate        */
+#define ICO_IVI_DEBUG_PERF_LOG          0x0001  /* performance log                  */
 
 /* Function prototype                   */
 int ico_ivi_get_mynode(void);               /* Get my node numner                   */
+int ico_ivi_optionflag(void);               /* Get option flag                      */
+int ico_ivi_debuglevel(void);               /* Get debug log level                  */
 int ico_ivi_debugflag(void);                /* Get debug flag                       */
-int ico_ivi_debuglevel(void);               /* Get debug level                      */
                                             /* Get default animation name           */
 const char *ico_ivi_default_animation_name(void);
 int ico_ivi_default_animation_time(void);   /* Get default animation time(ms)       */
@@ -76,11 +85,26 @@ int ico_ivi_default_animation_fps(void);    /* Get animation frame rate(fps)    
 #define UIFW_DEBUG_OUT  1   /* 1=Debug Print/0=No Debug Print           */
 
 #if UIFW_DEBUG_OUT > 0
+#define uifw_perf(fmt,...)  \
+    { if (ico_ivi_debugflag() & ICO_IVI_DEBUG_PERF_LOG) {weston_log("PRF>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_debug(fmt,...)  \
     { if (ico_ivi_debuglevel() >= 5) {weston_log("DBG>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 #define uifw_trace(fmt,...)  \
     { if (ico_ivi_debuglevel() >= 4) {weston_log("TRC>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
+
+#ifdef UIFW_DETAIL_OUT
+#if UIFW_DETAIL_OUT > 0
+#define uifw_detail(fmt,...)  \
+    { if (ico_ivi_debuglevel() >= 5) {weston_log("DBG>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
+#else
+#define uifw_detail(fmt,...)
+#endif
+#else
+#define uifw_detail(fmt,...)
+#endif
+
 #else  /*UIFW_DEBUG_OUT*/
+#define uifw_perf(fmt,...)
 #define uifw_debug(fmt,...)
 #define uifw_trace(fmt,...)
 #endif /*UIFW_DEBUG_OUT*/
@@ -92,5 +116,4 @@ int ico_ivi_default_animation_fps(void);    /* Get animation frame rate(fps)    
 #define uifw_error(fmt,...)  \
     { if (ico_ivi_debuglevel() >= 1) {weston_log("ERR>"fmt" (%s:%d)\n",##__VA_ARGS__,__FILE__,__LINE__);} }
 
-#endif  /*_ICO_IVI_COMMON_H_*/
-
+#endif  /*_ICO_IVI_COMMON_PRIVATE_H_*/

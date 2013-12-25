@@ -33,6 +33,7 @@ struct ico_uifw_input_region    {
     uint16_t    change;                 /* change method                        */
                                         /*   ICO_INPUT_MGR_DEVICE_REGION_ADD    */
                                         /*   ICO_INPUT_MGR_DEVICE_REGION_REMOVE */
+                                        /*   ICO_INPUT_MGR_DEVICE_REGION_CHANGE */
                                         /*   ICO_INPUT_MGR_DEVICE_REGION_REMOVEALL*/
     uint16_t    node;                   /* display node                         */
     uint32_t    surfaceid;              /* surface Id                           */

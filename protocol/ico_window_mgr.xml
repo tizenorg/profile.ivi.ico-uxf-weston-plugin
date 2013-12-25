@@ -72,6 +72,7 @@
       </description>
       <entry name="egl" value="1" summary="EGL buffer"/>
       <entry name="shm" value="2" summary="wl_shm_buffer"/>
+      <entry name="pixel" value="4" summary="glReadPixels image"/>
     </enum>
 
     <enum name="map_surface_event">
@@ -206,6 +207,15 @@
       </description>
       <arg name="appid" type="string"/>
       <arg name="pid" type="int"/>
+    </request>
+
+    <request name="set_map_buffer">
+      <description summary="set shared memory surfaces image buffer">
+       Set shared memory surfaces image buffer.
+      </description>
+      <arg name="shmname" type="string"/>
+      <arg name="bufsize" type="uint"/>
+      <arg name="bufnum" type="uint"/>
     </request>
 
     <request name="map_surface">

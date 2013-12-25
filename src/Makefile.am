@@ -6,6 +6,7 @@ pkginclude_HEADERS =               \
 	workspaces-client-protocol.h		\
 	ico_window_mgr-client-protocol.h	\
 	ico_input_mgr-client-protocol.h		\
+	ico_window_mgr.h					\
 	ico_input_mgr.h
 
 libico_uxf_weston_plugin_la_LIBADD = -ldrm_intel -lrt -lm
@@ -46,7 +47,8 @@ ico_plugin_loader_la_LIBADD = $(PLUGIN_LIBS)
 ico_plugin_loader_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_plugin_loader_la_SOURCES =		\
 	ico_plugin_loader.c				\
-	ico_ivi_common.h
+	ico_ivi_common_private.h		\
+	ico_plugin_version.h
 
 # IVI-Shell
 ico_ivi_shell = ico_ivi_shell.la
@@ -55,8 +57,8 @@ ico_ivi_shell_la_LIBADD = $(PLUGIN_LIBS)
 ico_ivi_shell_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_ivi_shell_la_SOURCES =			\
 	ico_ivi_shell.c					\
-	ico_ivi_shell.h					\
-	ico_ivi_common.h				\
+	ico_ivi_shell_private.h			\
+	ico_ivi_common_private.h		\
 	desktop-shell-protocol.c		\
 	input-method-protocol.c			\
 	workspaces-protocol.c			\
@@ -71,9 +73,10 @@ ico_window_mgr_la_LIBADD = -ldrm_intel $(PLUGIN_LIBS) $(AUL_LIBS)
 ico_window_mgr_la_CFLAGS = -I/usr/include/libdrm $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_window_mgr_la_SOURCES =			\
 	ico_window_mgr.c				\
+	ico_window_mgr_private.h		\
 	ico_window_mgr.h				\
-	ico_ivi_common.h				\
-	ico_ivi_shell.h					\
+	ico_ivi_common_private.h		\
+	ico_ivi_shell_private.h			\
 	ico_window_mgr-protocol.c		\
 	ico_window_mgr-server-protocol.h
 #
@@ -84,8 +87,8 @@ ico_window_animation_la_LIBADD = $(PLUGIN_LIBS) $(AUL_LIBS)
 ico_window_animation_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_window_animation_la_SOURCES =	\
 	ico_window_animation.c			\
-	ico_window_mgr.h				\
-	ico_ivi_common.h
+	ico_window_mgr_private.h		\
+	ico_ivi_common._privateh
 
 # Multi Input Manager
 ico_input_mgr = ico_input_mgr.la
@@ -95,8 +98,8 @@ ico_input_mgr_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_input_mgr_la_SOURCES =			\
 	ico_input_mgr.c					\
 	ico_input_mgr.h					\
-	ico_window_mgr.h				\
-	ico_ivi_common.h				\
+	ico_window_mgr_private.h		\
+	ico_ivi_common._privateh		\
 	ico_input_mgr-protocol.c		\
 	ico_input_mgr-server-protocol.h
 

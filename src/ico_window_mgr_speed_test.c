@@ -27,6 +27,8 @@
  * @date    Jul-26-2013
  */
 
+#define PIXEL_SPEED_TEST    1
+
 #define _GNU_SOURCE
 
 #include <stdlib.h>
@@ -39,7 +41,6 @@
 #include <signal.h>
 #include <math.h>
 #include <time.h>
-#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -57,16 +58,12 @@
 
 #include <weston/compositor.h>
 #include <libdrm/intel_bufmgr.h>
-
-/* detail debug log */
-#define UIFW_DETAIL_OUT 0                   /* 1=detail debug log/0=no detail log   */
-
-#include "ico_ivi_common_private.h"
-#include "ico_ivi_shell_private.h"
-#include "ico_window_mgr_private.h"
+#include "ico_ivi_common.h"
+#include "ico_ivi_shell.h"
 #include "ico_window_mgr.h"
 #include "desktop-shell-server-protocol.h"
 #include "ico_window_mgr-server-protocol.h"
+
 
 /* SurfaceID                            */
 #define INIT_SURFACE_IDS    1024            /* SurfaceId table initiale size        */
@@ -174,6 +171,7 @@ struct ico_win_mgr {
     struct weston_animation map_animation[ICO_IVI_MAX_DISPLAY];
                                             /* animation for map check              */
     struct wl_event_source  *wait_mapevent; /* map event send wait timer            */
+    int             waittime;               /* minimaum send wait time(ms)          */
 
     struct uifw_win_surface *active_pointer_usurf;  /* Active Pointer Surface       */
     struct uifw_win_surface *active_keyboard_usurf; /* Active Keyboard Surface      */
@@ -220,7 +218,7 @@ static void win_mgr_register_surface(
                                             /* surface destroy                      */
 static void win_mgr_destroy_surface(struct weston_surface *surface);
                                             /* map new surface                      */
-static void win_mgr_surface_map(struct weston_surface *surface, int32_t *width,
+static void win_mgr_map_surface(struct weston_surface *surface, int32_t *width,
                                 int32_t *height, int32_t *sx, int32_t *sy);
                                             /* send surface change event to manager */
 static void win_mgr_change_surface(struct weston_surface *surface,
@@ -291,16 +289,13 @@ static void uifw_set_layer_visible(struct wl_client *client, struct wl_resource 
 static void uifw_get_surfaces(struct wl_client *client, struct wl_resource *resource,
                               const char *appid, int32_t pid);
                                             /* check and change all mapped surface  */
-static void win_mgr_check_mapsurface(struct weston_animation *animation,
+static void win_mgr_check_mapsurrace(struct weston_animation *animation,
                                      struct weston_output *output, uint32_t msecs);
                                             /* check timer of mapped surface        */
-static int win_mgr_timer_mapsurface(void *data);
+static int win_mgr_timer_mapsurrace(void *data);
                                             /* check and change mapped surface      */
 static void win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event,
                                       uint32_t curtime);
-                                            /* set map buffer                       */
-static void uifw_set_map_buffer(struct wl_client *client, struct wl_resource *resource,
-                                const char *shmname, uint32_t bufsize, uint32_t bufnum);
                                             /* map surface to system application    */
 static void uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
                              uint32_t surfaceid, int32_t framerate);
@@ -345,7 +340,6 @@ static const struct ico_window_mgr_interface ico_window_mgr_implementation = {
     uifw_set_active,
     uifw_set_layer_visible,
     uifw_get_surfaces,
-    uifw_set_map_buffer,
     uifw_map_surface,
     uifw_unmap_surface
 };
@@ -380,15 +374,15 @@ static int  _ico_ivi_cursor_layer = 102;        /* cursor layer id              
 static int  _ico_ivi_startup_layer = 109;       /* deafult layer id at system startup*/
 
 static int  _ico_ivi_gpu_type = 0;              /* GPU type for get EGL buffer      */
-static int  _ico_ivi_map_framerate_gpu = 30;    /* framerate of map surface for GPU*/
-static int  _ico_ivi_map_framerate_shm = 2;     /* framerate of map surface for shm buffer*/
-static int  _ico_ivi_map_framerate_pixel = 5;   /* framerate of map surface for ReadPixels*/
 
 /* static management table              */
 static struct ico_win_mgr       *_ico_win_mgr = NULL;
 static int                      _ico_num_nodes = 0;
 static struct uifw_node_table   _ico_node_table[ICO_IVI_MAX_DISPLAY];
 static struct weston_seat       *touch_check_seat = NULL;
+#if PIXEL_SPEED_TEST > 0
+static char *speed_buffer = NULL;
+#endif
 
 
 /*--------------------------------------------------------------------------*/
@@ -1279,7 +1273,7 @@ win_mgr_register_surface(int layertype, struct wl_client *client,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_surface_map: map surface to display
+ * @brief   win_mgr_map_surface: map surface
  *
  * @param[in]   surface         Weston surface
  * @param[in]   width           surface width
@@ -1290,21 +1284,21 @@ win_mgr_register_surface(int layertype, struct wl_client *client,
  */
 /*--------------------------------------------------------------------------*/
 static void
-win_mgr_surface_map(struct weston_surface *surface, int32_t *width, int32_t *height,
+win_mgr_map_surface(struct weston_surface *surface, int32_t *width, int32_t *height,
                     int32_t *sx, int32_t *sy)
 {
     struct uifw_win_surface *usurf;
 
-    uifw_trace("win_mgr_surface_map: Enter(%08x, x/y=%d/%d w/h=%d/%d)",
+    uifw_trace("win_mgr_map_surface: Enter(%08x, x/y=%d/%d w/h=%d/%d)",
                (int)surface, *sx, *sy, *width, *height);
 
     usurf = find_uifw_win_surface_by_ws(surface);
 
     if (usurf) {
-        uifw_trace("win_mgr_surface_map: surf=%08x w/h=%d/%d vis=%d",
+        uifw_trace("win_mgr_map_surface: surf=%08x w/h=%d/%d vis=%d",
                    usurf->surfaceid, usurf->width, usurf->height, usurf->visible);
         if ((usurf->width > 0) && (usurf->height > 0)) {
-            uifw_trace("win_mgr_surface_map: HomeScreen registed, PositionSize"
+            uifw_trace("win_mgr_map_surface: HomeScreen registed, PositionSize"
                        "(surf=%08x x/y=%d/%d w/h=%d/%d vis=%d",
                        usurf->surfaceid, usurf->x, usurf->y, usurf->width, usurf->height,
                        usurf->visible);
@@ -1315,7 +1309,7 @@ win_mgr_surface_map(struct weston_surface *surface, int32_t *width, int32_t *hei
                                       usurf->width, usurf->height);
         }
         else    {
-            uifw_trace("win_mgr_surface_map: HomeScreen not regist Surface, "
+            uifw_trace("win_mgr_map_surface: HomeScreen not regist Surface, "
                        "Change PositionSize(surf=%08x x/y=%d/%d w/h=%d/%d)",
                        usurf->surfaceid, *sx, *sy, *width, *height);
             usurf->width = *width;
@@ -1353,7 +1347,7 @@ win_mgr_surface_map(struct weston_surface *surface, int32_t *width, int32_t *hei
                     if (usurf->x < 0)   usurf->x = 0;
                     if (usurf->y < 0)   usurf->y = 0;
                 }
-                uifw_trace("win_mgr_surface_map: set position %08x %d.%d/%d",
+                uifw_trace("win_mgr_map_surface: set position %08x %d.%d/%d",
                            usurf->surfaceid, usurf->node_tbl->node, usurf->x, usurf->y);
             }
             if (((ico_ivi_optionflag() & ICO_IVI_OPTION_SHOW_SURFACE) == 0) &&
@@ -1369,12 +1363,12 @@ win_mgr_surface_map(struct weston_surface *surface, int32_t *width, int32_t *hei
                                               ICO_IVI_MAX_COORDINATE+1,
                                               usurf->width, usurf->height);
                 }
-                uifw_trace("win_mgr_surface_map: Change size/position x/y=%d/%d w/h=%d/%d",
+                uifw_trace("win_mgr_map_surface: Change size/position x/y=%d/%d w/h=%d/%d",
                            (int)surface->geometry.x, (int)surface->geometry.y,
                            surface->geometry.width, surface->geometry.height);
             }
             else if (usurf->layertype != LAYER_TYPE_INPUTPANEL) {
-                uifw_trace("win_mgr_surface_map: No HomeScreen, chaneg to Visible");
+                uifw_trace("win_mgr_map_surface: No HomeScreen, chaneg to Visible");
                 ico_window_mgr_set_visible(usurf, 1);
             }
             else    {
@@ -1394,10 +1388,10 @@ win_mgr_surface_map(struct weston_surface *surface, int32_t *width, int32_t *hei
         if (usurf->visible) {
             ico_window_mgr_restack_layer(NULL);
         }
-        uifw_trace("win_mgr_surface_map: Leave");
+        uifw_trace("win_mgr_map_surface: Leave");
     }
     else    {
-        uifw_trace("win_mgr_surface_map: Leave(No UIFW Surface)");
+        uifw_trace("win_mgr_map_surface: Leave(No UIFW Surface)");
     }
 }
 
@@ -2137,7 +2131,7 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
         usurf->y = y;
         usurf->width = width;
         usurf->height = height;
-        uifw_trace("uifw_set_positionsize: Leave(OK, but no buffer)");
+        uifw_trace("uifw_set_positionsize: Leave(OK,but no buffer)");
     }
 
     /* if position change, call hook for input region   */
@@ -2786,7 +2780,7 @@ uifw_get_surfaces(struct wl_client *client, struct wl_resource *resource,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_check_mapsurface: check and change all surface
+ * @brief   win_mgr_check_mapsurrace: check and change all surface
  *
  * @param[in]   animation   weston animation table(unused)
  * @param[in]   outout      weston output table(unused)
@@ -2795,7 +2789,7 @@ uifw_get_surfaces(struct wl_client *client, struct wl_resource *resource,
  */
 /*--------------------------------------------------------------------------*/
 static void
-win_mgr_check_mapsurface(struct weston_animation *animation,
+win_mgr_check_mapsurrace(struct weston_animation *animation,
                          struct weston_output *output, uint32_t msecs)
 {
     struct uifw_surface_map *sm;
@@ -2805,7 +2799,7 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
     /* check touch down counter     */
     if (touch_check_seat)   {
         if (touch_check_seat->num_tp > 10)  {
-            uifw_trace("win_mgr_check_mapsurface: illegal touch counter(num=%d), reset",
+            uifw_trace("win_mgr_change_mapsurface: illegal touch counter(num=%d), reset",
                        (int)touch_check_seat->num_tp);
             touch_check_seat->num_tp = 0;
         }
@@ -2814,8 +2808,6 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
     /* check all mapped surfaces    */
     curtime = weston_compositor_get_time();
     wl_list_for_each (sm, &_ico_win_mgr->map_list, map_link) {
-        uifw_detail("win_mgr_check_mapsurface: sm=%08x surf=%08x",
-                    (int)sm, sm->usurf->surfaceid);
         win_mgr_change_mapsurface(sm, 0, curtime);
         if (sm->eventque)   {
             if (sm->interval < wait)    {
@@ -2825,27 +2817,31 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
     }
 
     /* check frame interval         */
-    if (wait < 2000)    {
+    if (wait < 99999999)    {
         wait = wait / 2;
     }
     else    {
         wait = 1000;
     }
-    wl_event_source_timer_update(_ico_win_mgr->wait_mapevent, wait);
+    if (wait != _ico_win_mgr->waittime)  {
+        _ico_win_mgr->waittime = wait;
+        wl_event_source_timer_update(_ico_win_mgr->wait_mapevent,
+                                     _ico_win_mgr->waittime);
+    }
 }
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_timer_mapsurface: mapped surface check timer
+ * @brief   win_mgr_timer_mapsurrace: mapped surface check timer
  *
  * @param[in]   data        user data(unused)
- * @return      fixed 1
+ * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static int
-win_mgr_timer_mapsurface(void *data)
+win_mgr_timer_mapsurrace(void *data)
 {
-    win_mgr_check_mapsurface(NULL, NULL, 0);
+    win_mgr_check_mapsurrace(NULL, NULL, 0);
     return 1;
 }
 
@@ -2873,43 +2869,26 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
     int         stride;
     uint32_t    format;
     uint32_t    dtime;
-    int         idx, idx2;
-    int         delta, settime2;
-    struct ico_uifw_image_buffer    *p;
-
-    uifw_detail("win_mgr_change_mapsurface: surf=%08x event=%d", sm->usurf->surfaceid, event);
-    if (event == 0) {
-        event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS;
-    }
 
     /* check if buffered        */
-    drm_buffer = NULL;
     es = sm->usurf->surface;
-    if ((es == NULL) ||
-        ((sm->type == ICO_WINDOW_MGR_MAP_TYPE_EGL) &&
-         ((es->buffer_ref.buffer == NULL) ||
-          (es->buffer_ref.buffer->width <= 0) || (es->buffer_ref.buffer->height <= 0)))) {
-        /* surface has no buffer    */
-        uifw_debug("win_mgr_change_mapsurface: surface(%08x) has no buffer %08x %08x",
-                   sm->usurf->surfaceid, (int)es,
-                   es ? (int)es->buffer_ref.buffer : 0);
-        if (sm->initflag)   {
-            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP;
-        }
-        else    {
-            event = 0;
+    if ((es == NULL) || (es->buffer_ref.buffer == NULL) ||
+        (es->buffer_ref.buffer->width <= 0) || (es->buffer_ref.buffer->height <= 0) ||
+        (es->buffer_ref.buffer->legacy_buffer == NULL) || (es->renderer_state == NULL)) {
+        drm_buffer = NULL;
+    }
+    else    {
+        drm_buffer = (struct uifw_drm_buffer *)wl_resource_get_user_data(
+                            (struct wl_resource *)es->buffer_ref.buffer->legacy_buffer);
+        if ((drm_buffer != NULL) && (drm_buffer->driver_buffer == NULL))    {
+            drm_buffer = NULL;
         }
     }
-    else if (sm->type == ICO_WINDOW_MGR_MAP_TYPE_EGL)   {
-        if ((es->buffer_ref.buffer->legacy_buffer != NULL) && (es->renderer_state != NULL)) {
-            drm_buffer = (struct uifw_drm_buffer *)wl_resource_get_user_data(
-                                (struct wl_resource *)es->buffer_ref.buffer->legacy_buffer);
-            if ((drm_buffer != NULL) && (drm_buffer->driver_buffer == NULL))    {
-                drm_buffer = NULL;
-            }
-        }
-        if (drm_buffer == NULL) {
-            /* surface has no buffer    */
+    if ((drm_buffer == NULL) || (_ico_ivi_gpu_type == ICO_GPUTYPE_NOACCELERATION))  {
+        /* surface has no buffer or not use GPU acceleration            */
+        /* currently, not support No Intel GPU, so same as no surafce   */
+        /* if (! es)    {   */
+            /* UIFW surface has no weston surface, error    */
             uifw_debug("win_mgr_change_mapsurface: surface(%08x) has no buffer",
                        sm->usurf->surfaceid);
             if (sm->initflag)   {
@@ -2918,231 +2897,106 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
             else    {
                 event = 0;
             }
-        }
+        /* }    */
     }
-    else if (sm->uclient->shmbuf == NULL)   {
-        /* no GPU acceleration but no buffer    */
-        uifw_debug("win_mgr_change_mapsurface: client has no shared memory buffer");
-        if (sm->initflag)   {
-            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP;
+    else    {
+        gl_state = (struct uifw_gl_surface_state *)es->renderer_state;
+        if (gl_state->buffer_type == BUFFER_TYPE_SHM)   {
+            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR;
         }
-        else    {
+        else if (gl_state->buffer_type != BUFFER_TYPE_EGL)   {
             event = 0;
         }
-    }
-
-    if ((event != 0) && (event != ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP))  {
-
-        if (sm->type == ICO_WINDOW_MGR_MAP_TYPE_EGL)    {
-            gl_state = (struct uifw_gl_surface_state *)es->renderer_state;
-            if (gl_state->buffer_type == BUFFER_TYPE_SHM)   {
-                event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR;
-            }
-            else if (gl_state->buffer_type != BUFFER_TYPE_EGL)   {
-                event = 0;
-            }
-            else    {
-                dri_image = (struct uifw_dri_image *)drm_buffer->driver_buffer;
-                dri_region = dri_image->region;
-                width = es->buffer_ref.buffer->width;
-                height = es->buffer_ref.buffer->height;
-                stride = drm_buffer->stride[0];
-                if (drm_buffer->format == __DRI_IMAGE_FOURCC_XRGB8888)  {
-                    format = EGL_TEXTURE_RGB;
-                }
-                else if (drm_buffer->format == __DRI_IMAGE_FOURCC_ARGB8888) {
-                    format = EGL_TEXTURE_RGBA;
-                }
-                else    {
-                    /* unknown format, error    */
-                    format = EGL_NO_TEXTURE;
-                }
-                eglname = dri_region->name;
-                if (eglname == 0)   {
-                    if (drm_intel_bo_flink((drm_intel_bo *)dri_region->bo, &eglname))   {
-                        uifw_warn("win_mgr_change_mapsurface: drm_intel_bo_flink() Error");
-                        eglname = 0;
-                    }
-                }
-                if ((sm->initflag == 0) && (eglname != 0) &&
-                    (width > 0) && (height > 0) && (stride > 0))    {
-                    sm->initflag = 1;
-                    event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP;
-                }
-                else    {
-                    if ((eglname == 0) || (width <= 0) || (height <= 0) || (stride <= 0))   {
-                        event = 0;
-                    }
-                    else if (event == ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS)    {
-                        if ((sm->width != width) || (sm->height != height) ||
-                            (sm->stride != stride) || (format != sm->format))   {
-                            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_RESIZE;
-                        }
-                        else if (eglname != sm->eglname)    {
-#if  PERFORMANCE_EVALUATIONS > 0
-                            uifw_perf("SWAP_BUFFER appid=%s surface=%08x name=%d",
-                                      sm->usurf->uclient->appid, sm->usurf->surfaceid,
-                                      sm->eglname);
-#endif /*PERFORMANCE_EVALUATIONS*/
-                            dtime = curtime - sm->lasttime;
-                            if ((sm->interval > 0) && (dtime < sm->interval))   {
-                                sm->eventque = 1;
-                                event = 0;
-                            }
-                        }
-                        else if (sm->eventque)  {
-                            dtime = curtime - sm->lasttime;
-                            if ((sm->interval > 0) && (dtime < sm->interval))   {
-                                event = 0;
-                            }
-                        }
-                        else    {
-                            event =0;
-                        }
-                    }
-                }
-                sm->width = width;
-                sm->height = height;
-                sm->stride = stride;
-                sm->eglname = eglname;
-                sm->format = format;
-            }
-        }
         else    {
-            if ((sm->type != ICO_WINDOW_MGR_MAP_TYPE_PIXEL) || (sm->eventque != 0) ||
-                (es->buffer_ref.buffer == NULL) || (es->buffer_ref.buffer != sm->curbuf)) {
-                sm->curbuf = es->buffer_ref.buffer;
-                if (es->buffer_ref.buffer != NULL)  {
-                    width = es->buffer_ref.buffer->width;
-                    height = es->buffer_ref.buffer->height;
-                }
-                else    {
-                    width = sm->usurf->client_width;
-                    height = sm->usurf->client_height;
-                }
-                /* get shared memory buffer area    */
-                idx2 = sm->uclient->bufnum;
-                settime2 = 0x7fffffff;
-                for (idx = 0; idx < sm->uclient->bufnum; idx++) {
-                    p = (struct ico_uifw_image_buffer *)
-                        (((char *)sm->uclient->shmbuf) + idx * sm->uclient->bufsize);
-                    if (p->settime == p->reftime)   break;
-                    delta = curtime - p->settime;
-                    if (delta < 0)  {
-                        delta = delta + 0x80000000;
-                    }
-                    if ((delta > 3000) && (delta < settime2))   {
-                        idx2 = idx;
-                        settime2 = p->settime;
-                    }
-                }
-                uifw_detail("win_mgr_change_mapsurface: PIX %08x idx=%d idx2=%d w/h=%d/%d",
-                            sm->usurf->surfaceid, idx, idx2, width, height);
-                if (idx >= sm->uclient->bufnum) {
-                    idx = idx2;
-                }
-                if (idx >= sm->uclient->bufnum) {
-                    uifw_debug("win_mgr_change_mapsurface: shared buffer full");
-                    event = 0;
-                    sm->curbuf = NULL;
-                    sm->eventque = 1;
-                }
-                else if ((sm->initflag == 0) && (width > 0) && (height > 0))    {
-                    sm->initflag = 1;
-                    event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP;
-                    uifw_detail("win_mgr_change_mapsurface: PIX MAP event %08x",
-                                sm->usurf->surfaceid);
-                }
-                else    {
-                    if ((width <= 0) || (height <= 0))  {
-                        event = 0;
-                        sm->curbuf = NULL;
-                        uifw_detail("win_mgr_change_mapsurface: PIX %08x w/h=0/0",
-                                    sm->usurf->surfaceid);
-                    }
-                    else if (event == ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS)    {
-#if  PERFORMANCE_EVALUATIONS > 0
-                        if (sm->type != ICO_WINDOW_MGR_MAP_TYPE_SHM)    {
-                            uifw_perf("SWAP_BUFFER appid=%s surface=%08x",
-                                      sm->usurf->uclient->appid, sm->usurf->surfaceid);
-                        }
-#endif /*PERFORMANCE_EVALUATIONS*/
-                        if ((sm->width != width) || (sm->height != height)) {
-                            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_RESIZE;
-                        }
-                        else    {
-                            dtime = curtime - sm->lasttime;
-                            if ((sm->interval > 0) && (dtime < sm->interval))   {
-                                sm->eventque = 1;
-                                event = 0;
-                                uifw_detail("win_mgr_change_mapsurface: PIX %08x new queue",
-                                            sm->usurf->surfaceid);
-                            }
-                            else if (sm->eventque)  {
-                                dtime = curtime - sm->lasttime;
-                                if ((sm->interval > 0) && (dtime < sm->interval))   {
-                                    event = 0;
-                                    uifw_detail("win_mgr_change_mapsurface: PIX %08x queued",
-                                                sm->usurf->surfaceid);
-                                }
-                            }
-                        }
-                    }
-                }
-                sm->width = width;
-                sm->height = height;
-                sm->stride = width;
-                sm->format = EGL_TEXTURE_RGBA;
-                if (event != 0) {
-                    /* read pixel           */
-                    p = (struct ico_uifw_image_buffer *)
-                        (((char *)sm->uclient->shmbuf) + idx * sm->uclient->bufsize);
-                    height = (sm->uclient->bufsize - sizeof(struct ico_uifw_image_buffer))
-                             / (width * 4);
-                    uifw_detail("win_mgr_change_mapsurface: PIX read buf=%08x height=%d(%d)",
-                                (int)p, height, sm->height);
-                    if ((height < sm->height) &&
-                        (sm->type == ICO_WINDOW_MGR_MAP_TYPE_SHM))  {
-                        uifw_warn("win_mgr_change_mapsurface: Buffer SHM, "
-                                  "but buffer overflow(%d>%d)", sm->height, height);
-                        event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR;
-                        sm->eventque = 0;
-                    }
-                    else    {
-                        if (height > sm->height)    {
-                            height = sm->height;
-                        }
-                        if ((*(_ico_win_mgr->compositor->renderer->read_surface_pixels))
-                                    (es, PIXMAN_a8r8g8b8, p->image,
-                                     0, 0, sm->width, height) != 0) {
-                            uifw_debug("win_mgr_change_mapsurface: Error read pixel %s.%08x",
-                                       sm->usurf->uclient->appid, sm->usurf->surfaceid);
-                            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR;
-                            sm->eventque = 0;
-                        }
-                        else    {
-                            uifw_detail("win_mgr_change_mapsurface: PIX read pixels(%d)",
-                                        idx+1);
-                            p->surfaceid = sm->usurf->surfaceid;
-                            p->settime = curtime;
-                            p->width = sm->width;
-                            p->height = height;
-                            sm->eglname = idx + 1;
-                        }
-                    }
-                }
+            dri_image = (struct uifw_dri_image *)drm_buffer->driver_buffer;
+            dri_region = dri_image->region;
+            width = es->buffer_ref.buffer->width;
+            height = es->buffer_ref.buffer->height;
+            stride = drm_buffer->stride[0];
+            if (drm_buffer->format == __DRI_IMAGE_FOURCC_XRGB8888)  {
+                format = EGL_TEXTURE_RGB;
+            }
+            else if (drm_buffer->format == __DRI_IMAGE_FOURCC_ARGB8888) {
+                format = EGL_TEXTURE_RGBA;
             }
             else    {
-                event = 0;
+                /* unknown format, error    */
+                format = EGL_NO_TEXTURE;
             }
+            eglname = dri_region->name;
+            if (eglname == 0)   {
+                if (drm_intel_bo_flink((drm_intel_bo *)dri_region->bo, &eglname))   {
+                    uifw_warn("win_mgr_change_mapsurface: drm_intel_bo_flink() Error");
+                    eglname = 0;
+                }
+            }
+            if ((sm->initflag == 0) && (eglname != 0) &&
+                (width > 0) && (height > 0) && (stride > 0))    {
+                sm->initflag = 1;
+                event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_MAP;
+            }
+            else    {
+                if ((eglname == 0) || (width <= 0) || (height <= 0) || (stride <= 0))   {
+                    event = 0;
+                }
+                else if (event == 0)    {
+                    if ((sm->width != width) || (sm->height != height) ||
+                        (sm->stride != stride) || (format != sm->format))   {
+                        event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_RESIZE;
+                    }
+                    else if (eglname != sm->eglname)    {
+#if PIXEL_SPEED_TEST > 0
+                        uifw_debug("start read pixel %s.%08x (%d,%d)",
+                                   sm->usurf->uclient->appid, sm->usurf->surfaceid,
+                                   sm->width, sm->height);
+                        if ((*(_ico_win_mgr->compositor->renderer->read_surface_pixels))
+                                    (sm->usurf->surface, PIXMAN_a8r8g8b8,
+                                    speed_buffer, 0, 0, sm->width, sm->height) != 0)    {
+                            uifw_debug("error read pixel %s.%08x",
+                                       sm->usurf->uclient->appid, sm->usurf->surfaceid);
+                        }
+                        else    {
+                            uifw_debug("end   read pixel %s.%08x",
+                                       sm->usurf->uclient->appid, sm->usurf->surfaceid);
+                        }
+#endif
+#if  PERFORMANCE_EVALUATIONS > 0
+                        uifw_perf("SWAP_BUFFER appid=%s surface=%08x name=%d",
+                                  sm->usurf->uclient->appid, sm->usurf->surfaceid,
+                                  sm->eglname);
+#endif /*PERFORMANCE_EVALUATIONS*/
+                        dtime = curtime - sm->lasttime;
+                        if ((sm->interval > 0) && (dtime < sm->interval))   {
+                            sm->eventque = 1;
+                            event = 0;
+                        }
+                        else    {
+                            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS;
+                        }
+                    }
+                    else if (sm->eventque)  {
+                        dtime = curtime - sm->lasttime;
+                        if ((sm->interval == 0) || (dtime >= sm->interval)) {
+                            event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_CONTENTS;
+                        }
+                    }
+                }
+            }
+            sm->width = width;
+            sm->height = height;
+            sm->stride = stride;
+            sm->eglname = eglname;
+            sm->format = format;
         }
     }
 
     if (event != 0) {
-        uifw_detail("win_mgr_change_mapsurface: send MAP event(ev=%d surf=%08x type=%d "
-                    "name=%d w/h/s=%d/%d/%d format=%x",
-                    event, sm->usurf->surfaceid, sm->type, sm->eglname,
-                    sm->width, sm->height, sm->stride, sm->format);
+#if 0       /* too many logs    */
+        uifw_debug("win_mgr_change_mapsurface: send MAP event(ev=%d surf=%08x name=%d "
+                   "w/h/s=%d/%d/%d format=%x",
+                   event, sm->usurf->surfaceid, sm->eglname,
+                   sm->width, sm->height, sm->stride, sm->format);
+#endif
         sm->lasttime = curtime;
         sm->eventque = 0;
         ico_window_mgr_send_map_surface(sm->uclient->mgr->resource, event,
@@ -3156,80 +3010,6 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
             _ico_win_mgr->free_maptable = sm;
         }
     }
-}
-
-/*--------------------------------------------------------------------------*/
-/**
- * @brief   uifw_set_map_buffer: set map surface image buffer
- *
- * @param[in]   client      Weyland client
- * @param[in]   resource    resource of request
- * @param[in]   shmname     shared memory name(POSIX I/F)
- * @param[in]   bufsize     buffer size in byte
- * @param[in]   bufnum      number of buffers
- * @return      none
- */
-/*--------------------------------------------------------------------------*/
-static void
-uifw_set_map_buffer(struct wl_client *client, struct wl_resource *resource,
-                    const char *shmname, uint32_t bufsize, uint32_t bufnum)
-{
-    struct uifw_client              *uclient;
-    struct ico_uifw_image_buffer    *p;
-    char    *shmbuf;
-    int     shmfd;
-    int     i;
-
-    uifw_trace("uifw_set_map_buffer: Enter(%s,%d,%d)",
-               shmname ? shmname : "(null)", bufsize, bufnum);
-
-    uclient = find_client_from_client(client);
-    if ((! uclient) || (! uclient->mgr))    {
-        /* client dose not exist, error         */
-        uifw_trace("uifw_set_map_buffer: Leave(client=%08x dose not exist)", (int)client);
-        return;
-    }
-
-    if ((shmname == NULL) || (*shmname == 0) || (*shmname == ' ') ||
-        (bufsize == 0) || (bufnum == 0))    {
-        /* delete shared memory buffer          */
-        if (uclient->shmbuf)    {
-            munmap(uclient->shmbuf, uclient->bufsize * uclient->bufnum);
-            uclient->shmbuf = NULL;
-        }
-        uifw_trace("uifw_set_map_buffer: Leave(delete shared memory buffer)");
-        return;
-    }
-
-    shmfd = shm_open(shmname, O_RDWR, 0600);
-    if (shmfd == -1)    {
-        /* shared memory dose not exist         */
-        uifw_trace("uifw_set_map_buffer: Leave(shared memory(%s) dose not exist)", shmname);
-        return;
-    }
-
-    shmbuf = (char *)mmap(NULL, bufsize * bufnum, PROT_READ|PROT_WRITE, MAP_SHARED, shmfd, 0);
-    close(shmfd);
-
-    if (shmbuf == NULL) {
-        /* can not map shared memory            */
-        uifw_trace("uifw_set_map_buffer: Leave(can not map shared memory(%s))", shmname);
-        return;
-    }
-    if (uclient->shmbuf)    {
-        munmap(uclient->shmbuf, uclient->bufsize * uclient->bufnum);
-    }
-
-    uclient->shmbuf = shmbuf;
-    uclient->bufsize = bufsize;
-    uclient->bufnum = bufnum;
-    for (i = 0; i < (int)bufnum; i++)    {
-        p = (struct ico_uifw_image_buffer *)(((char *)shmbuf) + bufsize * i);
-        memset((char *)p, 0, sizeof(struct ico_uifw_image_buffer));
-        memcpy((char *)&p->magich, ICO_UIFW_IMAGE_BUFFER_MAGICH, 4);
-        memcpy((char *)&p->magict, ICO_UIFW_IMAGE_BUFFER_MAGICT, 4);
-    }
-    uifw_trace("uifw_set_map_buffer: Leave(shm addr=%08x)", (int)uclient->shmbuf);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -3254,7 +3034,6 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
     struct uifw_client          *uclient;
     struct uifw_drm_buffer      *drm_buffer;
     struct uifw_gl_surface_state *gl_state;
-    int     maptype;
 
     uifw_trace("uifw_map_surface: Enter(surface=%08x,fps=%d)", surfaceid, framerate);
 
@@ -3289,47 +3068,12 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
     gl_state = (struct uifw_gl_surface_state *)es->renderer_state;
     if ((_ico_ivi_gpu_type == ICO_GPUTYPE_NOACCELERATION) ||
         (gl_state == NULL) || (gl_state->buffer_type == BUFFER_TYPE_SHM))   {
-        /* wl_shm_buffer support ReadPixels     */
-        if ((_ico_win_mgr->compositor->renderer == NULL) ||
-            (_ico_win_mgr->compositor->renderer->read_surface_pixels == NULL))  {
-            ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
-                                            surfaceid, 4, 0, 0, 0, 0, 0);
-            uifw_trace("uifw_map_surface: Leave(surface(%08x) not support ReadPixels)",
-                       surfaceid);
-            return;
-        }
-        else if ((gl_state != NULL) && (gl_state->buffer_type == BUFFER_TYPE_SHM) &&
-                (es->buffer_ref.buffer != NULL))    {
-            maptype = ICO_WINDOW_MGR_MAP_TYPE_SHM;
-        }
-        else    {
-            maptype = ICO_WINDOW_MGR_MAP_TYPE_PIXEL;
-        }
-        if (uclient->shmbuf == NULL)    {
-            /* ReadPixcels but client has no shared memory buffer   */
-            ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
-                                            surfaceid, 5, 0, 0, 0, 0, 0);
-            uifw_trace("uifw_map_surface: Leave(client has no shared memory buffer)");
-            return;
-        }
-    }
-    else    {
-        /* H/W(GPU) driver EGL buffer (Intel only)  */
-        maptype = ICO_WINDOW_MGR_MAP_TYPE_EGL;
-    }
-
-    /* maximum framerate        */
-    if (maptype == ICO_WINDOW_MGR_MAP_TYPE_EGL) {
-        if ((framerate <= 0) || (framerate > _ico_ivi_map_framerate_gpu))
-            framerate = _ico_ivi_map_framerate_gpu;
-    }
-    else if (maptype == ICO_WINDOW_MGR_MAP_TYPE_SHM) {
-        if ((framerate <= 0) || (framerate > _ico_ivi_map_framerate_shm))
-            framerate = _ico_ivi_map_framerate_shm;
-    }
-    else    {
-        if ((framerate <= 0) || (framerate > _ico_ivi_map_framerate_pixel))
-            framerate = _ico_ivi_map_framerate_pixel;
+        /* wl_shm_buffer not support    */
+        ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
+                                        surfaceid, 4, 0, 0, 0, 0, 0);
+        uifw_trace("uifw_map_surface: Leave(surface(%08x) is wl_shm_buffer, "
+                   "not support)", surfaceid);
+        return;
     }
 
     /* check same surface       */
@@ -3361,9 +3105,12 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
         wl_list_init(&sm->surf_link);
         sm->usurf = usurf;
         sm->uclient = uclient;
-        sm->type = maptype;
+        sm->type = ICO_WINDOW_MGR_MAP_TYPE_EGL;
         sm->framerate = framerate;
-        sm->interval = (1000 / sm->framerate) - 1;
+        if (sm->framerate > 60) sm->framerate = 60;
+        if (sm->framerate > 0)  {
+            sm->interval = (1000 / sm->framerate) - 1;
+        }
         wl_list_insert(_ico_win_mgr->map_list.next, &sm->map_link);
         wl_list_insert(usurf->surf_map.prev, &sm->surf_link);
     }
@@ -3373,67 +3120,38 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
                    sm->framerate, framerate);
         if (sm->framerate != framerate) {
             sm->framerate = framerate;
-            sm->interval = (1000 / sm->framerate) - 1;
+            if (sm->framerate > 60) sm->framerate = 60;
+            if (sm->framerate > 0)  {
+                sm->interval = (1000 / sm->framerate) - 1;
+            }
             win_mgr_change_mapsurface(sm, 0, weston_compositor_get_time());
         }
         return;
     }
 
     buffer = es->buffer_ref.buffer;
-    if (buffer != NULL) {
+    if ((buffer != NULL) && (gl_state->buffer_type == BUFFER_TYPE_EGL)) {
         sm->width = buffer->width;
         sm->height = buffer->height;
-        if (maptype != ICO_WINDOW_MGR_MAP_TYPE_EGL) {
-            sm->stride = sm->width;
-            sm->format = EGL_TEXTURE_RGBA;
-            if ((sm->width > 0) && (sm->height > 0))    {
-                sm->initflag = 1;
-            }
-            uifw_debug("uifw_map_surface: map type=%d,surface=%08x,fps=%d,w/h=%d/%d",
-                       maptype, surfaceid, framerate, buffer->width, buffer->height);
-        }
-        else    {
-            drm_buffer = (struct uifw_drm_buffer *)wl_resource_get_user_data(
+        drm_buffer = (struct uifw_drm_buffer *)wl_resource_get_user_data(
                                             (struct wl_resource *)buffer->legacy_buffer);
-            if (drm_buffer != NULL) {
-                sm->stride = drm_buffer->stride[0];
-                if (drm_buffer->format == __DRI_IMAGE_FOURCC_XRGB8888)  {
-                    sm->format = EGL_TEXTURE_RGB;
-                }
-                else if (drm_buffer->format == __DRI_IMAGE_FOURCC_ARGB8888) {
-                    sm->format = EGL_TEXTURE_RGBA;
-                }
-                else    {
-                    /* unknown format, error    */
-                    sm->format = EGL_NO_TEXTURE;
-                }
-                if ((sm->width > 0) && (sm->height > 0) && (sm->stride > 0) &&
-                    (gl_state != NULL))  {
-                    sm->initflag = 1;
-                }
-                uifw_debug("uifw_map_surface: map EGL surface=%08x,fps=%d,w/h=%d/%d",
-                           surfaceid, framerate, buffer->width, buffer->height);
+        if (drm_buffer != NULL) {
+            sm->stride = drm_buffer->stride[0];
+            if (drm_buffer->format == __DRI_IMAGE_FOURCC_XRGB8888)  {
+                sm->format = EGL_TEXTURE_RGB;
+            }
+            else if (drm_buffer->format == __DRI_IMAGE_FOURCC_ARGB8888) {
+                sm->format = EGL_TEXTURE_RGBA;
             }
             else    {
-                uifw_debug("uifw_map_surface: map EGL but no buffer surface=%08x,fps=%d",
-                           surfaceid, framerate);
+                /* unknown format, error    */
+                sm->format = EGL_NO_TEXTURE;
+            }
+            if ((sm->width > 0) && (sm->height > 0) && (sm->stride > 0) &&
+                (gl_state != NULL))  {
+                sm->initflag = 1;
             }
         }
-    }
-    else if (maptype != ICO_WINDOW_MGR_MAP_TYPE_EGL)    {
-        sm->width = usurf->client_width;
-        sm->height = usurf->client_height;
-        sm->stride = sm->width;
-        sm->format = EGL_TEXTURE_RGBA;
-        if ((sm->width > 0) && (sm->height > 0))    {
-            sm->initflag = 1;
-        }
-        uifw_debug("uifw_map_surface: map type=%d,surface=%08x,fps=%d,w/h=%d/%d",
-                   maptype, surfaceid, framerate, sm->width, sm->height);
-    }
-    else    {
-        uifw_debug("uifw_map_surface: map EGL but no buffer surface=%08x,fps=%d",
-                   surfaceid, framerate);
     }
 
     /* send map event                       */
@@ -3461,8 +3179,6 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
     struct uifw_win_surface *usurf;
     struct uifw_surface_map *sm, *sm_tmp;
     struct uifw_client      *uclient;
-    struct ico_uifw_image_buffer    *p;
-    int     idx;
 
     uifw_trace("uifw_unmap_surface: Enter(surface=%08x)", surfaceid);
 
@@ -3508,19 +3224,6 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
                                             ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP,
                                             surfaceid, sm->type, sm->eglname, sm->width,
                                             sm->height, sm->stride, sm->format);
-        }
-        if ((sm->type != ICO_WINDOW_MGR_MAP_TYPE_EGL) &&
-            (sm->uclient->shmbuf != NULL))  {
-            /* reset shared memory buffer   */
-            for (idx = 0; idx < sm->uclient->bufnum; idx++) {
-                p = (struct ico_uifw_image_buffer *)
-                    (((char *)sm->uclient->shmbuf) + idx * sm->uclient->bufsize);
-                if (p->surfaceid == surfaceid)  {
-                    p->surfaceid = 0;
-                    p->settime = 0;
-                    p->reftime = 0;
-                }
-            }
         }
         wl_list_remove(&sm->surf_link);
         wl_list_remove(&sm->map_link);
@@ -4175,7 +3878,7 @@ win_mgr_fullscreen(int event, struct weston_surface *surface)
     }
 
     switch(event)   {
-    case SHELL_FULLSCREEN_ISTOP:        /* check if top surface             */
+    case SHELL_FULLSCREEN_ISTOP:        /* check if top surrace             */
         if (usurf->layertype == LAYER_TYPE_FULLSCREEN)  {
             wl_list_for_each (ulayer, &_ico_win_mgr->ivi_layer_list, link)  {
                 if (ulayer->layertype >= LAYER_TYPE_TOUCH)  continue;
@@ -4216,7 +3919,7 @@ win_mgr_fullscreen(int event, struct weston_surface *surface)
             height = usurf->node_tbl->disp_height;
             sx = 0;
             sy = 0;
-            win_mgr_surface_map(usurf->surface, &width, &height, &sx, &sy);
+            win_mgr_map_surface(usurf->surface, &width, &height, &sx, &sy);
         }
         if ((usurf->surface != NULL) && (usurf->mapped != 0) &&
             (usurf->surface->buffer_ref.buffer != NULL))    {
@@ -4231,7 +3934,7 @@ win_mgr_fullscreen(int event, struct weston_surface *surface)
             height = usurf->node_tbl->disp_height;
             sx = 0;
             sy = 0;
-            win_mgr_surface_map(usurf->surface, &width, &height, &sx, &sy);
+            win_mgr_map_surface(usurf->surface, &width, &height, &sx, &sy);
         }
         break;
     default:
@@ -4618,12 +4321,6 @@ ico_win_mgr_send_to_mgr(const int event, struct uifw_win_surface *usurf,
 {
     int     num_mgr = 0;
     struct uifw_manager* mgr;
-
-    /* if DESTROY and no send CREATE, Nop       */
-    if ((event == ICO_WINDOW_MGR_WINDOW_DESTROYED) &&
-        (usurf != NULL) && (usurf->created == 0))   {
-        return 0;
-    }
 
     /* if appid not fix, check and fix appid    */
     if ((usurf != NULL) &&
@@ -5116,26 +4813,6 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     if (_ico_ivi_inputpanel_anima_time < 100)
         _ico_ivi_inputpanel_anima_time = _ico_ivi_animation_time;
 
-    /* get thumbnail maximum frame rate     */
-    section = weston_config_get_section(ec->config, "ivi-thumbnail", NULL, NULL);
-    if (section)    {
-        weston_config_section_get_int(section, "gpu_accel_fps",
-                                      &_ico_ivi_map_framerate_gpu, 30);
-        if ((_ico_ivi_map_framerate_gpu <= 0) || (_ico_ivi_map_framerate_gpu > 60)) {
-            _ico_ivi_map_framerate_gpu = 30;
-        }
-        weston_config_section_get_int(section, "shm_buffer_fps",
-                                      &_ico_ivi_map_framerate_shm, 5);
-        if ((_ico_ivi_map_framerate_shm <= 0) || (_ico_ivi_map_framerate_shm > 10)) {
-            _ico_ivi_map_framerate_shm = 5;
-        }
-        weston_config_section_get_int(section, "no_accel_fps",
-                                      &_ico_ivi_map_framerate_pixel, 10);
-        if ((_ico_ivi_map_framerate_pixel <= 0) || (_ico_ivi_map_framerate_pixel > 20)) {
-            _ico_ivi_map_framerate_pixel = 10;
-        }
-    }
-
     /* create ico_window_mgr management table   */
     _ico_win_mgr = (struct ico_win_mgr *)malloc(sizeof(struct ico_win_mgr));
     if (_ico_win_mgr == NULL)   {
@@ -5180,7 +4857,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     _ico_num_nodes = 0;
     wl_list_for_each (output, &ec->output_list, link) {
         wl_list_init(&_ico_win_mgr->map_animation[_ico_num_nodes].link);
-        _ico_win_mgr->map_animation[_ico_num_nodes].frame = win_mgr_check_mapsurface;
+        _ico_win_mgr->map_animation[_ico_num_nodes].frame = win_mgr_check_mapsurrace;
         wl_list_insert(output->animation_list.prev,
                        &_ico_win_mgr->map_animation[_ico_num_nodes].link);
         _ico_num_nodes++;
@@ -5247,9 +4924,10 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
 
     /* get seat for touch down counter check    */
     touch_check_seat = container_of(ec->seat_list.next, struct weston_seat, link);
+    _ico_win_mgr->waittime = 1000;
     loop = wl_display_get_event_loop(ec->wl_display);
     _ico_win_mgr->wait_mapevent =
-            wl_event_loop_add_timer(loop, win_mgr_timer_mapsurface, NULL);
+            wl_event_loop_add_timer(loop, win_mgr_timer_mapsurrace, NULL);
     wl_event_source_timer_update(_ico_win_mgr->wait_mapevent, 1000);
 
     /* Hook to IVI-Shell                            */
@@ -5257,7 +4935,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     ico_ivi_shell_hook_unbind(win_mgr_unbind_client);
     ico_ivi_shell_hook_create(win_mgr_register_surface);
     ico_ivi_shell_hook_destroy(win_mgr_destroy_surface);
-    ico_ivi_shell_hook_map(win_mgr_surface_map);
+    ico_ivi_shell_hook_map(win_mgr_map_surface);
     ico_ivi_shell_hook_configure(win_mgr_shell_configure);
     ico_ivi_shell_hook_select(win_mgr_select_surface);
     ico_ivi_shell_hook_title(win_mgr_set_title);
@@ -5275,9 +4953,6 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
               _ico_ivi_default_layer, _ico_ivi_background_layer);
     uifw_info("ico_window_mgr: layer touch=%d cursor=%d startup=%d",
               _ico_ivi_touch_layer, _ico_ivi_cursor_layer, _ico_ivi_startup_layer);
-    uifw_info("ico_window_mgr: thumbnail framerate gpu_accel=%d shm_buff=%d no_accel=%d",
-              _ico_ivi_map_framerate_gpu, _ico_ivi_map_framerate_shm,
-              _ico_ivi_map_framerate_pixel);
     uifw_info("ico_window_mgr: option flag=0x%04x log level=%d debug flag=0x%04x",
               _ico_ivi_option_flag, _ico_ivi_debug_level & 0x0ffff,
               (_ico_ivi_debug_level >> 16) & 0x0ffff);
@@ -5312,6 +4987,10 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
             uifw_info("ico_window_mgr: GPU type=No Acceleration(can not find GPU)");
         }
     }
+#if PIXEL_SPEED_TEST > 0
+    speed_buffer = malloc(1920*1080*4);
+#endif
+
     uifw_info("ico_window_mgr: Leave(module_init)");
 
     return 0;

@@ -27,8 +27,8 @@
  * @date    Jul-26-2013
  */
 
-#ifndef _ICO_IVI_SHELL_H_
-#define _ICO_IVI_SHELL_H_
+#ifndef _ICO_IVI_SHELL_PRIVATE_H_
+#define _ICO_IVI_SHELL_PRIVATE_H_
 
 #include "ico_window_mgr-server-protocol.h"
 
@@ -88,7 +88,7 @@ void ico_ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
                             int32_t *width, int32_t *height, int32_t *sx, int32_t *sy));
 void ico_ivi_shell_hook_configure(void (*hook_configure)(struct weston_surface *surface));
 void ico_ivi_shell_hook_select(void (*hook_select)(struct weston_surface *surface));
-void ico_ivi_shell_hook_title(void (*hook_title)(struct weston_surface *surface,
+void ico_ivi_shell_hook_title(char *(*hook_title)(struct weston_surface *surface,
                             const char *title));
 void ico_ivi_shell_hook_move(void (*hook_move)(struct weston_surface *surface,
                             int *dx, int *dy));
@@ -96,5 +96,4 @@ void ico_ivi_shell_hook_show_layer(void (*hook_show)(int layertype, int show, vo
 void ico_ivi_shell_hook_fullscreen(int (*hook_fullscreen)
                             (int event, struct weston_surface *surface));
 
-#endif  /*_ICO_IVI_SHELL_H_*/
-
+#endif  /*_ICO_IVI_SHELL_PRIVATE_H_*/

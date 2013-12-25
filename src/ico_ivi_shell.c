@@ -39,7 +39,7 @@
 #include "input-method-server-protocol.h"
 #include "workspaces-server-protocol.h"
 #include <weston/config-parser.h>
-#include "ico_ivi_shell.h"
+#include "ico_ivi_shell_private.h"
 
 #define DEFAULT_NUM_WORKSPACES 1
 #define DEFAULT_WORKSPACE_CHANGE_ANIMATION_LENGTH 200
@@ -164,6 +164,7 @@ struct desktop_shell {
 
     uint32_t binding_modifier;
     enum animation_type win_animation_type;
+    enum animation_type startup_animation_type;
 };
 
 #if 0           /* move to ico_ivi_shell.h  */
@@ -333,7 +334,7 @@ static void (*shell_hook_map)(struct weston_surface *surface, int32_t *width,
                               int32_t *height, int32_t *sx, int32_t *sy) = NULL;
 static void (*shell_hook_configure)(struct weston_surface *surface) = NULL;
 static void (*shell_hook_select)(struct weston_surface *surface) = NULL;
-static void (*shell_hook_title)(struct weston_surface *surface, const char *title) = NULL;
+static char *(*shell_hook_title)(struct weston_surface *surface, const char *title) = NULL;
 static void (*shell_hook_move)(struct weston_surface *surface, int *dx, int *dy) = NULL;
 static void (*shell_hook_show_layer)(int layertype, int show, void *data) = NULL;
 static int (*shell_hook_fullscreen)(int event, struct weston_surface *surface) = NULL;
@@ -468,9 +469,6 @@ get_modifier(char *modifier)
 static enum animation_type
 get_animation_type(char *animation)
 {
-    if (!animation)
-        return ANIMATION_NONE;
-
     if (!strcmp("zoom", animation))
         return ANIMATION_ZOOM;
     else if (!strcmp("fade", animation))
@@ -502,6 +500,13 @@ shell_configuration(struct desktop_shell *shell)
     weston_config_section_get_string(section, "animation", &s, "none");
     shell->win_animation_type = get_animation_type(s);
     free(s);
+    weston_config_section_get_string(section,
+                     "startup-animation", &s, "fade");
+    shell->startup_animation_type = get_animation_type(s);
+    free(s);
+    if (shell->startup_animation_type == ANIMATION_ZOOM)
+        shell->startup_animation_type = ANIMATION_NONE;
+
     weston_config_section_get_uint(section, "num-workspaces",
                        &shell->workspaces.num,
                        DEFAULT_NUM_WORKSPACES);
@@ -515,6 +520,7 @@ shell_configuration(struct desktop_shell *shell)
     if (section)    {
         weston_config_section_get_int(section, "log",
                                       &ico_debug_level, DEFAULT_DEBUG_LEVEL);
+        ico_debug_level &= 0x0ffff;
     }
 }
 
@@ -782,15 +788,12 @@ workspace_translate_in(struct workspace *ws, double fraction)
 static void
 broadcast_current_workspace_state(struct desktop_shell *shell)
 {
-    struct wl_list *link;
+    struct wl_resource *resource;
 
-    for (link = shell->workspaces.client_list.next;
-         link != &shell->workspaces.client_list;
-         link = link->next) {
-        workspace_manager_send_state(wl_resource_from_link(link),
+    wl_resource_for_each(resource, &shell->workspaces.client_list)
+        workspace_manager_send_state(resource,
                          shell->workspaces.current,
                          shell->workspaces.num);
-    }
 }
 
 static void
@@ -1150,10 +1153,14 @@ touch_move_grab_down(struct weston_touch_grab *grab, uint32_t time,
 static void
 touch_move_grab_up(struct weston_touch_grab *grab, uint32_t time, int touch_id)
 {
-    struct shell_touch_grab *shell_grab = container_of(grab,
-                               struct shell_touch_grab,
-                               grab);
-    shell_touch_grab_end(shell_grab);
+    struct weston_touch_move_grab *move =
+        (struct weston_touch_move_grab *) container_of(
+            grab, struct shell_touch_grab, grab);
+
+    if (grab->touch->seat->num_tp == 0) {
+        shell_touch_grab_end(&move->base);
+        free(move);
+    }
 }
 
 static void
@@ -1177,10 +1184,22 @@ touch_move_grab_motion(struct weston_touch_grab *grab, uint32_t time,
     weston_compositor_schedule_repaint(es->compositor);
 }
 
+static void
+touch_move_grab_cancel(struct weston_touch_grab *grab)
+{
+    struct weston_touch_move_grab *move =
+        (struct weston_touch_move_grab *) container_of(
+            grab, struct shell_touch_grab, grab);
+
+    shell_touch_grab_end(&move->base);
+    free(move);
+}
+
 static const struct weston_touch_grab_interface touch_move_grab_interface = {
     touch_move_grab_down,
     touch_move_grab_up,
     touch_move_grab_motion,
+    touch_move_grab_cancel,
 };
 
 static int
@@ -1255,10 +1274,21 @@ move_grab_button(struct weston_pointer_grab *grab,
     }
 }
 
+static void
+move_grab_cancel(struct weston_pointer_grab *grab)
+{
+    struct shell_grab *shell_grab =
+        container_of(grab, struct shell_grab, grab);
+
+    shell_grab_end(shell_grab);
+    free(grab);
+}
+
 static const struct weston_pointer_grab_interface move_grab_interface = {
     noop_grab_focus,
     move_grab_motion,
     move_grab_button,
+    move_grab_cancel,
 };
 
 static int
@@ -1387,10 +1417,20 @@ resize_grab_button(struct weston_pointer_grab *grab,
     }
 }
 
+static void
+resize_grab_cancel(struct weston_pointer_grab *grab)
+{
+    struct weston_resize_grab *resize = (struct weston_resize_grab *) grab;
+
+    shell_grab_end(&resize->base);
+    free(grab);
+}
+
 static const struct weston_pointer_grab_interface resize_grab_interface = {
     noop_grab_focus,
     resize_grab_motion,
     resize_grab_button,
+    resize_grab_cancel,
 };
 
 /*
@@ -1519,10 +1559,20 @@ busy_cursor_grab_button(struct weston_pointer_grab *base,
     }
 }
 
+static void
+busy_cursor_grab_cancel(struct weston_pointer_grab *base)
+{
+    struct shell_grab *grab = (struct shell_grab *) base;
+
+    shell_grab_end(grab);
+    free(grab);
+}
+
 static const struct weston_pointer_grab_interface busy_cursor_grab_interface = {
     busy_cursor_grab_focus,
     busy_cursor_grab_motion,
     busy_cursor_grab_button,
+    busy_cursor_grab_cancel,
 };
 
 static void
@@ -1668,18 +1718,31 @@ shell_surface_pong(struct wl_client *client, struct wl_resource *resource,
 }
 
 static void
+set_title(struct shell_surface *shsurf, const char *title)
+{
+    char    *p;
+
+    /* if ico_window_mgr hook, call hook routine    */
+    if (shell_hook_title)  {
+        p = (*shell_hook_title)(shsurf->surface, title);
+        if (p)  {
+            free(shsurf->title);
+            shsurf->title = strdup(p);
+        }
+    }
+    else    {
+        free(shsurf->title);
+        shsurf->title = strdup(title);
+    }
+}
+
+static void
 shell_surface_set_title(struct wl_client *client,
             struct wl_resource *resource, const char *title)
 {
     struct shell_surface *shsurf = wl_resource_get_user_data(resource);
 
-    free(shsurf->title);
-    shsurf->title = strdup(title);
-
-    /* if ico_window_mgr hook, call hook routine    */
-    if (shell_hook_title)  {
-        (*shell_hook_title)(shsurf->surface, shsurf->title);
-    }
+    set_title(shsurf, title);
 }
 
 static void
@@ -1709,9 +1772,9 @@ restore_output_mode(struct weston_output *output)
     if (output->current_mode != output->original_mode ||
         (int32_t)output->current_scale != output->original_scale)
         weston_output_switch_mode(output,
-                                  output->original_mode,
-                                  output->original_scale,
-                                  WESTON_MODE_SWITCH_RESTORE_NATIVE);
+                      output->original_mode,
+                      output->original_scale,
+                      WESTON_MODE_SWITCH_RESTORE_NATIVE);
 }
 
 static void
@@ -2064,7 +2127,7 @@ shell_configure_fullscreen(struct shell_surface *shsurf)
                 shsurf->fullscreen.framerate};
 
             if (weston_output_switch_mode(output, &mode, surface->buffer_scale,
-                                          WESTON_MODE_SWITCH_SET_TEMPORARY) == 0) {
+                    WESTON_MODE_SWITCH_SET_TEMPORARY) == 0) {
                 weston_surface_set_position(surface,
                                 output->x - surf_x,
                                 output->y - surf_y);
@@ -2284,8 +2347,8 @@ popup_grab_motion(struct weston_pointer_grab *grab, uint32_t time)
 
     wl_resource_for_each(resource, &pointer->focus_resource_list) {
         weston_surface_from_global_fixed(pointer->focus,
-                                         pointer->x, pointer->y,
-                                         &sx, &sy);
+                         pointer->x, pointer->y,
+                         &sx, &sy);
         wl_pointer_send_motion(resource, time, sx, sy);
     }
 }
@@ -2307,11 +2370,11 @@ popup_grab_button(struct weston_pointer_grab *grab,
         serial = wl_display_get_serial(display);
         wl_resource_for_each(resource, resource_list) {
             wl_pointer_send_button(resource, serial,
-                                   time, button, state);
+                           time, button, state);
         }
     } else if (state == WL_POINTER_BUTTON_STATE_RELEASED &&
-               (shseat->popup_grab.initial_up ||
-                time - shseat->seat->pointer->grab_time > 500)) {
+           (shseat->popup_grab.initial_up ||
+            time - shseat->seat->pointer->grab_time > 500)) {
         popup_grab_end(grab->pointer);
     }
 
@@ -2319,10 +2382,17 @@ popup_grab_button(struct weston_pointer_grab *grab,
         shseat->popup_grab.initial_up = 1;
 }
 
+static void
+popup_grab_cancel(struct weston_pointer_grab *grab)
+{
+    popup_grab_end(grab->pointer);
+}
+
 static const struct weston_pointer_grab_interface popup_grab_interface = {
     popup_grab_focus,
     popup_grab_motion,
     popup_grab_button,
+    popup_grab_cancel,
 };
 
 static void
@@ -2657,6 +2727,7 @@ launch_screensaver(struct desktop_shell *shell)
         return;
     }
 
+    uifw_trace("launch_screensaver: launch %s", shell->screensaver.path);
     weston_client_launch(shell->compositor,
                &shell->screensaver.process,
                shell->screensaver.path,
@@ -2930,6 +3001,26 @@ move_binding(struct weston_seat *seat, uint32_t time, uint32_t button, void *dat
 }
 
 static void
+touch_move_binding(struct weston_seat *seat, uint32_t time, void *data)
+{
+    struct weston_surface *focus =
+        (struct weston_surface *) seat->touch->focus;
+    struct weston_surface *surface;
+    struct shell_surface *shsurf;
+
+    surface = weston_surface_get_main_surface(focus);
+    if (surface == NULL)
+        return;
+
+    shsurf = get_shell_surface(surface);
+    if (shsurf == NULL || shsurf->type == SHELL_SURFACE_FULLSCREEN ||
+        shsurf->type == SHELL_SURFACE_MAXIMIZED)
+        return;
+
+    surface_touch_move(shsurf, (struct weston_seat *) seat);
+}
+
+static void
 resize_binding(struct weston_seat *seat, uint32_t time, uint32_t button, void *data)
 {
     struct weston_surface *focus =
@@ -3151,10 +3242,21 @@ rotate_grab_button(struct weston_pointer_grab *grab,
     }
 }
 
+static void
+rotate_grab_cancel(struct weston_pointer_grab *grab)
+{
+    struct rotate_grab *rotate =
+        container_of(grab, struct rotate_grab, base.grab);
+
+    shell_grab_end(&rotate->base);
+    free(rotate);
+}
+
 static const struct weston_pointer_grab_interface rotate_grab_interface = {
     noop_grab_focus,
     rotate_grab_motion,
     rotate_grab_button,
+    rotate_grab_cancel,
 };
 
 static void
@@ -3290,27 +3392,15 @@ is_black_surface (struct weston_surface *es, struct weston_surface **fs_surface)
 }
 
 static void
-click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t button,
-              void *data)
+activate_binding(struct weston_seat *seat,
+         struct desktop_shell *shell,
+         struct weston_surface *focus)
 {
-    struct weston_seat *ws = (struct weston_seat *) seat;
-    struct desktop_shell *shell = data;
-    struct weston_surface *focus;
     struct weston_surface *main_surface;
 
-    uifw_debug("click_to_activate_binding: mouse=%08x(%08x) touch=%08x(%08x)",
-               (int)seat->pointer, seat->pointer ? (int)seat->pointer->focus : 0,
-               (int)seat->touch, seat->touch ? (int)seat->touch->focus : 0);
-    if (seat->pointer == NULL)  {
-        uifw_debug("click_to_activate_binding: system has no mouse, Skip");
+    if (!focus)
         return;
-    }
 
-    focus = (struct weston_surface *) seat->pointer->focus;
-    if (!focus) {
-        uifw_debug("click_to_activate_binding: no focus, Skip");
-        return;
-    }
     if (is_black_surface(focus, &main_surface))
         focus = main_surface;
 
@@ -3318,8 +3408,7 @@ click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t butt
     if (get_shell_surface_type(main_surface) == SHELL_SURFACE_NONE)
         return;
 
-    if (seat->pointer->grab == &seat->pointer->default_grab)
-        activate(shell, focus, ws);
+    activate(shell, focus, seat);
 
     /* if ico_window_mgr hook, call hook routine    */
     if (shell_hook_select)  {
@@ -3328,41 +3417,24 @@ click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t butt
 }
 
 static void
-touch_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t button,
+click_to_activate_binding(struct weston_seat *seat, uint32_t time, uint32_t button,
               void *data)
 {
-    struct weston_seat *ws = (struct weston_seat *) seat;
-    struct desktop_shell *shell = data;
-    struct weston_surface *focus;
-    struct weston_surface *main_surface;
-
-    uifw_debug("touch_to_activate_binding: mouse=%08x(%08x) touch=%08x(%08x)",
-               (int)seat->pointer, seat->pointer ? (int)seat->pointer->focus : 0,
-               (int)seat->touch, seat->touch ? (int)seat->touch->focus : 0);
-    if (seat->touch == NULL)    {
-        uifw_debug("touch_to_activate_binding: system has no touch panel, Skip");
-        return;
-    }
-
-    focus = (struct weston_surface *) seat->touch->focus;
-    if (!focus) {
-        uifw_debug("touch_to_activate_binding: no focus, Skip");
-        return;
-    }
-    if (is_black_surface(focus, &main_surface))
-        focus = main_surface;
-
-    main_surface = weston_surface_get_main_surface(focus);
-    if (get_shell_surface_type(main_surface) == SHELL_SURFACE_NONE)
+    if (seat->pointer->grab != &seat->pointer->default_grab)
         return;
 
-    if (seat->touch->grab == &seat->touch->default_grab)
-        activate(shell, focus, ws);
+    activate_binding(seat, data,
+             (struct weston_surface *) seat->pointer->focus);
+}
 
-    /* if ico_window_mgr hook, call hook routine    */
-    if (shell_hook_select)  {
-        (*shell_hook_select)(focus);
-    }
+static void
+touch_to_activate_binding(struct weston_seat *seat, uint32_t time, void *data)
+{
+    if (seat->touch->grab != &seat->touch->default_grab)
+        return;
+
+    activate_binding(seat, data,
+             (struct weston_surface *) seat->touch->focus);
 }
 
 static void
@@ -3499,7 +3571,12 @@ do_shell_fade_startup(void *data)
 {
     struct desktop_shell *shell = data;
 
-    shell_fade(shell, FADE_IN);
+    if (shell->startup_animation_type == ANIMATION_FADE)
+        shell_fade(shell, FADE_IN);
+    else if (shell->startup_animation_type == ANIMATION_NONE) {
+        weston_surface_destroy(shell->fade.surface);
+        shell->fade.surface = NULL;
+    }
 }
 
 static void
@@ -3716,7 +3793,8 @@ weston_surface_set_initial_position (struct weston_surface *surface,
      */
     panel_height = get_output_panel_height(shell, target_output);
     range_x = target_output->width - surface->geometry.width;
-    range_y = target_output->height - surface->geometry.height;
+    range_y = (target_output->height - panel_height) -
+          surface->geometry.height;
 
     if (range_x > 0)    {
         dx = random() % range_x;
@@ -3996,6 +4074,7 @@ launch_desktop_shell_process(void *data)
         weston_log("no shell program\n");
     }
     else    {
+        uifw_trace("launch_desktop_shell_process: launch %s", shell_exe);
         shell->child.client = weston_client_launch(shell->compositor,
                                                    &shell->child.process,
                                                    shell_exe,
@@ -4063,6 +4142,7 @@ bind_desktop_shell(struct wl_client *client,
 
         return;
     }
+weston_log("bind_desktop_shell: client=%08x shell=%08x\n", (int)client, (int)shell->child.client);
 
     wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
                    "permission to bind desktop_shell denied");
@@ -4530,9 +4610,18 @@ switcher_modifier(struct weston_keyboard_grab *grab, uint32_t serial,
         switcher_destroy(switcher);
 }
 
+static void
+switcher_cancel(struct weston_keyboard_grab *grab)
+{
+    struct switcher *switcher = container_of(grab, struct switcher, grab);
+
+    switcher_destroy(switcher);
+}
+
 static const struct weston_keyboard_grab_interface switcher_grab = {
     switcher_key,
     switcher_modifier,
+    switcher_cancel,
 };
 
 static void
@@ -4640,7 +4729,7 @@ debug_binding_key(struct weston_keyboard_grab *grab, uint32_t time,
 
     if (check_binding) {
         if (weston_compositor_run_debug_binding(ec, db->seat, time,
-                                                key, state)) {
+                            key, state)) {
             /* We ran a binding so swallow the press and keep the
              * grab to swallow the released too. */
             send = 0;
@@ -4682,13 +4771,23 @@ debug_binding_modifiers(struct weston_keyboard_grab *grab, uint32_t serial,
 
     wl_resource_for_each(resource, resource_list) {
         wl_keyboard_send_modifiers(resource, serial, mods_depressed,
-                                   mods_latched, mods_locked, group);
+                       mods_latched, mods_locked, group);
     }
+}
+
+static void
+debug_binding_cancel(struct weston_keyboard_grab *grab)
+{
+    struct debug_binding_grab *db = (struct debug_binding_grab *) grab;
+
+    weston_keyboard_end_grab(grab->keyboard);
+    free(db);
 }
 
 struct weston_keyboard_grab_interface debug_binding_keyboard_grab = {
     debug_binding_key,
-    debug_binding_modifiers
+    debug_binding_modifiers,
+    debug_binding_cancel,
 };
 
 static void
@@ -4847,9 +4946,9 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
     weston_compositor_add_button_binding(ec, BTN_LEFT, 0,
                          click_to_activate_binding,
                          shell);
-    weston_compositor_add_button_binding(ec, BTN_TOUCH, 0,
-                         touch_to_activate_binding,
-                         shell);
+    weston_compositor_add_touch_binding(ec, 0,
+                        touch_to_activate_binding,
+                        shell);
     weston_compositor_add_axis_binding(ec, WL_POINTER_AXIS_VERTICAL_SCROLL,
                            MODIFIER_SUPER | MODIFIER_ALT,
                            surface_opacity_binding, NULL);
@@ -4865,6 +4964,7 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
                       zoom_key_binding, NULL);
     weston_compositor_add_button_binding(ec, BTN_LEFT, mod, move_binding,
                          shell);
+    weston_compositor_add_touch_binding(ec, mod, touch_move_binding, shell);
     weston_compositor_add_button_binding(ec, BTN_MIDDLE, mod,
                          resize_binding, shell);
 
@@ -4921,14 +5021,13 @@ module_init(struct weston_compositor *ec,
     unsigned int i;
     struct wl_event_loop *loop;
 
-    shell = malloc(sizeof *shell);
+    shell = zalloc(sizeof *shell);
     if (shell == NULL)
         return -1;
 
     /* save shell management table for other plugin */
     _ico_ivi_shell = shell;
 
-    memset(shell, 0, sizeof *shell);
     shell->compositor = ec;
 
     shell->destroy_listener.notify = shell_destroy;
@@ -4952,6 +5051,7 @@ module_init(struct weston_compositor *ec,
     ec->shell_interface.set_xwayland = set_xwayland;
     ec->shell_interface.move = surface_move;
     ec->shell_interface.resize = surface_resize;
+    ec->shell_interface.set_title = set_title;
 
     wl_list_init(&shell->input_panel.surfaces);
 
@@ -5268,8 +5368,8 @@ ico_ivi_shell_hook_select(void (*hook_select)(struct weston_surface *surface))
  */
 /*--------------------------------------------------------------------------*/
 WL_EXPORT void
-ico_ivi_shell_hook_title(void (*hook_title)(struct weston_surface *surface,
-                                            const char *title))
+ico_ivi_shell_hook_title(char *(*hook_title)(struct weston_surface *surface,
+                                             const char *title))
 {
     shell_hook_title = hook_title;
 }
@@ -5318,4 +5418,3 @@ ico_ivi_shell_hook_fullscreen(int (*hook_fullscreen)
 {
     shell_hook_fullscreen = hook_fullscreen;
 }
-

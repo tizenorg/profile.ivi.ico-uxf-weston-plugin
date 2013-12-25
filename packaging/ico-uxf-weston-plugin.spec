@@ -1,13 +1,13 @@
 Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
-Version:    0.9.07
-Release:    1.1
+Version:    0.9.11
+Release:    2.1
 Group:      Graphics & UI Framework/Automotive UI
 License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(weston) >= 1.3
+BuildRequires: pkgconfig(weston) >= 1.3.0
 BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(xkbcommon) >= 0.0.578
 BuildRequires: pkgconfig(eina)
@@ -18,7 +18,7 @@ BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
 BuildRequires: mesa-devel
-Requires: weston >= 1.3
+Requires: weston >= 1.3.0
 Requires: weekeyboard
 
 %description
@@ -54,6 +54,7 @@ install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 %postun -p /sbin/ldconfig
 
 %files
+%manifest %{name}.manifest
 %defattr(-,root,root,-)
 %license COPYING
 %dir %{_libdir}/weston/
@@ -62,11 +63,13 @@ install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 %{weston_conf}/weston.ini
 
 %files devel
+%manifest %{name}.manifest
 %defattr(-,root,root,-)
 %{_includedir}/%{name}/desktop-shell-client-protocol.h
 %{_includedir}/%{name}/input-method-client-protocol.h
 %{_includedir}/%{name}/workspaces-client-protocol.h
 %{_includedir}/%{name}/ico_input_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_window_mgr-client-protocol.h
+%{_includedir}/%{name}/ico_window_mgr.h
 %{_includedir}/%{name}/ico_input_mgr.h
 %{_libdir}/libico-uxf-weston-plugin.so

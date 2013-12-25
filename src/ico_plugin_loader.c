@@ -42,7 +42,8 @@
 
 #include <weston/compositor.h>
 #include <weston/config-parser.h>
-#include "ico_ivi_common.h"
+#include "ico_ivi_common_private.h"
+#include "ico_plugin_version.h"
 
 /* Internal function to load one plugin.    */
 static void load_module(struct weston_compositor *ec, const char *path, const char *entry,
@@ -153,6 +154,8 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     char    *end;
     char    buffer[256];
 
+    weston_log("INF>ico-uxf-weston-plugin " ICO_PLUIGN_VERSION "\n");
+
     uifw_info("ico_plugin_loader: Enter(module_init)");
 
     /* get ivi debug level          */
@@ -160,7 +163,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     if (section)    {
         weston_config_section_get_int(section, "log", &debug_level, 3);
     }
-    
+
     /* get plugin module name from config file(weston_ivi_plugin.ini)   */
     section = weston_config_get_section(ec->config, "ivi-plugin", NULL, NULL);
     if (section)    {

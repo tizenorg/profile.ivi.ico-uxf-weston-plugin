@@ -17,8 +17,9 @@ export WESTON_IVI_PLUGIN_DIR="../src/.libs"
 
 # 4 Start Weston
 export XDG_CONFIG_HOME="../tests"
+export XDG_RUNTIME_DIR="/run/user/5000"
 MOD_DIR="$PWD/../src/.libs"
-/usr/bin/weston --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 $WESTON_BACKEND --log=../tests/testlog/weston.log &
+/usr/bin/weston --tty=2 --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 $WESTON_BACKEND --log=../tests/testlog/weston.log &
 sleep 1
 
 # 5 Set library path
@@ -47,7 +48,7 @@ fi
 if [ "$?" != "1" ] ; then
 	FOUND_ERR=1
 fi
-/bin/grep "error" testlog/* | /bin/grep -v "error_but_no_problem_for_test"
+/bin/grep "error" testlog/* | /bin/grep -v "error_but_no_problem_for_test" | /bin/grep -v "failed to restore kb mode:" | /bin/grep -v "failed to set KD_TEXT mode on tty:"
 if [ "$?" != "1" ] ; then
 	FOUND_ERR=1
 fi

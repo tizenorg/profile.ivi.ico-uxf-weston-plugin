@@ -6,6 +6,15 @@
       to Multi Input Manager from HomeScreen.
     </description>
 
+    <enum name="touch_event">
+      <description summary="touch event code">
+       Declare touch event code for send_input_event.
+      </description>
+      <entry name="up" value="0" summary="touch up event"/>
+      <entry name="down" value="1" summary="touch down event"/>
+      <entry name="reset" value="9" summary="reset touch focus"/>
+    </enum>
+
     <request name="add_input_app">
       <description summary="assign input switch to application">
         Assign input switch to application from HomeScreen.
@@ -126,7 +135,8 @@
       </description>
       <entry name="add" value="1" summary="add input region"/>
       <entry name="remove" value="2" summary="remove input region"/>
-      <entry name="removeall" value="4" summary="remove all input region"/>
+      <entry name="change" value="4" summary="change surface"/>
+      <entry name="removeall" value="8" summary="remove all input region"/>
     </enum>
 
     <request name="configure_input">
