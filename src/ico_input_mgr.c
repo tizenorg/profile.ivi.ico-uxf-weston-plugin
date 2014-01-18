@@ -1441,6 +1441,14 @@ ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
+    if (! pInput->app->resource) {
+        uifw_trace("ico_device_input_event: Leave(%s.%s assigned App.%s "
+                   "is not running or not interested)",
+                   pIctlMgr->device, pInput->swname, pInput->app->appid);
+        return;
+    }
+
+
     /* send event to application        */
     uifw_trace("ico_device_input_event: send event=%s.%s[%d],%d,%d to App.%s",
                pIctlMgr->device, pInput->swname, input, code, state, pInput->app->appid);
