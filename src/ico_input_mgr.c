@@ -45,6 +45,7 @@
 #include "ico_ivi_common_private.h"
 #include "ico_ivi_shell_private.h"
 #include "ico_input_mgr.h"
+#include "ico_window_mgr.h"
 #include "ico_window_mgr_private.h"
 #include "ico_window_mgr-server-protocol.h"
 #include "ico_input_mgr-server-protocol.h"
@@ -248,13 +249,31 @@ ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *resource,
                       const char *appid, const char *device, int32_t input,
                       int32_t fix, int32_t keycode)
 {
-    uifw_trace("ico_mgr_add_input_app: Enter(appid=%s,dev=%s,input=%d,fix=%d,key=%d)",
-               appid, device, input, fix, keycode);
-
+    struct uifw_client      *uclient;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
     struct ico_app_mgr      *pAppMgr;
 
+    uifw_trace("ico_mgr_add_input_app: Enter(appid=%s,dev=%s,input=%d,fix=%d,key=%d)",
+               appid, device, input, fix, keycode);
+
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_control_add_input_app: unknown client");
+            uifw_trace("ico_mgr_add_input_app: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_CONTROL_ADD_INPUT_APP) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_control_add_input_app: not permitted");
+            uifw_trace("ico_mgr_add_input_app: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
         /* not configure input controller, create   */
@@ -316,14 +335,32 @@ static void
 ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
                       const char *appid, const char *device, int32_t input)
 {
-    uifw_trace("ico_mgr_del_input_app: Enter(appid=%s,dev=%s,input=%d)",
-               appid ? appid : "(NULL)", device ? device : "(NULL)", input);
-
+    struct uifw_client      *uclient;
     int     alldev = 0;
     struct ico_ictl_mgr     *pIctlMgr = NULL;
     struct ico_ictl_input   *pInput = NULL;
     struct ico_app_mgr      *pAppMgr;
 
+    uifw_trace("ico_mgr_del_input_app: Enter(appid=%s,dev=%s,input=%d)",
+               appid ? appid : "(NULL)", device ? device : "(NULL)", input);
+
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_control_del_input_app: unknown client");
+            uifw_trace("ico_mgr_del_input_app: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_CONTROL_DEL_INPUT_APP) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_control_del_input_app: not permitted");
+            uifw_trace("ico_mgr_del_input_app: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     if ((device != NULL) && (*device != 0)) {
         pIctlMgr = find_ictlmgr_by_device(device);
         if (! pIctlMgr) {
@@ -446,6 +483,7 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                          const char *target, uint32_t surfaceid, int32_t type,
                          int32_t deviceno, uint32_t time, int32_t code, int32_t value)
 {
+    struct uifw_client      *uclient;
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
     struct uifw_input_device *dev;          /* device control table         */
     struct wl_resource      *cres;          /* event send client resource   */
@@ -466,6 +504,23 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                time, code, value);
 #endif
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_control_send_input_event: unknown client");
+            uifw_trace("ico_mgr_send_input_event: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_CONTROL_ADD_INPUT_APP) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_control_send_input_event: not permitted");
+            uifw_trace("ico_mgr_send_input_event: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     /* search pseudo input device           */
     wl_list_for_each (dev, &pInputMgr->dev_list, link)  {
         if ((dev->type == type) && (dev->no == deviceno))   break;
@@ -876,12 +931,30 @@ ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                          int32_t hotspot_y, int32_t cursor_x, int32_t cursor_y,
                          int32_t cursor_width, int32_t cursor_height, uint32_t attr)
 {
+    struct uifw_client      *uclient;
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
 
     uifw_trace("ico_mgr_set_input_region: Enter(%s %d/%d-%d/%d(%d/%d) %d/%d-%d/%d)",
                target, x, y, width, height, hotspot_x, hotspot_y,
                cursor_x, cursor_y, cursor_width, cursor_height);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_exapi_input_set_input_region: unknown client");
+            uifw_trace("ico_mgr_set_input_region: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_EXINPUT_SET_INPUT_REGION) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_exapi_input_set_input_region: not permitted");
+            uifw_trace("ico_mgr_set_input_region: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     /* get target surface           */
     usurf = ico_window_mgr_get_client_usurf(target);
     if (! usurf)    {
@@ -914,11 +987,29 @@ ico_mgr_unset_input_region(struct wl_client *client, struct wl_resource *resourc
                            const char *target, int32_t x, int32_t y,
                            int32_t width, int32_t height)
 {
-    struct uifw_win_surface     *usurf;     /* UIFW surface                 */
+    struct uifw_client      *uclient;
+    struct uifw_win_surface *usurf;         /* UIFW surface                 */
 
     uifw_trace("ico_mgr_unset_input_region: Enter(%s %d/%d-%d/%d)",
                target, x, y, width, height);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_exapi_input_unset_input_region: unknown client");
+            uifw_trace("ico_mgr_unset_input_region: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_EXINPUT_UNSET_INPUT_REGION) == 0)   {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_exapi_input_unset_input_region: not permitted");
+            uifw_trace("ico_mgr_unset_input_region: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     /* get target surface           */
     usurf = ico_window_mgr_get_client_usurf(target);
     if (! usurf)    {
@@ -1222,15 +1313,33 @@ ico_device_configure_input(struct wl_client *client, struct wl_resource *resourc
                            const char *device, int32_t type, const char *swname,
                            int32_t input, const char *codename, int32_t code)
 {
-    uifw_trace("ico_device_configure_input: Enter(client=%08x,dev=%s,type=%d,swname=%s,"
-               "input=%d,code=%d[%s])", (int)client, device, type,
-               swname ? swname : "(NULL)", input, code, codename ? codename : " ");
-
+    struct uifw_client      *uclient;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_mgr     *psameIctlMgr;
     struct ico_ictl_input   *pInput;
     struct ico_app_mgr      *pAppMgr;
 
+    uifw_trace("ico_device_configure_input: Enter(client=%08x,dev=%s,type=%d,swname=%s,"
+               "input=%d,code=%d[%s])", (int)client, device, type,
+               swname ? swname : "(NULL)", input, code, codename ? codename : " ");
+
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_device_configure_input: unknown client");
+            uifw_trace("ico_device_configure_input: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_INPUT) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_device_configure_input: not permitted");
+            uifw_trace("ico_device_configure_input: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
         /* search binded table      */
@@ -1343,14 +1452,32 @@ ico_device_configure_code(struct wl_client *client, struct wl_resource *resource
                           const char *device, int32_t input,
                           const char *codename, int32_t code)
 {
-    uifw_trace("ico_device_configure_code: Enter(client=%08x,dev=%s,input=%d,code=%d[%s])",
-               (int)client, device, input, code, codename ? codename : " ");
-
+    struct uifw_client      *uclient;
     int     i;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
     struct ico_app_mgr      *pAppMgr;
 
+    uifw_trace("ico_device_configure_code: Enter(client=%08x,dev=%s,input=%d,code=%d[%s])",
+               (int)client, device, input, code, codename ? codename : " ");
+
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_device_configure_code: unknown client");
+            uifw_trace("ico_device_configure_code: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_CODE) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_device_configure_code: not permitted");
+            uifw_trace("ico_device_configure_code: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
         uifw_warn("ico_device_configure_code: Leave(dev=%s dose not exist)", device);
@@ -1415,12 +1542,30 @@ ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                        uint32_t time, const char *device,
                        int32_t input, int32_t code, int32_t state)
 {
-    uifw_trace("ico_device_input_event: Enter(time=%d,dev=%s,input=%d,code=%d,state=%d)",
-               time, device, input, code, state);
-
+    struct uifw_client      *uclient;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
 
+    uifw_trace("ico_device_input_event: Enter(time=%d,dev=%s,input=%d,code=%d,state=%d)",
+               time, device, input, code, state);
+
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_device_input_event: unknown client");
+            uifw_trace("ico_device_input_event: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_DEVICE_INPUT_EVENT) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_input_mgr_device_input_event: not permitted");
+            uifw_trace("ico_device_input_event: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     /* find input devcie by client      */
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
@@ -1440,14 +1585,12 @@ ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                   pIctlMgr->device, pInput->swname);
         return;
     }
-
     if (! pInput->app->resource) {
         uifw_trace("ico_device_input_event: Leave(%s.%s assigned App.%s "
                    "is not running or not interested)",
                    pIctlMgr->device, pInput->swname, pInput->app->appid);
         return;
     }
-
 
     /* send event to application        */
     uifw_trace("ico_device_input_event: send event=%s.%s[%d],%d,%d to App.%s",

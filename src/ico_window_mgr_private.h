@@ -51,7 +51,8 @@ struct uifw_client  {
     int         bufsize;                    /* shared memory buffer size            */
     int         bufnum;                     /* number of shared memory buffer       */
     struct wl_list  surface_link;           /* surface list of same client          */
-    struct wl_list  link;
+    struct wl_list  link;                   /* client list                          */
+    uint32_t    api_access_control;         /* api permission flags                 */
 };
 
 /* Node information                     */
@@ -168,6 +169,13 @@ struct uifw_win_surface {
     struct uifw_win_surface *next_wshash;   /* Weston SurfaceId hash list           */
 };
 
+/* access control                       */
+#define ICO_UIFW_MAX_SUBJECT_NAME    64
+struct ico_uifw_api_permit  {
+    char     subject[ICO_UIFW_MAX_SUBJECT_NAME];    /* subject smack label  */
+    uint32_t api_permit;                            /* api permission flags */
+};
+
 /* animation operation                  */
 /* default animation                    */
 #define ICO_WINDOW_MGR_ANIMATION_NONE           0   /* no animation                 */
@@ -197,6 +205,8 @@ struct uifw_win_surface {
 #define ICO_WINDOW_MGR_ANIMATION_OPSHOWPOS 12       /* change to show with position */
 
 /* Prototype for function               */
+                                            /* find uifw_client table               */
+struct uifw_client *ico_window_mgr_find_uclient(struct wl_client *client);
                                             /* surface visible control              */
 void ico_window_mgr_set_visible(struct uifw_win_surface *usurf, const int visible);
                                             /* get client applicationId             */

@@ -1,6 +1,6 @@
 AC_PREREQ([2.68])
 AC_INIT([ico-uxf-weston-plugin],
-        [0.9.06],
+        [0.9.12],
         [https://BUG-REPORT-ADDRESS])
 
 AC_CONFIG_HEADERS([config.h])

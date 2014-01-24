@@ -26,3 +26,5 @@ config.*
 *.tar.*
 core*
 *.log
+ibus/
+wkb-ibus-cfg
