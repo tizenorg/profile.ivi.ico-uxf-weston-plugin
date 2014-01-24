@@ -1,1 +1,1 @@
-#define ICO_PLUIGN_VERSION  "0.9.11 (Dec-25-2013)"
+#define ICO_PLUIGN_VERSION  "0.9.12 (Jan-22-2014)"
