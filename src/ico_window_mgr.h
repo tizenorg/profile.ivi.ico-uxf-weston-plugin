@@ -30,6 +30,30 @@
 #ifndef _ICO_WINDOW_MGR_H_
 #define _ICO_WINDOW_MGR_H_
 
+/* API flag                             */
+#define ICO_UIFW_WINDOW_MGR_DECLARE_MANAGER         (1 << 0)
+#define ICO_UIFW_WINDOW_MGR_SET_WINDOW_LAYER        (1 << 1)
+#define ICO_UIFW_WINDOW_MGR_SET_POSITIONSIZE        (1 << 2)
+#define ICO_UIFW_WINDOW_MGR_SET_VISIBLE             (1 << 3)
+#define ICO_UIFW_WINDOW_MGR_SET_ANIMATION           (1 << 4)
+#define ICO_UIFW_WINDOW_MGR_SET_ATTRIBUTES          (1 << 5)
+#define ICO_UIFW_WINDOW_MGR_VISIBLE_ANIMATION       (1 << 6)
+#define ICO_UIFW_WINDOW_MGR_SET_ACTIVE              (1 << 7)
+#define ICO_UIFW_WINDOW_MGR_SET_LAYER_VISIBLE       (1 << 8)
+#define ICO_UIFW_WINDOW_MGR_GET_SURFACES            (1 << 9)
+#define ICO_UIFW_WINDOW_MGR_SET_MAP_BUFFER          (1 << 10)
+#define ICO_UIFW_WINDOW_MGR_MAP_SURFACE             (1 << 11)
+#define ICO_UIFW_WINDOW_MGR_UNMAP_SURFACE           (1 << 12)
+
+#define ICO_UIFW_INPUT_MGR_CONTROL_ADD_INPUT_APP    (1 << 16)
+#define ICO_UIFW_INPUT_MGR_CONTROL_DEL_INPUT_APP    (1 << 17)
+#define ICO_UIFW_INPUT_MGR_CONTROL_SEND_INPUT_EVENT (1 << 18)
+#define ICO_UIFW_EXINPUT_SET_INPUT_REGION           (1 << 19)
+#define ICO_UIFW_EXINPUT_UNSET_INPUT_REGION         (1 << 20)
+#define ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_INPUT   (1 << 21)
+#define ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_CODE    (1 << 22)
+#define ICO_UIFW_INPUT_MGR_DEVICE_INPUT_EVENT       (1 << 23)
+
 /* surface image buffer in wl_shm_pool  */
 struct ico_uifw_image_buffer    {
     uint32_t    magich;                     /* Magic number, fixed "UIFH"(no NULL terminate)*/
@@ -42,6 +66,7 @@ struct ico_uifw_image_buffer    {
     uint32_t    magict;                     /* Magic number, fixed "UIFT"(no NULL terminate)*/
     unsigned char image[4];                 /* surface image(variable length)       */
 };
+#define ICO_UIFW_IMAGE_HEADER_SIZE  ((int)sizeof(struct ico_uifw_image_buffer) - 4)
 
 #define ICO_UIFW_IMAGE_BUFFER_MAGICH    "UIFH"
 #define ICO_UIFW_IMAGE_BUFFER_MAGICT    "UIFT"

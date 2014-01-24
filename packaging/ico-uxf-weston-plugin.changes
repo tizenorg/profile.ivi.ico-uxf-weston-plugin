@@ -1,3 +1,10 @@
+* Fri Jan 24 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/release/20140109.181723@96ba865
+- 0.9.12 release
+-- bugfix: ico_input_mgr avoid crashes in case the assigned app were not running
+-- revise: live thumbnail display processing is changed into GPU un-depending
+-- revise: add access control which used SMACK for the wayland extension protocol
+-- revise: changed default config file(Weston.ini) in the same way as wston-ivi package
+
 * Wed Dec 25 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20131122.001017@2122c69
 - 0.9.11 release.
 -- bug fix: A ivi cursor layer may pick up a touch event.
@@ -13,10 +20,10 @@
 -- fix for: TIVI-1841 - virtual keyboard cannot triggered on ICO UI
             Supported virtual keyboard(weekeyboard) which worked in input panel layer
 -- fix for: TIVI-1956 - Error occurs when running weston-plugin-test testing
-			Multi Input Manager was not able to use the plural logical devices in one Device Input Controller Daemon
+                        Multi Input Manager was not able to use the plural logical devices in one Device Input Controller Daemon
 -- fix for: TIVI-1996 - App shortcut doesn't work after switching app for many times
 -- fix for: TIVI-1997 - Touch doesn't work in ico homescreen after some operations
-			When a history of application activity gesture was canceled, the liberation of the grab fell out
+                        When a history of application activity gesture was canceled, the liberation of the grab fell out
 -- support: Support of Mesa 9.2.1
 
 * Tue Oct 08 2013 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/20131004.165200@60ccba2

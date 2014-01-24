@@ -156,6 +156,12 @@ struct uifw_gl_surface_state {      /* struct gl_surface_state  */
     int y_inverted;         /* add weston 1.3.x */
 };
 
+/* API access control configuration     */
+struct ico_api_permit    {
+    struct ico_api_permit       *next;      /* access control configuration list    */
+    struct ico_uifw_api_permit  permit;     /* permission                           */
+};
+
 /* Multi Windiw Manager                 */
 struct ico_win_mgr {
     struct weston_compositor *compositor;   /* Weston compositor                    */
@@ -185,8 +191,42 @@ struct ico_win_mgr {
     uint32_t surfaceid_max;                 /* Maximum number of surface id         */
     uint16_t *surfaceid_map;                /* SurfaceId assign bit map             */
 
+    struct ico_api_permit   *access_config; /* access control configuration list    */
+    uint32_t default_access;                /* default permit APIs                  */
+
     char    shell_init;                     /* shell initialize flag                */
     char    res[3];                         /* (unused)                             */
+};
+
+/* access control api table             */
+static const struct {
+    char        name[24];                   /* API name                             */
+    uint32_t    api;                        /* API flag                             */
+} access_api_table[] = {
+    { "declare_manager", ICO_UIFW_WINDOW_MGR_DECLARE_MANAGER },
+    { "set_window_layer", ICO_UIFW_WINDOW_MGR_SET_WINDOW_LAYER },
+    { "set_positionsize", ICO_UIFW_WINDOW_MGR_SET_POSITIONSIZE },
+    { "set_visible", ICO_UIFW_WINDOW_MGR_SET_VISIBLE },
+    { "set_animation", ICO_UIFW_WINDOW_MGR_SET_ANIMATION },
+    { "set_attributes", ICO_UIFW_WINDOW_MGR_SET_ATTRIBUTES },
+    { "visible_animation", ICO_UIFW_WINDOW_MGR_VISIBLE_ANIMATION },
+    { "set_active", ICO_UIFW_WINDOW_MGR_SET_ACTIVE },
+    { "set_layer_visible", ICO_UIFW_WINDOW_MGR_SET_LAYER_VISIBLE },
+    { "get_surfaces", ICO_UIFW_WINDOW_MGR_GET_SURFACES },
+    { "set_map_buffer", ICO_UIFW_WINDOW_MGR_SET_MAP_BUFFER },
+    { "map_surface", ICO_UIFW_WINDOW_MGR_MAP_SURFACE },
+    { "unmap_surface", ICO_UIFW_WINDOW_MGR_UNMAP_SURFACE },
+
+    { "add_input_app", ICO_UIFW_INPUT_MGR_CONTROL_ADD_INPUT_APP },
+    { "del_input_app", ICO_UIFW_INPUT_MGR_CONTROL_DEL_INPUT_APP },
+    { "send_input_event", ICO_UIFW_INPUT_MGR_CONTROL_SEND_INPUT_EVENT },
+    { "set_input_region", ICO_UIFW_EXINPUT_SET_INPUT_REGION },
+    { "unset_input_region", ICO_UIFW_EXINPUT_UNSET_INPUT_REGION },
+    { "confiure_input", ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_INPUT },
+    { "confiure_code", ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_CODE },
+    { "input_event", ICO_UIFW_INPUT_MGR_DEVICE_INPUT_EVENT },
+
+    { "\0", 0 }
 };
 
 /* Internal macros                      */
@@ -199,8 +239,6 @@ struct ico_win_mgr {
                                             /* get surface table from weston surface*/
 static struct uifw_win_surface *find_uifw_win_surface_by_ws(
                     struct weston_surface *wsurf);
-                                            /* get client table from weston client  */
-static struct uifw_client* find_client_from_client(struct wl_client *client);
                                             /* assign new surface id                */
 static uint32_t generate_id(void);
                                             /* bind shell client                    */
@@ -623,7 +661,7 @@ ico_window_mgr_get_usurf_client(const uint32_t surfaceid, struct wl_client *clie
     struct uifw_client *uclient;
 
     if (surfaceid == ICO_WINDOW_MGR_V_MAINSURFACE) {
-        uclient = find_client_from_client(client);
+        uclient = ico_window_mgr_find_uclient(client);
         if (uclient)    {
             if (&uclient->surface_link != uclient->surface_link.next)   {
                 usurf = container_of (uclient->surface_link.next,
@@ -672,7 +710,7 @@ find_uifw_win_surface_by_ws(struct weston_surface *wsurf)
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   find_client_from_client: find UIFW client by wayland client
+ * @brief   ico_window_mgr_find_uclient: find UIFW client by wayland client
  *
  * @param[in]   client      Wayland client
  * @return      UIFW client table address
@@ -680,8 +718,8 @@ find_uifw_win_surface_by_ws(struct weston_surface *wsurf)
  * @retval      NULL        error(client dose not exist)
  */
 /*--------------------------------------------------------------------------*/
-static struct uifw_client*
-find_client_from_client(struct wl_client *client)
+WL_EXPORT   struct uifw_client*
+ico_window_mgr_find_uclient(struct wl_client *client)
 {
     struct uifw_client  *uclient;
 
@@ -690,7 +728,7 @@ find_client_from_client(struct wl_client *client)
             return(uclient);
         }
     }
-    uifw_trace("find_client_from_client: client.%08x is NULL", (int)client);
+    uifw_trace("ico_window_mgr_find_uclient: client.%08x is NULL", (int)client);
     return NULL;
 }
 
@@ -709,7 +747,7 @@ ico_window_mgr_get_appid(struct wl_client* client)
 {
     struct uifw_client  *uclient;
 
-    uclient = find_client_from_client(client);
+    uclient = ico_window_mgr_find_uclient(client);
 
     if (! uclient)  {
         return NULL;
@@ -827,6 +865,10 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
     pid_t   pid;
     uid_t   uid;
     gid_t   gid;
+    struct ico_api_permit   *accp;
+    char    subject[ICO_UIFW_MAX_SUBJECT_NAME];
+    int     fd;
+    int     i;
 
     uifw_trace("win_mgr_bind_client: Enter(client=%08x, shell=%08x)",
                (int)client, (int)shell);
@@ -837,7 +879,7 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
     }
 
     /* set client                           */
-    uclient = find_client_from_client(client);
+    uclient = ico_window_mgr_find_uclient(client);
     if (! uclient)  {
         /* client not exist, create client management table             */
         uifw_trace("win_mgr_bind_client: Create Client");
@@ -848,6 +890,7 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         }
         memset(uclient, 0, sizeof(struct uifw_client));
         uclient->client = client;
+        uclient->api_access_control = _ico_win_mgr->default_access;
         wl_list_init(&uclient->surface_link);
         newclient = 1;
     }
@@ -861,6 +904,46 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         uclient->pid = (int)pid;
         /* get applicationId from AppCore(AUL)  */
         win_mgr_get_client_appid(uclient);
+
+        /* get SMACK subject label  */
+        if (! _ico_win_mgr->access_config)  {
+            /* no access control, permit all APIs   */
+            uclient->api_access_control = 0xffffffff;
+        }
+        else    {
+            sprintf(subject, "/proc/%d/attr/current", (int)pid);
+            fd = open(subject, O_RDONLY);
+            if (fd < 0) {
+                uifw_warn("win_mgr_bind_client: pid=%d(%s) not exist current",
+                          pid, uclient->appid);
+            }
+            else    {
+                i = read(fd, subject, sizeof(subject)-1);
+                if (i > 0)  {
+                    subject[i] = 0;
+                    accp = _ico_win_mgr->access_config;
+                    while (accp)    {
+                        if (strcmp(subject, accp->permit.subject) == 0) {
+                            uclient->api_access_control |= accp->permit.api_permit;
+                            break;
+                        }
+                        accp = accp->next;
+                    }
+                }
+                else    {
+                    i = errno;
+                    uifw_trace("win_mgr_bind_client: pid=%d(%s) current read error<%d>",
+                               pid, uclient->appid, i);
+                    if (i == EINVAL)    {
+                        /* SMACK not active     */
+                        uclient->api_access_control = 0xffffffff;
+                    }
+                }
+                close(fd);
+            }
+        }
+        uifw_trace("win_mgr_bind_client: pid=%d(%s) access_control=%08x",
+                   pid, uclient->appid, uclient->api_access_control);
 
         if (newclient > 0)  {
             wl_list_insert(&_ico_win_mgr->client_list, &uclient->link);
@@ -887,7 +970,7 @@ win_mgr_unbind_client(struct wl_client *client)
 
     uifw_trace("win_mgr_unbind_client: Enter(client=%08x)", (int)client);
 
-    uclient = find_client_from_client(client);
+    uclient = ico_window_mgr_find_uclient(client);
     if (uclient)    {
         /* Client exist, Destory client management table             */
         wl_list_remove(&uclient->link);
@@ -1209,12 +1292,12 @@ win_mgr_register_surface(int layertype, struct wl_client *client,
     }
 
     /* set client                           */
-    usurf->uclient = find_client_from_client(client);
+    usurf->uclient = ico_window_mgr_find_uclient(client);
     if (! usurf->uclient)  {
         /* client not exist, create client management table */
         uifw_trace("win_mgr_register_surface: Create Client");
         win_mgr_bind_client(client, NULL);
-        usurf->uclient = find_client_from_client(client);
+        usurf->uclient = ico_window_mgr_find_uclient(client);
         if (! usurf->uclient)  {
             uifw_error("win_mgr_register_surface: No Memory");
             return;
@@ -1264,7 +1347,8 @@ win_mgr_register_surface(int layertype, struct wl_client *client,
         layer = _ico_ivi_cursor_layer;
         break;
     default:
-        if (_ico_win_mgr->num_manager > 0)  {
+        if ((_ico_win_mgr->num_manager > 0) ||
+            (layertype == LAYER_TYPE_INPUTPANEL))   {
             layer = _ico_ivi_default_layer;
         }
         else    {
@@ -1696,7 +1780,7 @@ win_mgr_set_layer(struct uifw_win_surface *usurf, const uint32_t layer)
 /**
  * @brief   win_mgr_set_active: set(or change) active surface
  *
- * @param[in]   usurf       UIFW surface
+ * @param[in]   usurf       UIFW surface (if NULL, change to inactive)
  * @param[in]   target      target device
  * @return      none
  */
@@ -1711,7 +1795,7 @@ win_mgr_set_active(struct uifw_win_surface *usurf, const int target)
     int     savetp, i;
 #endif              /* pointer grab can not release */
 
-    uifw_trace("win_mgr_set_active: Enter(%08x,%x)", (int)usurf, target);
+    uifw_trace("win_mgr_set_active: Enter(%08x,%x)", usurf ? usurf->surfaceid : 0, target);
 
     if ((usurf) && (usurf->shsurf) && (usurf->surface)) {
         surface = usurf->surface;
@@ -1828,15 +1912,19 @@ win_mgr_set_active(struct uifw_win_surface *usurf, const int target)
 #endif              /* pointer grab can not release */
         if ((object & ICO_WINDOW_MGR_ACTIVE_KEYBOARD) && (seat->keyboard))  {
             if (surface)    {
+#if 0               /* pointer grab can not release */
                 if (seat->keyboard->focus != surface)    {
+#endif              /* pointer grab can not release */
                     weston_keyboard_set_focus(seat->keyboard, surface);
                     uifw_trace("win_mgr_set_active: keyboard change surface(%08x=>%08x)",
                                (int)seat->keyboard->focus, (int)surface);
+#if 0               /* pointer grab can not release */
                 }
                 else    {
                     uifw_trace("win_mgr_set_active: keyboard nochange surface(%08x)",
                                (int)surface);
                 }
+#endif              /* pointer grab can not release */
             }
             else    {
                 uifw_trace("win_mgr_set_active: keyboard reset surface(%08x)",
@@ -1845,7 +1933,7 @@ win_mgr_set_active(struct uifw_win_surface *usurf, const int target)
             }
         }
     }
-    uifw_trace("win_mgr_set_active: Leave(%08x)", (int)usurf);
+    uifw_trace("win_mgr_set_active: Leave");
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1885,9 +1973,18 @@ uifw_declare_manager(struct wl_client *client, struct wl_resource *resource, int
     uifw_trace("uifw_declare_manager: Enter client=%08x manager=%d",
                (int)client, manager);
 
-    uclient = find_client_from_client(client);
+    /* check for access control         */
+    uclient = ico_window_mgr_find_uclient(client);
     if (! uclient)  {
+        wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                               "ico_window_mgr_declare_manager: unknown client");
         uifw_trace("uifw_declare_manager: Leave(unknown client=%08x)", (int)client);
+        return;
+    }
+    if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_DECLARE_MANAGER) == 0)   {
+        wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                               "ico_window_mgr_declare_manager: not permitted");
+        uifw_trace("uifw_declare_manager: Leave(%s not permitted)", uclient->appid);
         return;
     }
 
@@ -1945,6 +2042,9 @@ static void
 uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
                       uint32_t surfaceid, uint32_t layer)
 {
+    struct uifw_client      *uclient;
+    struct uifw_win_surface *usurf;
+
     if (layer == ICO_WINDOW_MGR_LAYERTYPE_BACKGROUND)  {
         layer = _ico_ivi_background_layer;
     }
@@ -1961,7 +2061,24 @@ uifw_set_window_layer(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_window_layer: Enter res=%08x surfaceid=%08x layer=%d",
                (int)resource, surfaceid, layer);
 
-    struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_window_layer: unknown client");
+            uifw_trace("uifw_set_window_layer: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_WINDOW_LAYER) == 0)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_window_layer: not permitted");
+            uifw_trace("uifw_set_window_layer: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
+    usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     if (! usurf)    {
         uifw_trace("uifw_set_window_layer: Leave(No Surface(id=%08x))", surfaceid);
@@ -2007,6 +2124,23 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_positionsize: Enter surf=%08x node=%x x/y/w/h=%d/%d/%d/%d flag=%x",
                surfaceid, node, x, y, width, height, flags);
 
+    /* check for access control         */
+    uclient = ico_window_mgr_find_uclient(client);
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_positionsize: unknown client");
+            uifw_trace("uifw_set_positionsize: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_POSITIONSIZE) == 0)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_positionsize: not permitted");
+            uifw_trace("uifw_set_positionsize: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
     if (! usurf)    {
         uifw_trace("uifw_set_positionsize: Leave(surf=%08x NOT Found)", surfaceid);
@@ -2015,8 +2149,6 @@ uifw_set_positionsize(struct wl_client *client, struct wl_resource *resource,
     oldx = usurf->x;
     oldy = usurf->y;
     oldnode = usurf->node_tbl;
-
-    uclient = find_client_from_client(client);
 
     usurf->disable = 0;
     if (((int)node) >= _ico_num_nodes)  {
@@ -2174,6 +2306,23 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_visible: Enter(surf=%08x,%d,%d,%x)",
                surfaceid, visible, raise, flags);
 
+    /* check for access control         */
+    uclient = ico_window_mgr_find_uclient(client);
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_visible: unknown client");
+            uifw_trace("uifw_set_visible: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_POSITIONSIZE) == 0)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_visible: not permitted");
+            uifw_trace("uifw_set_visible: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
     if ((! usurf) || (! usurf->surface))    {
         uifw_trace("uifw_set_visible: Leave(Surface Not Exist)");
@@ -2181,20 +2330,14 @@ uifw_set_visible(struct wl_client *client, struct wl_resource *resource,
     }
     oldvisible = ico_window_mgr_is_visible(usurf);
 
-    uclient = find_client_from_client(client);
-    if (uclient)    {
-        if ((surfaceid != ICO_WINDOW_MGR_V_MAINSURFACE) &&
-            (uclient->manager == 0) && (uclient->privilege == 0))   {
-            uifw_trace("uifw_set_visible: Request from App(%s), not Manager",
-                       uclient->appid);
-            uclient = NULL;
-        }
-        else    {
-            uifw_trace("uifw_set_visible: Request from Manager(%s)", uclient->appid);
-        }
+    if ((surfaceid != ICO_WINDOW_MGR_V_MAINSURFACE) &&
+        (uclient->manager == 0) && (uclient->privilege == 0))   {
+        uifw_trace("uifw_set_visible: Request from App(%s), not Manager",
+                   uclient ? uclient->appid : "");
+        uclient = NULL;
     }
     else    {
-        uifw_trace("uifw_set_visible: Request from Unknown App, not Manager");
+        uifw_trace("uifw_set_visible: Request from Manager(%s)", uclient->appid);
     }
 
     restack = 0;
@@ -2356,12 +2499,30 @@ static void
 uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
                    uint32_t surfaceid, int32_t type, const char *animation, int32_t time)
 {
-    int animaid;
+    struct uifw_client *uclient;
+    int     animaid;
     struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     uifw_trace("uifw_set_transition: surf=%08x,type=%x,anim=%s,time=%d",
                surfaceid, type, animation, time);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_animation: unknown client");
+            uifw_trace("uifw_set_animation: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_ANIMATION) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_animation: not permitted");
+            uifw_trace("uifw_set_animation: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     if (usurf) {
         if ((*animation != 0) && (*animation != ' '))   {
             animaid = ico_get_animation_name(animation);
@@ -2436,10 +2597,28 @@ static void
 uifw_set_attributes(struct wl_client *client, struct wl_resource *resource,
                     uint32_t surfaceid, uint32_t attributes)
 {
+    struct uifw_client *uclient;
     struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     uifw_trace("uifw_set_attributes: Enter(surf=%08x,attributes=%x)", surfaceid, attributes);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_attributes: unknown client");
+            uifw_trace("uifw_set_attributes: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_ATTRIBUTES) == 0)    {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_attributes: not permitted");
+            uifw_trace("uifw_set_attributes: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     if (usurf) {
         usurf->attributes = attributes;
         if ((attributes & (ICO_WINDOW_MGR_ATTR_ALIGN_LEFT|ICO_WINDOW_MGR_ATTR_ALIGN_RIGHT)) ==
@@ -2476,11 +2655,29 @@ uifw_visible_animation(struct wl_client *client, struct wl_resource *resource,
                        uint32_t surfaceid, int32_t visible,
                        int32_t x, int32_t y, int32_t width, int32_t height)
 {
+    struct uifw_client *uclient;
     struct uifw_win_surface *usurf;
 
     uifw_trace("uifw_visible_animation: Enter(%08x,%d,x/y=%d/%d,w/h=%d/%d)",
                surfaceid, visible, x, y, width, height);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_visible_animation: unknown client");
+            uifw_trace("uifw_visible_animation: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_VISIBLE_ANIMATION) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_visible_animation: not permitted");
+            uifw_trace("uifw_visible_animation: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
     if ((! usurf) || (! usurf->surface))    {
@@ -2517,10 +2714,28 @@ static void
 uifw_set_active(struct wl_client *client, struct wl_resource *resource,
                 uint32_t surfaceid, int32_t active)
 {
+    struct uifw_client *uclient;
     struct uifw_win_surface *usurf;
 
     uifw_trace("uifw_set_active: Enter(surf=%08x,active=%x)", surfaceid, active);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_active: unknown client");
+            uifw_trace("uifw_set_active: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_ACTIVE) == 0)    {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_active: not permitted");
+            uifw_trace("uifw_set_active: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     if ((surfaceid > 0) &&
         ((active & (ICO_WINDOW_MGR_ACTIVE_POINTER|ICO_WINDOW_MGR_ACTIVE_KEYBOARD)) != 0)) {
         usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
@@ -2640,6 +2855,7 @@ static void
 uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
                        uint32_t layer, int32_t visible)
 {
+    struct uifw_client      *uclient;
     struct uifw_win_layer   *el;
     struct uifw_win_layer   *new_el;
     struct uifw_win_surface *usurf;
@@ -2663,9 +2879,25 @@ uifw_set_layer_visible(struct wl_client *client, struct wl_resource *resource,
     else if (layer == ICO_WINDOW_MGR_LAYERTYPE_STARTUP)    {
         layer = _ico_ivi_startup_layer;
     }
-
     uifw_trace("uifw_set_layer_visible: Enter(layer=%d, visilbe=%d)", layer, visible);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_layer_visible: unknown client");
+            uifw_trace("uifw_set_layer_visible: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_LAYER_VISIBLE) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_set_layer_visible: not permitted");
+            uifw_trace("uifw_set_layer_visible: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     /* Search Layer                             */
     wl_list_for_each (el, &_ico_win_mgr->ivi_layer_list, link) {
         if (el->layer == layer) break;
@@ -2749,6 +2981,21 @@ uifw_get_surfaces(struct wl_client *client, struct wl_resource *resource,
     uint32_t            *up;
 
     uifw_trace("uifw_get_surfaces: Enter(appid=%s, pid=%d)", appid ? appid : " ", pid);
+
+    /* check for access control         */
+    uclient = ico_window_mgr_find_uclient(client);
+    if (! uclient)  {
+        wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                               "ico_window_mgr_get_surfaces: unknown client");
+        uifw_trace("uifw_get_surfaces: Leave(unknown client=%08x)", (int)client);
+        return;
+    }
+    if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_GET_SURFACES) == 0)  {
+        wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                               "ico_window_mgr_get_surfaces: not permitted");
+        uifw_trace("uifw_get_surfaces: Leave(%s not permitted)", uclient->appid);
+        return;
+    }
 
     wl_array_init(&reply);
 
@@ -2867,6 +3114,7 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
     struct uifw_intel_region  *dri_region;
     struct uifw_gl_surface_state *gl_state;
     struct weston_surface   *es;
+    struct wl_shm_buffer    *shm_buffer;
     uint32_t    eglname;
     int         width;
     int         height;
@@ -2928,6 +3176,19 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
         }
         else    {
             event = 0;
+        }
+    }
+    else if (sm->type == ICO_WINDOW_MGR_MAP_TYPE_SHM)   {
+        if (es->buffer_ref.buffer != NULL)  {
+            shm_buffer = wl_shm_buffer_get(es->buffer_ref.buffer->resource);
+            if (shm_buffer) {
+                format = wl_shm_buffer_get_format(shm_buffer);
+                if (format != WL_SHM_FORMAT_ARGB8888)   {
+                    uifw_trace("win_mgr_change_mapsurface: %08x shm_buffer type %x",
+                               sm->usurf->surfaceid, format);
+                    event = ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP;
+                }
+            }
         }
     }
 
@@ -3091,7 +3352,7 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
                 }
                 sm->width = width;
                 sm->height = height;
-                sm->stride = width;
+                sm->stride = width * 4;
                 sm->format = EGL_TEXTURE_RGBA;
                 if (event != 0) {
                     /* read pixel           */
@@ -3183,10 +3444,18 @@ uifw_set_map_buffer(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("uifw_set_map_buffer: Enter(%s,%d,%d)",
                shmname ? shmname : "(null)", bufsize, bufnum);
 
-    uclient = find_client_from_client(client);
-    if ((! uclient) || (! uclient->mgr))    {
-        /* client dose not exist, error         */
-        uifw_trace("uifw_set_map_buffer: Leave(client=%08x dose not exist)", (int)client);
+    /* check for access control         */
+    uclient = ico_window_mgr_find_uclient(client);
+    if (! uclient)  {
+        wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                               "ico_window_mgr_set_map_buffer: unknown client");
+        uifw_trace("uifw_set_map_buffer: Leave(unknown client=%08x)", (int)client);
+        return;
+    }
+    if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_SET_MAP_BUFFER) == 0)    {
+        wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                               "ico_window_mgr_set_map_buffer: not permitted");
+        uifw_trace("uifw_set_map_buffer: Leave(%s not permitted)", uclient->appid);
         return;
     }
 
@@ -3251,12 +3520,36 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
     struct weston_surface       *es;
     struct uifw_surface_map     *sm;
     struct weston_buffer        *buffer;
+    struct wl_shm_buffer        *shm_buffer;
     struct uifw_client          *uclient;
     struct uifw_drm_buffer      *drm_buffer;
     struct uifw_gl_surface_state *gl_state;
     int     maptype;
+    int     format;
 
     uifw_trace("uifw_map_surface: Enter(surface=%08x,fps=%d)", surfaceid, framerate);
+
+    /* check for access control         */
+    uclient = ico_window_mgr_find_uclient(client);
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_map_surface: unknown client");
+            uifw_trace("uifw_map_surface: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_MAP_SURFACE) == 0)   {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_map_surface: not permitted");
+            uifw_trace("uifw_map_surface: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
+    if (! uclient)  {
+        uifw_trace("uifw_map_surface: Leave(unknown client=%08x)", (int)client);
+        return;
+    }
 
     usurf = ico_window_mgr_get_usurf(surfaceid);
     if (! usurf)    {
@@ -3264,14 +3557,6 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
         ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
                                         surfaceid, 1, 0, 0, 0, 0, 0);
         uifw_trace("uifw_map_surface: Leave(surface=%08x dose not exist)", surfaceid);
-        return;
-    }
-    uclient = find_client_from_client(client);
-    if ((! uclient) || (! uclient->mgr))    {
-        /* client dose not exist, error         */
-        ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
-                                        surfaceid, 2, 0, 0, 0, 0, 0);
-        uifw_trace("uifw_map_surface: Leave(client=%08x dose not exist)", (int)client);
         return;
     }
 
@@ -3284,33 +3569,52 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
         uifw_trace("uifw_map_surface: Leave(surface(%08x) has no surface)", surfaceid);
         return;
     }
+    buffer = es->buffer_ref.buffer;
 
     /* check buffer type        */
     gl_state = (struct uifw_gl_surface_state *)es->renderer_state;
     if ((_ico_ivi_gpu_type == ICO_GPUTYPE_NOACCELERATION) ||
         (gl_state == NULL) || (gl_state->buffer_type == BUFFER_TYPE_SHM))   {
-        /* wl_shm_buffer support ReadPixels     */
+        /* No Acceleration or wl_shm_buffer support ReadPixels  */
         if ((_ico_win_mgr->compositor->renderer == NULL) ||
-            (_ico_win_mgr->compositor->renderer->read_surface_pixels == NULL))  {
+            (_ico_win_mgr->compositor->renderer->read_surface_pixels == NULL) ||
+            (uclient->shmbuf == NULL))  {
             ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
                                             surfaceid, 4, 0, 0, 0, 0, 0);
             uifw_trace("uifw_map_surface: Leave(surface(%08x) not support ReadPixels)",
                        surfaceid);
             return;
         }
-        else if ((gl_state != NULL) && (gl_state->buffer_type == BUFFER_TYPE_SHM) &&
-                (es->buffer_ref.buffer != NULL))    {
-            maptype = ICO_WINDOW_MGR_MAP_TYPE_SHM;
+        if ((gl_state != NULL) && (gl_state->buffer_type == BUFFER_TYPE_SHM))   {
+            maptype = -1;
+            format = 0xff;
+            if (ico_ivi_optionflag() & ICO_IVI_OPTION_SUPPORT_SHM)  {
+                if (buffer != NULL) {
+                    shm_buffer = wl_shm_buffer_get(buffer->resource);
+                    if (shm_buffer) {
+                        format = wl_shm_buffer_get_format(shm_buffer);
+                        uifw_detail("uifw_map_surface: %08x shm_buffer type %x",
+                                    surfaceid, format);
+                        if (format == WL_SHM_FORMAT_ARGB8888)   {
+                            maptype = ICO_WINDOW_MGR_MAP_TYPE_SHM;
+                        }
+                    }
+                }
+                else    {
+                    maptype = ICO_WINDOW_MGR_MAP_TYPE_SHM;
+                }
+            }
+            if (maptype < 0)    {
+                ico_window_mgr_send_map_surface(resource,
+                                                ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
+                                                surfaceid, 5, 0, 0, 0, 0, 0);
+                uifw_trace("uifw_map_surface: Leave(surface(%08x) not support shm_buffer(%x))",
+                           surfaceid, format);
+                return;
+            }
         }
         else    {
             maptype = ICO_WINDOW_MGR_MAP_TYPE_PIXEL;
-        }
-        if (uclient->shmbuf == NULL)    {
-            /* ReadPixcels but client has no shared memory buffer   */
-            ico_window_mgr_send_map_surface(resource, ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR,
-                                            surfaceid, 5, 0, 0, 0, 0, 0);
-            uifw_trace("uifw_map_surface: Leave(client has no shared memory buffer)");
-            return;
         }
     }
     else    {
@@ -3379,12 +3683,11 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
-    buffer = es->buffer_ref.buffer;
     if (buffer != NULL) {
         sm->width = buffer->width;
         sm->height = buffer->height;
         if (maptype != ICO_WINDOW_MGR_MAP_TYPE_EGL) {
-            sm->stride = sm->width;
+            sm->stride = sm->width * 4;
             sm->format = EGL_TEXTURE_RGBA;
             if ((sm->width > 0) && (sm->height > 0))    {
                 sm->initflag = 1;
@@ -3423,7 +3726,7 @@ uifw_map_surface(struct wl_client *client, struct wl_resource *resource,
     else if (maptype != ICO_WINDOW_MGR_MAP_TYPE_EGL)    {
         sm->width = usurf->client_width;
         sm->height = usurf->client_height;
-        sm->stride = sm->width;
+        sm->stride = sm->width * 4;
         sm->format = EGL_TEXTURE_RGBA;
         if ((sm->width > 0) && (sm->height > 0))    {
             sm->initflag = 1;
@@ -3466,6 +3769,23 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
 
     uifw_trace("uifw_unmap_surface: Enter(surface=%08x)", surfaceid);
 
+    /* check for access control         */
+    if (resource != NULL)   {
+        /* resource is NULL, internal use   */
+        uclient = ico_window_mgr_find_uclient(client);
+        if (! uclient)  {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_unmap_surface: unknown client");
+            uifw_trace("uifw_unmap_surface: Leave(unknown client=%08x)", (int)client);
+            return;
+        }
+        if ((uclient->api_access_control & ICO_UIFW_WINDOW_MGR_UNMAP_SURFACE) == 0) {
+            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
+                                   "ico_window_mgr_unmap_surface: not permitted");
+            uifw_trace("uifw_unmap_surface: Leave(%s not permitted)", uclient->appid);
+            return;
+        }
+    }
     usurf = ico_window_mgr_get_usurf(surfaceid);
     if (! usurf)    {
         /* surface dose not exist, error        */
@@ -3473,7 +3793,7 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
         return;
     }
     if (client) {
-        uclient = find_client_from_client(client);
+        uclient = ico_window_mgr_find_uclient(client);
         if ((! uclient) || (! uclient->mgr))    {
             /* client dose not exist, error         */
             uifw_trace("uifw_unmap_surface: Leave(client=%08x dose not exist)", (int)client);
@@ -4544,10 +4864,10 @@ bind_ico_win_mgr(struct wl_client *client,
     }
 
     /* Create client management tabel       */
-    uclient = find_client_from_client(client);
+    uclient = ico_window_mgr_find_uclient(client);
     if (! uclient)  {
         win_mgr_bind_client(client, NULL);
-        uclient = find_client_from_client(client);
+        uclient = ico_window_mgr_find_uclient(client);
     }
 
     /* Manager                              */
@@ -5032,8 +5352,12 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     struct weston_output *output;
     struct weston_config_section *section;
     char    *displayno = NULL;
-    char    *p;
+    char    *p, *pp;
     char    *wrkstrp;
+    char    wkbuf[ICO_UIFW_MAX_SUBJECT_NAME];
+    struct ico_api_permit   *accp;
+    struct ico_api_permit   *accp_next;
+    int     same_accp;
     struct wl_event_loop *loop;
 
     uifw_info("ico_window_mgr: Enter(module_init)");
@@ -5144,6 +5468,91 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     }
 
     memset(_ico_win_mgr, 0, sizeof(struct ico_win_mgr));
+
+    /* get access control configuration         */
+    section = weston_config_get_section(ec->config, "ivi-access-control", NULL, NULL);
+    accp_next = NULL;
+    if (section)    {
+        for (idx = 0; ; idx++)  {
+            sprintf(wkbuf, "access_api.%d", idx);
+            weston_config_section_get_string(section, wkbuf, &wrkstrp, NULL);
+            if (wrkstrp == NULL)    {
+                if (idx <= 0)   continue;
+                break;
+            }
+            p = wrkstrp;
+            for (i = 0; i < (ICO_UIFW_MAX_SUBJECT_NAME-1); i++, p++) {
+                if ((*p == 0) || (*p == ';'))   break;
+                wkbuf[i] = *p;
+            }
+            if ((i <= 0) || (*p == 0))  {
+                uifw_error("ico_window_mgr: illegal config format[%s]", wrkstrp);
+                free(wrkstrp);
+                continue;
+            }
+            wkbuf[i] = 0;
+            accp = _ico_win_mgr->access_config;
+            while (accp)   {
+                if (strcmp(wkbuf, accp->permit.subject) == 0)  break;
+                accp = accp->next;
+            }
+            if (! accp) {
+                accp = (struct ico_api_permit *) malloc(sizeof(struct ico_api_permit));
+                if (! accp) {
+                    uifw_error("ico_window_mgr: malloc failed");
+                    continue;
+                }
+                same_accp = 0;
+                memset(accp, 0, sizeof(struct ico_api_permit));
+                strcpy(accp->permit.subject, wkbuf);
+            }
+            else    {
+                same_accp = 1;
+            }
+
+            while (1)   {
+                pp = p + 1;
+                for (p++; (*p != 0) && (*p != ','); p++)    ;
+                if ((strcasecmp(pp, "all") == 0) || (strcmp(pp, "*") == 0)) {
+                    accp->permit.api_permit = 0xffffffff;
+                    break;
+                }
+                if (strncasecmp(pp, "ico_", 4) == 0)            pp += 4;
+                if (strncasecmp(pp, "window_mgr_", 11) == 0)    pp += 11;
+                if (strncasecmp(pp, "input_mgr_", 10) == 0)     pp += 10;
+                if (strncasecmp(pp, "exinput_", 8) == 0)        pp += 8;
+                for (i = 0; access_api_table[i].name[0]; i++)   {
+                    if (strncasecmp(pp, access_api_table[i].name, p - pp) == 0) {
+                        accp->permit.api_permit |= access_api_table[i].api;
+                        break;
+                    }
+                }
+                if (*p == 0)    break;
+            }
+            free(wrkstrp);
+            if (same_accp == 0) {
+                if (accp_next)  {
+                    accp_next->next = accp;
+                }
+                else    {
+                    _ico_win_mgr->access_config = accp;
+                }
+                accp_next = accp;
+            }
+            if (strcmp(accp->permit.subject, "*") == 0) {
+                _ico_win_mgr->default_access |= accp->permit.api_permit;
+            }
+        }
+        accp = _ico_win_mgr->access_config;
+        while (accp)   {
+            accp->permit.api_permit |= _ico_win_mgr->default_access;
+            accp = accp->next;
+        }
+    }
+    else    {
+        uifw_trace("ico_window_mgr: no access control in weston.ini");
+    }
+
     _ico_win_mgr->surfaceid_map = (uint16_t *) malloc(INIT_SURFACE_IDS/8);
     if (! _ico_win_mgr->surfaceid_map)  {
         uifw_error("ico_window_mgr: malloc failed");
@@ -5281,17 +5690,18 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     uifw_info("ico_window_mgr: option flag=0x%04x log level=%d debug flag=0x%04x",
               _ico_ivi_option_flag, _ico_ivi_debug_level & 0x0ffff,
               (_ico_ivi_debug_level >> 16) & 0x0ffff);
+    accp = _ico_win_mgr->access_config;
+    while (accp)    {
+        uifw_info("ico_window_mgr: access_control %s=%08x",
+                  accp->permit.subject, accp->permit.api_permit);
+        accp = accp->next;
+    }
 
     /* get GPU type for H/W support of the thumbnail acquisition    */
-    if (ico_ivi_optionflag() & ICO_IVI_OPTION_GPU_NODEPEND) {
+    if ((ico_ivi_optionflag() & ICO_IVI_OPTION_GPU_DEPEND) == 0)    {
         /* can not use GPU H/W dependent acceleration   */
         _ico_ivi_gpu_type = ICO_GPUTYPE_NOACCELERATION;
         uifw_info("ico_window_mgr: GPU type=No Acceleration by option flag");
-    }
-    else if (ico_ivi_optionflag() & ICO_IVI_OPTION_GPU_DEPENDINTEL) {
-        /* use Intel GPU H/W dependent acceleration     */
-        _ico_ivi_gpu_type = ICO_GPUTYPE_INTEL_SANDYBRIDGE;
-        uifw_info("ico_window_mgr: GPU type=Acceleration Intel GPU by option flag");
     }
     else    {
         _ico_ivi_gpu_type = ICO_GPUTYPE_NOACCELERATION;
