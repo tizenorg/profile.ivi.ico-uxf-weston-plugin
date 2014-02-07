@@ -1,7 +1,7 @@
 /*
  * Copyright © 2010-2011 Intel Corporation
  * Copyright © 2008-2011 Kristian Høgsberg
- * Copyright © 2013 TOYOTA MOTOR CORPORATION.
+ * Copyright © 2013-2014 TOYOTA MOTOR CORPORATION.
  *
  * Permission to use, copy, modify, distribute, and sell this software and
  * its documentation for any purpose is hereby granted without fee, provided
@@ -72,7 +72,7 @@ struct  uifw_win_layer  {
     char        visible;                    /* visibility                           */
     char        layertype;                  /* layer type                           */
     char        res[2];                     /* (unused)                             */
-    struct wl_list surface_list;            /* Surfacae list                        */
+    struct wl_list surface_list;            /* Surface list                         */
     struct wl_list link;                    /* Link pointer for layer list          */
 };
 
@@ -238,6 +238,14 @@ void ico_window_mgr_touch_layer(int omit);
 int ico_window_mgr_is_visible(struct uifw_win_surface *usurf);
                                             /* set active surface                   */
 void ico_window_mgr_active_surface(struct weston_surface *surface);
+                                            /* get buffer width                     */
+int ico_ivi_surface_buffer_width(struct weston_surface *es);
+                                            /* get buffer height                    */
+int ico_ivi_surface_buffer_height(struct weston_surface *es);
+                                            /* get buffer size                      */
+void ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height);
+                                            /* get surface primary view             */
+struct weston_view *ico_ivi_get_primary_view(struct uifw_win_surface *usurf);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
                                             /* set surface attribute change hook    */

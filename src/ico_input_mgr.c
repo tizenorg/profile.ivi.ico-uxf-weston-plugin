@@ -1,7 +1,7 @@
 /*
  * Copyright © 2010-2011 Intel Corporation
  * Copyright © 2008-2011 Kristian Høgsberg
- * Copyright © 2013 TOYOTA MOTOR CORPORATION.
+ * Copyright © 2013-2014 TOYOTA MOTOR CORPORATION.
  *
  * Permission to use, copy, modify, distribute, and sell this software and
  * its documentation for any purpose is hereby granted without fee, provided
@@ -127,7 +127,7 @@ struct uifw_input_device    {
     int         pend_y;                     /* pending Y coordinate                 */
     uint16_t    node;                       /* display number                       */
     uint16_t    pending;                    /* pending flag                         */
-    struct weston_surface *grab;            /* current grab surface                 */
+    struct weston_view *grab;               /* current grab surface view            */
 };
 
 /* Input Region Table           */
@@ -494,7 +494,7 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
     wl_fixed_t  fix_x;                      /* wayland X coordinate         */
     wl_fixed_t  fix_y;                      /* wayland Y coordinate         */
     wl_fixed_t  dx, dy;                     /* relative coordinate (dummy)  */
-    struct weston_surface   *grabsave;      /* real grab surface            */
+    struct weston_view  *grabsave;          /* real grab surface view       */
     int         keyboard_active;            /* keyborad active surface flag */
 
 #if 0           /* too many log */
@@ -691,10 +691,10 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
         case EVENT_MOTION:
             if ((type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH) &&
                 (pInputMgr->seat->touch))   {
-                if (pInputMgr->seat->num_tp > 10)   {
+                if (pInputMgr->seat->touch->num_tp > 10)   {
                     uifw_debug("ico_mgr_send_input_event: num=%d reset",
-                               pInputMgr->seat->num_tp);
-                    pInputMgr->seat->num_tp = 0;        /* safty gard   */
+                               pInputMgr->seat->touch->num_tp);
+                    pInputMgr->seat->touch->num_tp = 0;     /* safty gard   */
                 }
                 grabsave = pInputMgr->seat->touch->focus;
                 uifw_debug("ico_mgr_send_input_event: MOTION(%d/%d) grab %08x org %08x",
@@ -719,10 +719,10 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
             uifw_trace("ico_mgr_send_input_event: notify_button(%d,%d)", code, value);
             if (pInputMgr->seat->pointer)   {
                 if (value)  {
-                    dev->grab = weston_compositor_pick_surface(
+                    dev->grab = weston_compositor_pick_view(
                                     pInputMgr->compositor, fix_x, fix_y, &dx, &dy);
                     weston_pointer_set_focus(pInputMgr->seat->pointer, dev->grab, dx, dy);
-                    ico_window_mgr_active_surface(dev->grab);
+                    ico_window_mgr_active_surface(dev->grab->surface);
                 }
                 else    {
                     dev->grab = NULL;
@@ -741,16 +741,16 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                 dev->grab = NULL;
                 if (grabsave)   {
                     weston_touch_set_focus(pInputMgr->seat, NULL);
-                    if (pInputMgr->seat->num_tp > 0)   {
+                    if (pInputMgr->seat->touch->num_tp > 0) {
                         uifw_debug("ico_mgr_send_input_event: num=%d reset for reset focuse",
-                                   pInputMgr->seat->num_tp);
-                        pInputMgr->seat->num_tp = 0;
+                                   pInputMgr->seat->touch->num_tp);
+                        pInputMgr->seat->touch->num_tp = 0;
                     }
                 }
             }
             else if (value == ICO_INPUT_MGR_CONTROL_TOUCH_EVENT_DOWN)   {
                 grabsave = pInputMgr->seat->touch->focus;
-                dev->grab = weston_compositor_pick_surface(
+                dev->grab = weston_compositor_pick_view(
                                 pInputMgr->compositor, fix_x, fix_y, &dx, &dy);
                 uifw_trace("ico_mgr_send_input_event: notify_touch(DOWN=%d/%d) "
                            "grab=%08x org=%08x", fix_x/256, fix_y/256,
@@ -758,13 +758,13 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                 if (grabsave != dev->grab)  {
                     weston_touch_set_focus(pInputMgr->seat, dev->grab);
                 }
-                if (pInputMgr->seat->num_tp > 0)    {
+                if (pInputMgr->seat->touch->num_tp > 0)    {
                     uifw_debug("ico_mgr_send_input_event: touch_down illegal num, modify");
                     weston_touch_set_focus(pInputMgr->seat, NULL);
-                    pInputMgr->seat->num_tp = 0;
+                    pInputMgr->seat->touch->num_tp = 0;
                 }
                 notify_touch(pInputMgr->seat, ctime, 0, fix_x, fix_y, WL_TOUCH_DOWN);
-                ico_window_mgr_active_surface(dev->grab);
+                ico_window_mgr_active_surface(dev->grab->surface);
             }
             else    {
                 grabsave = pInputMgr->seat->touch->focus;
@@ -773,10 +773,11 @@ ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
                 if ((grabsave != dev->grab) && (dev->grab != NULL)) {
                     weston_touch_set_focus(pInputMgr->seat, dev->grab);
                 }
-                if ((pInputMgr->seat->num_tp == 0) || (pInputMgr->seat->num_tp > 10))   {
+                if ((pInputMgr->seat->touch->num_tp == 0) ||
+                    (pInputMgr->seat->touch->num_tp > 10))  {
                     uifw_debug("ico_mgr_send_input_event: num=%d reset",
-                               pInputMgr->seat->num_tp);
-                    pInputMgr->seat->num_tp = 1;
+                               pInputMgr->seat->touch->num_tp);
+                    pInputMgr->seat->touch->num_tp = 1;
                 }
                 notify_touch(pInputMgr->seat, ctime, 0, 0, 0, WL_TOUCH_UP);
                 if (grabsave == dev->grab)  grabsave = NULL;

@@ -1,3 +1,10 @@
+* Fri Feb 07 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140128.174118@6241868
+- 0.9.14 release
+-- improve: it corresponded to Wayland/Weston 1.4.0
+-- bugfix:  when change of surface different from deletion of surface overlaps, ico_window_mgr may crash
+-- bugfix:  when HomeScreen shows the menu and installation/uninstallation of a package are performed, a live thumbnail may blink
+-- improve: output the conflict message of a configuration file(weston.ini) with a weston-ivi-config package
+
 * Fri Jan 24 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/release/20140109.181723@96ba865
 - 0.9.12 release
 -- bugfix: ico_input_mgr avoid crashes in case the assigned app were not running

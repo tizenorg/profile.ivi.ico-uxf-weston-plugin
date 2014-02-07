@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013 TOYOTA MOTOR CORPORATION.
+ * Copyright © 2013-2014 TOYOTA MOTOR CORPORATION.
  *
  * Permission to use, copy, modify, distribute, and sell this software and
  * its documentation for any purpose is hereby granted without fee, provided

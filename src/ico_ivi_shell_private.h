@@ -1,7 +1,7 @@
 /*
  * Copyright © 2010-2011 Intel Corporation
  * Copyright © 2008-2011 Kristian Høgsberg
- * Copyright © 2013 TOYOTA MOTOR CORPORATION.
+ * Copyright © 2013-2014 TOYOTA MOTOR CORPORATION.
  *
  * Permission to use, copy, modify, distribute, and sell this software and
  * its documentation for any purpose is hereby granted without fee, provided
@@ -24,7 +24,7 @@
 /**
  * @brief   Public functions in ico_ivi_shell Weston plugin
  *
- * @date    Jul-26-2013
+ * @date    Jan-30-2014
  */
 
 #ifndef _ICO_IVI_SHELL_PRIVATE_H_
@@ -38,9 +38,6 @@ struct shell_surface;
 enum shell_surface_type {
     SHELL_SURFACE_NONE,
     SHELL_SURFACE_TOPLEVEL,
-    SHELL_SURFACE_TRANSIENT,
-    SHELL_SURFACE_FULLSCREEN,
-    SHELL_SURFACE_MAXIMIZED,
     SHELL_SURFACE_POPUP,
     SHELL_SURFACE_XWAYLAND
 };
@@ -60,7 +57,7 @@ enum shell_surface_type {
 enum shell_fullscreen_control   {
     SHELL_FULLSCREEN_ISTOP,
     SHELL_FULLSCREEN_SET,
-    SHELL_FULLSCREEN_STACK,
+    SHELL_FULLSCREEN_UNSET,
     SHELL_FULLSCREEN_CONF,
     SHELL_FULLSCREEN_HIDEALL
 };
@@ -74,15 +71,14 @@ void ico_ivi_shell_send_configure(struct weston_surface *surface,
                                   const uint32_t edges, const int width, const int height);
 void ico_ivi_shell_startup(void *shell);
 int ico_ivi_shell_layertype(struct weston_surface *surface);
-void ivi_shell_set_surface_initial_position(struct weston_surface *surface);
 void ivi_shell_set_default_display(struct weston_output *inputpanel);
 
 /* Prototypr for hook routine           */
 void ico_ivi_shell_hook_bind(void (*hook_bind)(struct wl_client *client, void *shell));
 void ico_ivi_shell_hook_unbind(void (*hook_unbind)(struct wl_client *client));
-void ico_ivi_shell_hook_create(void (*hook_create)(int layertype, struct wl_client *client,
-                            struct wl_resource *resource, struct weston_surface *surface,
-                            struct shell_surface *shsurf));
+void ico_ivi_shell_hook_create(void (*hook_create)(int layertype,
+                            struct weston_surface *surface,
+                            struct wl_client *client, struct shell_surface *shsurf));
 void ico_ivi_shell_hook_destroy(void (*hook_destroy)(struct weston_surface *surface));
 void ico_ivi_shell_hook_map(void (*hook_map)(struct weston_surface *surface,
                             int32_t *width, int32_t *height, int32_t *sx, int32_t *sy));
@@ -95,5 +91,22 @@ void ico_ivi_shell_hook_move(void (*hook_move)(struct weston_surface *surface,
 void ico_ivi_shell_hook_show_layer(void (*hook_show)(int layertype, int show, void *data));
 void ico_ivi_shell_hook_fullscreen(int (*hook_fullscreen)
                             (int event, struct weston_surface *surface));
+struct weston_view *ico_input_panel_get_view(void *ipsurf);
+
+/* hook functions           */
+extern void (*shell_hook_bind)(struct wl_client *client, void *shell);
+extern void (*shell_hook_unbind)(struct wl_client *client);
+extern void (*shell_hook_create)(int layertype, struct weston_surface *surface,
+                                 struct wl_client *client,
+                                 struct shell_surface *shsurf);
+extern void (*shell_hook_destroy)(struct weston_surface *surface);
+extern void (*shell_hook_map)(struct weston_surface *surface, int32_t *width,
+                              int32_t *height, int32_t *sx, int32_t *sy);
+extern void (*shell_hook_configure)(struct weston_surface *surface);
+extern void (*shell_hook_select)(struct weston_surface *surface);
+extern char *(*shell_hook_title)(struct weston_surface *surface, const char *title); 
+extern void (*shell_hook_move)(struct weston_surface *surface, int *dx, int *dy);
+extern void (*shell_hook_show_layer)(int layertype, int show, void *data);
+extern int (*shell_hook_fullscreen)(int event, struct weston_surface *surface);
 
 #endif  /*_ICO_IVI_SHELL_PRIVATE_H_*/

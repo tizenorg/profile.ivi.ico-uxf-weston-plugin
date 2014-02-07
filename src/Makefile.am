@@ -2,6 +2,7 @@ lib_LTLIBRARIES = libico-uxf-weston-plugin.la
 
 pkginclude_HEADERS =               \
 	desktop-shell-client-protocol.h		\
+	xdg-shell-client-protocol.h			\
 	input-method-client-protocol.h		\
 	workspaces-client-protocol.h		\
 	ico_window_mgr-client-protocol.h	\
@@ -13,6 +14,7 @@ libico_uxf_weston_plugin_la_LIBADD = -ldrm_intel -lrt -lm
 libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:9:0
 libico_uxf_weston_plugin_la_SOURCES =          \
 	desktop-shell-protocol.c		\
+	xdg-shell-protocol.c			\
 	input-method-protocol.c			\
 	workspaces-protocol.c			\
 	ico_window_mgr-protocol.c		\
@@ -56,20 +58,21 @@ ico_ivi_shell_la_LDFLAGS = -module -avoid-version
 ico_ivi_shell_la_LIBADD = $(PLUGIN_LIBS)
 ico_ivi_shell_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_ivi_shell_la_SOURCES =			\
+	ico_ivi_shell.h					\
 	ico_ivi_shell.c					\
+	ico_exposay.c					\
+	ico_input-panel.c				\
 	ico_ivi_shell_private.h			\
 	ico_ivi_common_private.h		\
 	desktop-shell-protocol.c		\
-	input-method-protocol.c			\
-	workspaces-protocol.c			\
 	desktop-shell-server-protocol.h	\
-	input-method-server-protocol.h	\
-	workspaces-server-protocol.h
+	xdg-shell-protocol.c			\
+	xdg-shell-server-protocol.h
 
 # Multi Window Manager
 ico_window_mgr = ico_window_mgr.la
 ico_window_mgr_la_LDFLAGS = -module -avoid-version
-ico_window_mgr_la_LIBADD = -ldrm_intel $(PLUGIN_LIBS) $(AUL_LIBS)
+ico_window_mgr_la_LIBADD = -lEGL -lGLESv2 -ldrm_intel $(PLUGIN_LIBS) $(AUL_LIBS)
 ico_window_mgr_la_CFLAGS = -I/usr/include/libdrm $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_window_mgr_la_SOURCES =			\
 	ico_window_mgr.c				\
@@ -108,6 +111,9 @@ BUILT_SOURCES =						\
 	desktop-shell-protocol.c		\
 	desktop-shell-server-protocol.h	\
 	desktop-shell-client-protocol.h	\
+	xdg-shell-protocol.c			\
+	xdg-shell-server-protocol.h		\
+	xdg-shell-client-protocol.h		\
 	input-method-protocol.c			\
 	input-method-server-protocol.h	\
 	input-method-client-protocol.h	\
