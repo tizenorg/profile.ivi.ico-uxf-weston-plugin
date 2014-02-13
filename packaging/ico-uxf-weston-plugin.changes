@@ -1,3 +1,6 @@
+* Thu Feb 13 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140128.174118@4018b9f
+- bugfix:  TIVI-2396: Virtual Keyboard doesn't catch the mouse event with the ICO UI
+
 * Fri Feb 07 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140128.174118@6241868
 - 0.9.14 release
 -- improve: it corresponded to Wayland/Weston 1.4.0

@@ -1717,8 +1717,6 @@ ico_window_mgr_restack_layer(struct uifw_win_surface *usurf)
 
     /* remove all surfaces in panel_layer   */
     wl_list_for_each_safe (view, viewtmp, &wlayer->view_list, layer_link)   {
-uifw_debug("ico_window_mgr_restack_layer: remove view %08x surf=%08x",
-        (int)view, (int)view->surface);
         wl_list_remove(&view->layer_link);
         wl_list_init(&view->layer_link);
     }
@@ -1766,8 +1764,6 @@ uifw_debug("ico_window_mgr_restack_layer: remove view %08x surf=%08x",
                     new_y = (float)(eu->y + eu->node_tbl->disp_y + eu->yadd);
                 }
                 wl_list_for_each (view, &eu->surface->views, surface_link)  {
-uifw_debug("ico_window_mgr_restack_layer: add %08x view %08x surf=%08x",
-        eu->surfaceid, (int)view, (int)view->surface);
                     wl_list_remove(&view->layer_link);
                     wl_list_init(&view->layer_link);
                     wl_list_insert(wlayer->view_list.prev, &view->layer_link);
@@ -1787,10 +1783,6 @@ uifw_debug("ico_window_mgr_restack_layer: add %08x view %08x surf=%08x",
                 }
             }
         }
-    }
-    wl_list_for_each (view, &wlayer->view_list, layer_link)   {
-uifw_debug("ico_window_mgr_restack_layer: panel_layer view %08x surf=%08x",
-        (int)view, (int)view->surface);
     }
 
     /* damage(redraw) target surfacem if target exist   */
@@ -5325,9 +5317,6 @@ win_mgr_set_scale(struct uifw_win_surface *usurf)
                 weston_matrix_init(&usurf->transform.matrix);
                 weston_matrix_scale(&usurf->transform.matrix, scalex, scaley, 1.0f);
                 uifw_trace("win_mgr_set_scale: change scale(%d)", usurf->set_transform);
-uifw_trace("ev=%08x transformation_list=%08x next=%08x prev=%08x",
-    (int)ev, (int)&ev->geometry.transformation_list,
-    (int)ev->geometry.transformation_list.next, (int)ev->geometry.transformation_list.prev);
                 if (usurf->set_transform == 0)  {
                     usurf->set_transform = 1;
                     wl_list_init(&usurf->transform.link);

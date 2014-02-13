@@ -67,6 +67,7 @@ install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 %manifest %{name}.manifest
 %defattr(-,root,root,-)
 %{_includedir}/%{name}/desktop-shell-client-protocol.h
+%{_includedir}/%{name}/xdg-shell-client-protocol.h
 %{_includedir}/%{name}/input-method-client-protocol.h
 %{_includedir}/%{name}/workspaces-client-protocol.h
 %{_includedir}/%{name}/ico_input_mgr-client-protocol.h
