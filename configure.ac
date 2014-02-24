@@ -1,6 +1,6 @@
 AC_PREREQ([2.68])
 AC_INIT([ico-uxf-weston-plugin],
-        [0.9.14],
+        [0.9.21],
         [https://BUG-REPORT-ADDRESS])
 
 AC_CONFIG_HEADERS([config.h])
@@ -30,9 +30,7 @@ AC_CHECK_HEADERS([execinfo.h])
 
 AC_CHECK_FUNCS([mkostemp strchrnul])
 
-PKG_CHECK_MODULES([PLUGIN], [wayland-server >= 1.3.0 weston >= 1.3.0 pixman-1 xkbcommon])
-
-PKG_CHECK_MODULES([EGL], [egl])
+PKG_CHECK_MODULES([PLUGIN], [weston >= 1.1.1 pixman-1 xkbcommon])
 
 if test "x$GCC" = "xyes"; then
 	my_common_gcc_flags="-Wall -Wextra -Wno-unused-parameter \

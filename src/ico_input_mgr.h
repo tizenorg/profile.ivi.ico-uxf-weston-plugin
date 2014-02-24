@@ -22,7 +22,7 @@
 /**
  * @brief   Multi Input Manager header for Device Input Controller
  *
- * @date    Jul-26-2013
+ * @date    Feb-21-2014
  */
 
 #ifndef _ICO_INPUT_MGR_H_

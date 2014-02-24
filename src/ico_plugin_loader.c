@@ -26,7 +26,7 @@
  * @brief   Load the Weston plugins, because plugin loader of main body of Weston
  * @brief   cannot use other plugin functions by a other plugin.
  *
- * @date    Jul-26-2013
+ * @date    Feb-21-2014
  */
 
 #define _GNU_SOURCE

@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+#	Weston IVI Plugin Test
+#
+#	  Remark: This examination premises that Weston does not run.
+
+# 1 Delete log file
+mkdir ../tests/testlog 2> /dev/null
+rm -fr ../tests/testlog/* 2> /dev/null
+
+# 2 Set Environment for Test
+export WESTON_IVI_PLUGIN_DIR="../src/.libs"
+
+# 3 Start Weston
+export XDG_CONFIG_HOME="../tests"
+export XDG_RUNTIME_DIR="/run/user/5000"
+MOD_DIR="$PWD/../src/.libs"
+/usr/bin/weston --tty=2 --modules=$MOD_DIR/ico_plugin_loader.so --idle-time=0 $WESTON_BACKEND --log=../tests/testlog/weston.log &
+sleep 1
+

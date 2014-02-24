@@ -24,7 +24,7 @@
 /**
  * @brief   Multi Input Manager (Weston(Wayland) PlugIn)
  *
- * @date    Jul-26-2013
+ * @date    Feb-21-2014
  */
 
 #include <stdlib.h>
@@ -43,9 +43,7 @@
 #include <wayland-server.h>
 #include <weston/compositor.h>
 #include "ico_ivi_common_private.h"
-#include "ico_ivi_shell_private.h"
 #include "ico_input_mgr.h"
-#include "ico_window_mgr.h"
 #include "ico_window_mgr_private.h"
 #include "ico_window_mgr-server-protocol.h"
 #include "ico_input_mgr-server-protocol.h"
@@ -167,11 +165,6 @@ static void ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *
                                             /* delete input event to application    */
 static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
                                   const char *appid, const char *device, int32_t input);
-                                            /* send input event from manager        */
-static void ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
-                                     const char *target, uint32_t surfaceid, int32_t type,
-                                     int32_t deviceno, uint32_t time,
-                                     int32_t code, int32_t value);
                                             /* set input region                     */
 static void ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                                      const char *target, int32_t x, int32_t y,
@@ -209,8 +202,7 @@ static void ico_input_send_region_event(struct wl_array *array);
 /* Input Manager Control interface      */
 static const struct ico_input_mgr_control_interface ico_input_mgr_implementation = {
     ico_mgr_add_input_app,
-    ico_mgr_del_input_app,
-    ico_mgr_send_input_event
+    ico_mgr_del_input_app
 };
 
 /* Extended Input interface             */
@@ -249,7 +241,6 @@ ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *resource,
                       const char *appid, const char *device, int32_t input,
                       int32_t fix, int32_t keycode)
 {
-    struct uifw_client      *uclient;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
     struct ico_app_mgr      *pAppMgr;
@@ -257,23 +248,6 @@ ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("ico_mgr_add_input_app: Enter(appid=%s,dev=%s,input=%d,fix=%d,key=%d)",
                appid, device, input, fix, keycode);
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_control_add_input_app: unknown client");
-            uifw_trace("ico_mgr_add_input_app: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_CONTROL_ADD_INPUT_APP) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_control_add_input_app: not permitted");
-            uifw_trace("ico_mgr_add_input_app: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
         /* not configure input controller, create   */
@@ -335,7 +309,6 @@ static void
 ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
                       const char *appid, const char *device, int32_t input)
 {
-    struct uifw_client      *uclient;
     int     alldev = 0;
     struct ico_ictl_mgr     *pIctlMgr = NULL;
     struct ico_ictl_input   *pInput = NULL;
@@ -344,23 +317,6 @@ ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
     uifw_trace("ico_mgr_del_input_app: Enter(appid=%s,dev=%s,input=%d)",
                appid ? appid : "(NULL)", device ? device : "(NULL)", input);
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_control_del_input_app: unknown client");
-            uifw_trace("ico_mgr_del_input_app: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_CONTROL_DEL_INPUT_APP) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_control_del_input_app: not permitted");
-            uifw_trace("ico_mgr_del_input_app: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     if ((device != NULL) && (*device != 0)) {
         pIctlMgr = find_ictlmgr_by_device(device);
         if (! pIctlMgr) {
@@ -464,448 +420,6 @@ ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   ico_mgr_send_input_event: send input event from manager
- *
- * @param[in]   client          client(HomeScreen)
- * @param[in]   resource        resource of request
- * @param[in]   target          target window name and application id
- * @param[in]   surfaceid       target surface id
- * @param[in]   type            event device type
- * @param[in]   deviceno        device number
- * @param[in]   time            event time (if 0, generate)
- * @param[in]   code            event code
- * @param[in]   value           event value
- * @return      none
- */
-/*--------------------------------------------------------------------------*/
-static void
-ico_mgr_send_input_event(struct wl_client *client, struct wl_resource *resource,
-                         const char *target, uint32_t surfaceid, int32_t type,
-                         int32_t deviceno, uint32_t time, int32_t code, int32_t value)
-{
-    struct uifw_client      *uclient;
-    struct uifw_win_surface *usurf;         /* UIFW surface                 */
-    struct uifw_input_device *dev;          /* device control table         */
-    struct wl_resource      *cres;          /* event send client resource   */
-    struct wl_array dummy_array;            /* dummy array for wayland API  */
-    uint32_t    ctime;                      /* current time(ms)             */
-    uint32_t    serial;                     /* event serial number          */
-    int         event;                      /* event flag                   */
-    wl_fixed_t  fix_x;                      /* wayland X coordinate         */
-    wl_fixed_t  fix_y;                      /* wayland Y coordinate         */
-    wl_fixed_t  dx, dy;                     /* relative coordinate (dummy)  */
-    struct weston_view  *grabsave;          /* real grab surface view       */
-    int         keyboard_active;            /* keyborad active surface flag */
-
-#if 0           /* too many log */
-    uifw_debug("ico_mgr_send_input_event: Enter(target=%s surf=%x dev=%d.%d "
-               "time=%d code=%x value=%d)",
-               target ? target : "(NULL)", surfaceid, type, deviceno,
-               time, code, value);
-#endif
-
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_control_send_input_event: unknown client");
-            uifw_trace("ico_mgr_send_input_event: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_CONTROL_ADD_INPUT_APP) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_control_send_input_event: not permitted");
-            uifw_trace("ico_mgr_send_input_event: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
-    /* search pseudo input device           */
-    wl_list_for_each (dev, &pInputMgr->dev_list, link)  {
-        if ((dev->type == type) && (dev->no == deviceno))   break;
-    }
-    if (&dev->link == &pInputMgr->dev_list) {
-        /* device not exist, create new device  */
-        uifw_trace("ico_mgr_send_input_event: new device=%d no=%d", type, deviceno);
-        dev = malloc(sizeof(struct uifw_input_device));
-        if (! dev)  {
-            uifw_error("ico_mgr_send_input_event: Leave(No Memory)");
-            return;
-        }
-        memset(dev, 0, sizeof(struct uifw_input_device));
-        dev->type = type;
-        dev->no = deviceno;
-        if ((type == ICO_INPUT_MGR_DEVICE_TYPE_POINTER) ||
-            (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH) ||
-            (type == ICO_INPUT_MGR_DEVICE_TYPE_HAPTIC)) {
-            ico_window_mgr_get_display_coordinate(deviceno, &dev->disp_x, &dev->disp_y);
-        }
-        wl_list_insert(pInputMgr->dev_list.prev, &dev->link);
-    }
-
-    /* convert pending event            */
-    event = 0;
-    if ((code & 0xffff0000) != (EV_REL << 16))  {
-        code &= 0x0000ffff;
-    }
-    switch (type)   {
-    case ICO_INPUT_MGR_DEVICE_TYPE_POINTER:         /* mouse        */
-    case ICO_INPUT_MGR_DEVICE_TYPE_TOUCH:           /* touch panel  */
-    case ICO_INPUT_MGR_DEVICE_TYPE_HAPTIC:          /* haptic       */
-        switch (code)   {
-        case ABS_X:
-            if (dev->pending & PENDING_Y)   {
-                dev->x = value;
-                dev->y = dev->pend_y;
-                dev->pending = 0;
-                dev->pend_x = 0;
-                dev->pend_y = 0;
-                event = EVENT_MOTION;
-            }
-            else    {
-                dev->pend_x = value;
-                dev->pending |= PENDING_X;
-                event = EVENT_PENDING;
-            }
-            break;
-        case ABS_Y:
-            if (dev->pending & PENDING_X)   {
-                dev->x = dev->pend_x;
-                dev->y = value;
-                dev->pending = 0;
-                dev->pend_x = 0;
-                dev->pend_y = 0;
-                event = EVENT_MOTION;
-            }
-            else    {
-                dev->pend_y = value;
-                dev->pending |= PENDING_Y;
-                event = EVENT_PENDING;
-            }
-            break;
-        case ABS_Z:
-            dev->x = (short)(value >> 16);
-            dev->y = (short)(value & 0x0ffff);
-            dev->pending = 0;
-            dev->pend_x = 0;
-            dev->pend_y = 0;
-            event = EVENT_MOTION;
-            break;
-        case ((EV_REL << 16) | REL_X):
-            if (dev->pending & PENDING_Y)   {
-                dev->x += value;
-                dev->y = dev->pend_y;
-                dev->pending = 0;
-                dev->pend_x = 0;
-                dev->pend_y = 0;
-                event = EVENT_MOTION;
-            }
-            else    {
-                dev->pend_x = dev->x + value;
-                dev->pending |= PENDING_X;
-                event = EVENT_PENDING;
-            }
-            break;
-        case ((EV_REL << 16) | REL_Y):
-            if (dev->pending & PENDING_X)   {
-                dev->x = dev->pend_x;
-                dev->y += value;
-                dev->pending = 0;
-                dev->pend_x = 0;
-                dev->pend_y = 0;
-                event = EVENT_MOTION;
-            }
-            else    {
-                dev->pend_x = dev->y + value;
-                dev->pending |= PENDING_Y;
-                event = EVENT_PENDING;
-            }
-            break;
-        case ((EV_REL << 16) | REL_Z):
-            dev->x += (short)(value >> 16);
-            dev->y += (short)(value & 0x0ffff);
-            dev->pending = 0;
-            dev->pend_x = 0;
-            dev->pend_y = 0;
-            event = EVENT_MOTION;
-            break;
-        default:
-            if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
-                event = EVENT_TOUCH;
-            }
-            else    {
-                event = EVENT_BUTTON;
-            }
-            break;
-        }
-        break;
-    default:
-        event = EVENT_KEY;
-        break;
-    }
-
-    if (event == EVENT_PENDING)   {
-#if 0           /* too many log */
-        uifw_debug("ico_mgr_send_input_event: Leave(event pending)");
-#endif
-        return;
-    }
-
-    if (time)   {
-        ctime = time;
-    }
-    else    {
-        ctime = weston_compositor_get_time();
-    }
-    fix_x = wl_fixed_from_int(dev->x + dev->disp_x);
-    fix_y = wl_fixed_from_int(dev->y + dev->disp_y);
-
-    if ((surfaceid == 0) && ((target == NULL) || (*target == 0) || (*target == ' ')))  {
-        /* send event to surface via weston */
-
-        /* disable the event transmission to a input layer  */
-        if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
-            ico_window_mgr_touch_layer(TRUE);
-        }
-
-        if ((event == EVENT_TOUCH) && (pInputMgr->seat->touch == NULL)) {
-            /* system has no touch, change to pointer event */
-            if (pInputMgr->seat->pointer == NULL)   {
-                uifw_trace("ico_mgr_send_input_event: Leave(no touch & no pointerr)");
-                return;
-            }
-            event = EVENT_BUTTON;
-            code = BTN_LEFT;
-        }
-        else if ((event == EVENT_BUTTON) && (pInputMgr->seat->pointer == NULL)) {
-            /* system has no pointer, change to touch event */
-            if (pInputMgr->seat->touch == NULL) {
-                uifw_trace("ico_mgr_send_input_event: Leave(no touch & no pointerr)");
-                return;
-            }
-            event = EVENT_TOUCH;
-        }
-
-        switch (event)    {
-        case EVENT_MOTION:
-            if ((type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH) &&
-                (pInputMgr->seat->touch))   {
-                if (pInputMgr->seat->touch->num_tp > 10)   {
-                    uifw_debug("ico_mgr_send_input_event: num=%d reset",
-                               pInputMgr->seat->touch->num_tp);
-                    pInputMgr->seat->touch->num_tp = 0;     /* safty gard   */
-                }
-                grabsave = pInputMgr->seat->touch->focus;
-                uifw_debug("ico_mgr_send_input_event: MOTION(%d/%d) grab %08x org %08x",
-                           fix_x/256, fix_y/256, (int)dev->grab, (int)grabsave);
-                if ((grabsave != dev->grab) && (dev->grab != NULL)) {
-                    weston_touch_set_focus(pInputMgr->seat, dev->grab);
-                }
-                notify_touch(pInputMgr->seat, ctime, 0, fix_x, fix_y, WL_TOUCH_MOTION);
-                if ((grabsave != dev->grab) && (dev->grab != NULL)) {
-                    weston_touch_set_focus(pInputMgr->seat, grabsave);
-                }
-            }
-            else if (pInputMgr->seat->pointer)  {
-#if 0           /* too many log */
-                uifw_debug("ico_mgr_send_input_event: notify_motion_absolute(%d/%d)",
-                           fix_x/256, fix_y/256);
-#endif
-                notify_motion_absolute(pInputMgr->seat, ctime, fix_x, fix_y);
-            }
-            break;
-        case EVENT_BUTTON:
-            uifw_trace("ico_mgr_send_input_event: notify_button(%d,%d)", code, value);
-            if (pInputMgr->seat->pointer)   {
-                if (value)  {
-                    dev->grab = weston_compositor_pick_view(
-                                    pInputMgr->compositor, fix_x, fix_y, &dx, &dy);
-                    weston_pointer_set_focus(pInputMgr->seat->pointer, dev->grab, dx, dy);
-                    ico_window_mgr_active_surface(dev->grab->surface);
-                }
-                else    {
-                    dev->grab = NULL;
-                }
-                notify_button(pInputMgr->seat, ctime, code,
-                              value ? WL_POINTER_BUTTON_STATE_PRESSED :
-                                      WL_POINTER_BUTTON_STATE_RELEASED);
-            }
-            break;
-        case EVENT_TOUCH:
-            if (value == ICO_INPUT_MGR_CONTROL_TOUCH_EVENT_RESET)   {
-                /* reset touch focus    */
-                grabsave = pInputMgr->seat->touch->focus;
-                uifw_trace("ico_mgr_send_input_event: notify_touch(UnGrab dev=%08x sys=%08x)",
-                           (int)dev->grab, (int)grabsave);
-                dev->grab = NULL;
-                if (grabsave)   {
-                    weston_touch_set_focus(pInputMgr->seat, NULL);
-                    if (pInputMgr->seat->touch->num_tp > 0) {
-                        uifw_debug("ico_mgr_send_input_event: num=%d reset for reset focuse",
-                                   pInputMgr->seat->touch->num_tp);
-                        pInputMgr->seat->touch->num_tp = 0;
-                    }
-                }
-            }
-            else if (value == ICO_INPUT_MGR_CONTROL_TOUCH_EVENT_DOWN)   {
-                grabsave = pInputMgr->seat->touch->focus;
-                dev->grab = weston_compositor_pick_view(
-                                pInputMgr->compositor, fix_x, fix_y, &dx, &dy);
-                uifw_trace("ico_mgr_send_input_event: notify_touch(DOWN=%d/%d) "
-                           "grab=%08x org=%08x", fix_x/256, fix_y/256,
-                           (int)dev->grab, (int)grabsave);
-                if (grabsave != dev->grab)  {
-                    weston_touch_set_focus(pInputMgr->seat, dev->grab);
-                }
-                if (pInputMgr->seat->touch->num_tp > 0)    {
-                    uifw_debug("ico_mgr_send_input_event: touch_down illegal num, modify");
-                    weston_touch_set_focus(pInputMgr->seat, NULL);
-                    pInputMgr->seat->touch->num_tp = 0;
-                }
-                notify_touch(pInputMgr->seat, ctime, 0, fix_x, fix_y, WL_TOUCH_DOWN);
-                ico_window_mgr_active_surface(dev->grab->surface);
-            }
-            else    {
-                grabsave = pInputMgr->seat->touch->focus;
-                uifw_trace("ico_mgr_send_input_event: notify_touch(UP) org=%08x",
-                           (int)grabsave);
-                if ((grabsave != dev->grab) && (dev->grab != NULL)) {
-                    weston_touch_set_focus(pInputMgr->seat, dev->grab);
-                }
-                if ((pInputMgr->seat->touch->num_tp == 0) ||
-                    (pInputMgr->seat->touch->num_tp > 10))  {
-                    uifw_debug("ico_mgr_send_input_event: num=%d reset",
-                               pInputMgr->seat->touch->num_tp);
-                    pInputMgr->seat->touch->num_tp = 1;
-                }
-                notify_touch(pInputMgr->seat, ctime, 0, 0, 0, WL_TOUCH_UP);
-                if (grabsave == dev->grab)  grabsave = NULL;
-                weston_touch_set_focus(pInputMgr->seat, grabsave);
-                dev->grab = NULL;
-            }
-            break;
-        case EVENT_KEY:
-            uifw_trace("ico_mgr_send_input_event: notify_key(%d,%d)", code, value);
-            notify_key(pInputMgr->seat, ctime, code,
-                       value ? WL_KEYBOARD_KEY_STATE_PRESSED :
-                               WL_KEYBOARD_KEY_STATE_RELEASED, STATE_UPDATE_NONE);
-            break;
-        default:
-            uifw_trace("ico_mgr_send_input_event: unknown event=%d", event);
-            break;
-        }
-        /* enable the event transmission to a input layer   */
-        if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
-            ico_window_mgr_touch_layer(FALSE);
-        }
-    }
-    else    {
-        if ((target != NULL) && (*target != 0) && (*target != ' '))    {
-            /* send event to fixed application  */
-
-            /* get application surface       */
-            usurf = ico_window_mgr_get_client_usurf(target);
-            if (! usurf)  {
-                uifw_trace("ico_mgr_send_input_event: Leave(window=%s dose not exist)",
-                           target);
-                return;
-            }
-        }
-        else    {
-            /* get UIFW surface             */
-            usurf = ico_window_mgr_get_usurf(surfaceid);
-            if (! usurf)    {
-                uifw_trace("ico_mgr_send_input_event: Leave(surface dose not exist)");
-                return;
-            }
-        }
-
-        /* send event                   */
-        switch (event)    {
-        case EVENT_MOTION:
-            if (type == ICO_INPUT_MGR_DEVICE_TYPE_TOUCH)    {
-                cres = wl_resource_find_for_client(
-                                    &pInputMgr->seat->touch->resource_list,
-                                    wl_resource_get_client(usurf->surface->resource));
-                if (cres)   {
-                    wl_touch_send_motion(cres, ctime, 0, fix_x, fix_y);
-                }
-            }
-            else    {
-                cres = wl_resource_find_for_client(
-                                    &pInputMgr->seat->pointer->resource_list,
-                                    wl_resource_get_client(usurf->surface->resource));
-                if (cres)   {
-                    wl_pointer_send_motion(cres, ctime, fix_x, fix_y);
-                }
-            }
-            break;
-        case EVENT_BUTTON:
-            cres = wl_resource_find_for_client(
-                                &pInputMgr->seat->pointer->resource_list,
-                                wl_resource_get_client(usurf->surface->resource));
-            if (cres)   {
-                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                wl_pointer_send_button(cres, serial, ctime, code,
-                                       value ? WL_POINTER_BUTTON_STATE_PRESSED :
-                                               WL_POINTER_BUTTON_STATE_RELEASED);
-            }
-            break;
-        case EVENT_TOUCH:
-            cres = wl_resource_find_for_client(
-                                &pInputMgr->seat->touch->resource_list,
-                                wl_resource_get_client(usurf->surface->resource));
-            if (cres)   {
-                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                if (value)  {
-                    wl_touch_send_down(cres, serial, ctime, usurf->surface->resource, 0,
-                                       fix_x, fix_y);
-                }
-                else    {
-                    wl_touch_send_up(cres, serial, ctime, 0);
-                }
-            }
-            break;
-        case EVENT_KEY:
-            cres = wl_resource_find_for_client(
-                                &pInputMgr->seat->keyboard->resource_list,
-                                wl_resource_get_client(usurf->surface->resource));
-            if (cres)   {
-                keyboard_active = ico_window_mgr_ismykeyboard(usurf);
-                if (! keyboard_active)  {
-                    wl_array_init(&dummy_array);
-                    serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                    wl_keyboard_send_enter(cres, serial,
-                                           usurf->surface->resource, &dummy_array);
-                }
-                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                uifw_trace("ico_mgr_send_input_event: send Key (%d, %d) to %08x",
-                           code, value, usurf->surfaceid);
-                wl_keyboard_send_key(cres, serial, ctime, code,
-                                     value ? WL_KEYBOARD_KEY_STATE_PRESSED :
-                                             WL_KEYBOARD_KEY_STATE_RELEASED);
-                if (! keyboard_active)  {
-                    serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                    wl_keyboard_send_leave(cres, serial, usurf->surface->resource);
-                }
-            }
-            else    {
-                uifw_trace("ico_mgr_send_input_event: Key client %08x dose not exist",
-                           (int)usurf->surface->resource);
-            }
-            break;
-        default:
-            break;
-        }
-    }
-#if 0           /* too many log */
-    uifw_debug("ico_mgr_send_input_event: Leave");
-#endif
-}
-
-/*--------------------------------------------------------------------------*/
-/**
  * @brief   ico_mgr_set_input_region: set input region for haptic devcie
  *
  * @param[in]   client          client(Device Input Controller)
@@ -932,30 +446,12 @@ ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                          int32_t hotspot_y, int32_t cursor_x, int32_t cursor_y,
                          int32_t cursor_width, int32_t cursor_height, uint32_t attr)
 {
-    struct uifw_client      *uclient;
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
 
     uifw_trace("ico_mgr_set_input_region: Enter(%s %d/%d-%d/%d(%d/%d) %d/%d-%d/%d)",
                target, x, y, width, height, hotspot_x, hotspot_y,
                cursor_x, cursor_y, cursor_width, cursor_height);
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_exapi_input_set_input_region: unknown client");
-            uifw_trace("ico_mgr_set_input_region: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_EXINPUT_SET_INPUT_REGION) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_exapi_input_set_input_region: not permitted");
-            uifw_trace("ico_mgr_set_input_region: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     /* get target surface           */
     usurf = ico_window_mgr_get_client_usurf(target);
     if (! usurf)    {
@@ -988,29 +484,11 @@ ico_mgr_unset_input_region(struct wl_client *client, struct wl_resource *resourc
                            const char *target, int32_t x, int32_t y,
                            int32_t width, int32_t height)
 {
-    struct uifw_client      *uclient;
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
 
     uifw_trace("ico_mgr_unset_input_region: Enter(%s %d/%d-%d/%d)",
                target, x, y, width, height);
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_exapi_input_unset_input_region: unknown client");
-            uifw_trace("ico_mgr_unset_input_region: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_EXINPUT_UNSET_INPUT_REGION) == 0)   {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_exapi_input_unset_input_region: not permitted");
-            uifw_trace("ico_mgr_unset_input_region: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     /* get target surface           */
     usurf = ico_window_mgr_get_client_usurf(target);
     if (! usurf)    {
@@ -1040,12 +518,11 @@ ico_input_hook_region_change(struct uifw_win_surface *usurf)
     int                         chgcount = 0;
     int                         visible;
 
-    visible = ico_window_mgr_is_visible(usurf);
-
-    uifw_trace("ico_input_hook_region_change: Entery(surf=%08x, visible=%d)",
-               usurf->surfaceid, visible);
+    uifw_trace("ico_input_hook_region_change: Entery(surf=%08x)", usurf->surfaceid);
 
     wl_array_init(&array);
+
+    visible = /* get visiblety form weston_layout */ 0;
 
     wl_list_for_each(p, &usurf->input_region, link) {
         if (((p->region.change > 0) && (visible <= 0)) ||
@@ -1214,7 +691,7 @@ ico_set_input_region(int set, struct uifw_win_surface *usurf,
             p->region.cursor_width = cursor_width;
             p->region.cursor_height = cursor_height;
         }
-        p->region.change = ico_window_mgr_is_visible(usurf);
+        p->region.change = /* get form weston_layout */ 1;
         wl_list_insert(usurf->input_region.prev, &p->link);
 
         /* send input region to haptic device input controller  */
@@ -1314,7 +791,6 @@ ico_device_configure_input(struct wl_client *client, struct wl_resource *resourc
                            const char *device, int32_t type, const char *swname,
                            int32_t input, const char *codename, int32_t code)
 {
-    struct uifw_client      *uclient;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_mgr     *psameIctlMgr;
     struct ico_ictl_input   *pInput;
@@ -1324,23 +800,6 @@ ico_device_configure_input(struct wl_client *client, struct wl_resource *resourc
                "input=%d,code=%d[%s])", (int)client, device, type,
                swname ? swname : "(NULL)", input, code, codename ? codename : " ");
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_device_configure_input: unknown client");
-            uifw_trace("ico_device_configure_input: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_INPUT) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_device_configure_input: not permitted");
-            uifw_trace("ico_device_configure_input: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
         /* search binded table      */
@@ -1453,7 +912,6 @@ ico_device_configure_code(struct wl_client *client, struct wl_resource *resource
                           const char *device, int32_t input,
                           const char *codename, int32_t code)
 {
-    struct uifw_client      *uclient;
     int     i;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
@@ -1462,23 +920,6 @@ ico_device_configure_code(struct wl_client *client, struct wl_resource *resource
     uifw_trace("ico_device_configure_code: Enter(client=%08x,dev=%s,input=%d,code=%d[%s])",
                (int)client, device, input, code, codename ? codename : " ");
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_device_configure_code: unknown client");
-            uifw_trace("ico_device_configure_code: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_DEVICE_CONFIGURE_CODE) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_device_configure_code: not permitted");
-            uifw_trace("ico_device_configure_code: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {
         uifw_warn("ico_device_configure_code: Leave(dev=%s dose not exist)", device);
@@ -1543,30 +984,12 @@ ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                        uint32_t time, const char *device,
                        int32_t input, int32_t code, int32_t state)
 {
-    struct uifw_client      *uclient;
     struct ico_ictl_mgr     *pIctlMgr;
     struct ico_ictl_input   *pInput;
 
     uifw_trace("ico_device_input_event: Enter(time=%d,dev=%s,input=%d,code=%d,state=%d)",
                time, device, input, code, state);
 
-    /* check for access control         */
-    if (resource != NULL)   {
-        /* resource is NULL, internal use   */
-        uclient = ico_window_mgr_find_uclient(client);
-        if (! uclient)  {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_device_input_event: unknown client");
-            uifw_trace("ico_device_input_event: Leave(unknown client=%08x)", (int)client);
-            return;
-        }
-        if ((uclient->api_access_control & ICO_UIFW_INPUT_MGR_DEVICE_INPUT_EVENT) == 0) {
-            wl_resource_post_error(resource, WL_DISPLAY_ERROR_INVALID_OBJECT,
-                                   "ico_input_mgr_device_input_event: not permitted");
-            uifw_trace("ico_device_input_event: Leave(%s not permitted)", uclient->appid);
-            return;
-        }
-    }
     /* find input devcie by client      */
     pIctlMgr = find_ictlmgr_by_device(device);
     if (! pIctlMgr) {

@@ -6,15 +6,6 @@
       to Multi Input Manager from HomeScreen.
     </description>
 
-    <enum name="touch_event">
-      <description summary="touch event code">
-       Declare touch event code for send_input_event.
-      </description>
-      <entry name="up" value="0" summary="touch up event"/>
-      <entry name="down" value="1" summary="touch down event"/>
-      <entry name="reset" value="9" summary="reset touch focus"/>
-    </enum>
-
     <request name="add_input_app">
       <description summary="assign input switch to application">
         Assign input switch to application from HomeScreen.
@@ -33,19 +24,6 @@
       <arg name="appid" type="string" summary="application Id for input switch, if NULL all applications with out fixed assign"/>
       <arg name="device" type="string" summary="input device name, if NULL, all devices with out fixed assign"/>
       <arg name="input" type="int" summary="input switch number, if -1, all input with out dixed assign"/>
-    </request>
-
-    <request name="send_input_event">
-      <description summary="send input event to application">
-        Mouse, Touch or Keyboard event sent to application.
-      </description>
-      <arg name="target" type="string" summary="target surface@application for input switch"/>
-      <arg name="surfaceid" type="uint" summary="event surface Id"/>
-      <arg name="type" type="int" summary="event device type"/>
-      <arg name="deviceno" type="int" summary="device number"/>
-      <arg name="time" type="uint" summary="event time"/>
-      <arg name="code" type="int" summary="event code"/>
-      <arg name="value" type="int" summary="event value"/>
     </request>
   </interface>
 

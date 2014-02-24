@@ -1,22 +1,15 @@
 lib_LTLIBRARIES = libico-uxf-weston-plugin.la
 
 pkginclude_HEADERS =               \
-	desktop-shell-client-protocol.h		\
-	xdg-shell-client-protocol.h			\
-	input-method-client-protocol.h		\
-	workspaces-client-protocol.h		\
 	ico_window_mgr-client-protocol.h	\
 	ico_input_mgr-client-protocol.h		\
-	ico_window_mgr.h					\
 	ico_input_mgr.h
 
 libico_uxf_weston_plugin_la_LIBADD = -ldrm_intel -lrt -lm
 libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:9:0
 libico_uxf_weston_plugin_la_SOURCES =          \
-	desktop-shell-protocol.c		\
-	xdg-shell-protocol.c			\
-	input-method-protocol.c			\
-	workspaces-protocol.c			\
+	ivi-application-protocol.c		\
+	ivi-controller-protocol.c		\
 	ico_window_mgr-protocol.c		\
 	ico_input_mgr-protocol.c
 
@@ -37,7 +30,6 @@ git-version.h : .FORCE
 moduledir = @libdir@/weston
 module_LTLIBRARIES =		\
 	$(ico_plugin_loader)	\
-	$(ico_ivi_shell)		\
 	$(ico_window_mgr)		\
 	$(ico_window_animation)	\
 	$(ico_input_mgr)
@@ -52,34 +44,15 @@ ico_plugin_loader_la_SOURCES =		\
 	ico_ivi_common_private.h		\
 	ico_plugin_version.h
 
-# IVI-Shell
-ico_ivi_shell = ico_ivi_shell.la
-ico_ivi_shell_la_LDFLAGS = -module -avoid-version
-ico_ivi_shell_la_LIBADD = $(PLUGIN_LIBS)
-ico_ivi_shell_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
-ico_ivi_shell_la_SOURCES =			\
-	ico_ivi_shell.h					\
-	ico_ivi_shell.c					\
-	ico_exposay.c					\
-	ico_input-panel.c				\
-	ico_ivi_shell_private.h			\
-	ico_ivi_common_private.h		\
-	desktop-shell-protocol.c		\
-	desktop-shell-server-protocol.h	\
-	xdg-shell-protocol.c			\
-	xdg-shell-server-protocol.h
-
 # Multi Window Manager
 ico_window_mgr = ico_window_mgr.la
 ico_window_mgr_la_LDFLAGS = -module -avoid-version
-ico_window_mgr_la_LIBADD = -lEGL -lGLESv2 -ldrm_intel $(PLUGIN_LIBS) $(AUL_LIBS)
+ico_window_mgr_la_LIBADD = -ldrm_intel $(PLUGIN_LIBS) $(AUL_LIBS)
 ico_window_mgr_la_CFLAGS = -I/usr/include/libdrm $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_window_mgr_la_SOURCES =			\
 	ico_window_mgr.c				\
 	ico_window_mgr_private.h		\
-	ico_window_mgr.h				\
 	ico_ivi_common_private.h		\
-	ico_ivi_shell_private.h			\
 	ico_window_mgr-protocol.c		\
 	ico_window_mgr-server-protocol.h
 #
@@ -108,18 +81,12 @@ ico_input_mgr_la_SOURCES =			\
 
 # Wayland protocol(Build by wayland-scanner)
 BUILT_SOURCES =						\
-	desktop-shell-protocol.c		\
-	desktop-shell-server-protocol.h	\
-	desktop-shell-client-protocol.h	\
-	xdg-shell-protocol.c			\
-	xdg-shell-server-protocol.h		\
-	xdg-shell-client-protocol.h		\
-	input-method-protocol.c			\
-	input-method-server-protocol.h	\
-	input-method-client-protocol.h	\
-	workspaces-protocol.c			\
-	workspaces-server-protocol.h	\
-	workspaces-client-protocol.h	\
+	ivi-application-protocol.c		\
+	ivi-application-server-protocol.h	\
+	ivi-application-client-protocol.h	\
+	ivi-controller-protocol.c		\
+	ivi-controller-server-protocol.h	\
+	ivi-controller-client-protocol.h	\
 	ico_window_mgr-protocol.c		\
 	ico_window_mgr-server-protocol.h	\
 	ico_window_mgr-client-protocol.h	\

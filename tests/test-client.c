@@ -427,15 +427,19 @@ handle_global(void *data, struct wl_registry *registry, uint32_t id,
         display->shell = wl_registry_bind(display->registry, id, &wl_shell_interface, 1);
     }
     else if (strcmp(interface, "ico_window_mgr") == 0)  {
+#if 0
         display->ico_window_mgr = wl_registry_bind(display->registry, id,
                                                    &ico_window_mgr_interface, 1);
         print_log("CLIENT: created window_mgr global %p", display->ico_window_mgr);
+#endif
     }
     else if (strcmp(interface, "ico_exinput") == 0)   {
+#if 0
         display->ico_exinput = wl_registry_bind(display->registry, id,
                                                 &ico_exinput_interface, 1);
         ico_exinput_add_listener(display->ico_exinput, &exinput_listener, display);
         print_log("CLIENT: created exinput global %p", display->ico_exinput);
+#endif
     }
 }
 
@@ -708,7 +712,10 @@ int main(int argc, char *argv[])
     else    {
         display->display = wl_display_connect(NULL);
     }
-    assert(display->display);
+    if (! display->display) {
+        fprintf(stderr, "CLIENT: can not connect to weston\n");
+        exit(2);
+    }
 
     display->registry = wl_display_get_registry(display->display);
     wl_registry_add_listener(display->registry,

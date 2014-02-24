@@ -24,7 +24,7 @@
 /**
  * @brief   Window Animation (Weston(Wayland) PlugIn)
  *
- * @date    Jul-26-2013
+ * @date    Feb-21-2014
  */
 
 #include <stdlib.h>
@@ -40,8 +40,9 @@
 
 #include <weston/compositor.h>
 #include <pixman.h>
+#include <ilm/ilm_types.h>
+#include <weston/weston-layout.h>
 #include "ico_ivi_common_private.h"
-#include "ico_ivi_shell_private.h"
 #include "ico_window_mgr_private.h"
 
 /* Animation type               */
@@ -454,16 +455,20 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         usurf->restrain_configure = 0;
         if ((usurf->animation.visible == ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
-            ico_window_mgr_set_visible(usurf, 0);
+            usurf->visible = 0;
+            weston_layout_surfaceSetVisibility(usurf->ivisurf, 0);
+            weston_layout_commitChanges();
             weston_surface_damage(usurf->surface);
+            weston_view_geometry_dirty(ev);
         }
         if ((usurf->animation.visible == ANIMA_SHOW_AT_END) &&
             (usurf->visible == 0))  {
-            ico_window_mgr_set_visible(usurf, 1);
+            usurf->visible = 1;
+            weston_layout_surfaceSetVisibility(usurf->ivisurf, 1);
+            weston_layout_commitChanges();
             weston_surface_damage(usurf->surface);
+            weston_view_geometry_dirty(ev);
         }
-        weston_view_geometry_dirty(ev);
-        ico_window_mgr_restack_layer(usurf);
     }
     usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
     if (usurf->animation.next_anima != ICO_WINDOW_MGR_ANIMATION_NONE)    {
@@ -493,9 +498,6 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         free_data = animadata;
     }
     usurf->animation.type = ICO_WINDOW_MGR_ANIMATION_OPNONE;
-    if (! disp) {
-        ico_window_mgr_restack_layer(usurf);
-    }
 #if  PERFORMANCE_EVALUATIONS > 0
     uifw_perf("SWAP_BUFFER End Animation appid=%s surface=%08x anima=%d",
               usurf->uclient->appid, usurf->surfaceid, usurf->animation.anima);
@@ -965,9 +967,6 @@ animation_fade(struct weston_animation *animation,
                 ev->alpha = 0.0;
                 ico_window_mgr_set_weston_surface(usurf, usurf->x, usurf->y,
                                                   usurf->width, usurf->height);
-                ico_window_mgr_change_surface(usurf,
-                                              usurf->animation.no_configure ? -1 : 0, 1);
-                ico_window_mgr_restack_layer(usurf);
             }
         }
         else    {
@@ -1095,8 +1094,6 @@ animation_zoom(struct weston_animation *animation,
         /* zoom move/resize         */
         ico_window_mgr_set_weston_surface(usurf, usurf->x, usurf->y,
                                           usurf->width, usurf->height);
-        ico_window_mgr_change_surface(usurf, usurf->animation.no_configure ? -1 : 0, 1);
-
         fu = (float)usurf->width;
         fa = (float)usurf->animation.pos_width;
         fp = (100.0f - (float)par) / 100.0f;

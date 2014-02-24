@@ -24,7 +24,7 @@
 /**
  * @brief   Public functions in ico_window_mgr Weston plugin
  *
- * @date    Jul-26-2013
+ * @date    Feb-21-2014
  */
 
 #ifndef _ICO_WINDOW_MGR_PRIVATE_H_
@@ -33,7 +33,6 @@
 /* Manager management table             */
 struct uifw_manager {
     struct wl_resource *resource;           /* Manager resource                     */
-    int         manager;                    /* Manager(=event send flag)            */
     struct wl_list link;                    /* link to next manager                 */
 };
 
@@ -50,9 +49,9 @@ struct uifw_client  {
     char        *shmbuf;                    /* shared memory for surface image      */
     int         bufsize;                    /* shared memory buffer size            */
     int         bufnum;                     /* number of shared memory buffer       */
+    struct wl_listener destroy_listener;    /* client destroy listener              */
     struct wl_list  surface_link;           /* surface list of same client          */
     struct wl_list  link;                   /* client list                          */
-    uint32_t    api_access_control;         /* api permission flags                 */
 };
 
 /* Node information                     */
@@ -66,23 +65,14 @@ struct uifw_node_table {
     int         disp_height;                /* display height                       */
 };
 
-/* Layer management table               */
-struct  uifw_win_layer  {
-    uint32_t    layer;                      /* Layer Id                             */
-    char        visible;                    /* visibility                           */
-    char        layertype;                  /* layer type                           */
-    char        res[2];                     /* (unused)                             */
-    struct wl_list surface_list;            /* Surface list                         */
-    struct wl_list link;                    /* Link pointer for layer list          */
-};
-
 /* Surface map table                    */
 struct uifw_win_surface;
 struct uifw_surface_map {
     struct uifw_win_surface *usurf;         /* UIFW surface                         */
     struct uifw_client      *uclient;       /* UIFW client                          */
     struct weston_buffer    *curbuf;        /* current buffer                       */
-    uint32_t    eglname;                    /* EGL buffer name                      */
+    char        filepath[ICO_IVI_FILEPATH_LENGTH];
+                                            /* surface image file path              */
     uint32_t    format;                     /* format                               */
     uint16_t    type;                       /* buffer type(currently only EGL buffer)*/
     uint16_t    width;                      /* width                                */
@@ -100,13 +90,12 @@ struct uifw_surface_map {
 
 /* UIFW surface                         */
 struct shell_surface;
+struct weston_layout_surface;
 struct uifw_win_surface {
     uint32_t    surfaceid;                  /* UIFW SurfaceId                       */
     struct uifw_node_table *node_tbl;       /* Node manager of ico_window_mgr       */
-    struct uifw_win_layer *win_layer;       /* surface layer                        */
-    struct uifw_win_layer *old_layer;       /* saved surface layer for change full screen*/
     struct weston_surface *surface;         /* Weston surface                       */
-    struct shell_surface  *shsurf;          /* Shell(IVI-Shell) surface             */
+    struct weston_layout_surface *ivisurf;  /* Weston layout surface                */
     struct uifw_client    *uclient;         /* Client                               */
     struct weston_transform transform;      /* transform matrix                     */
     float       scalex;                     /* surface transform scale of X         */
@@ -130,9 +119,7 @@ struct uifw_win_surface {
     char        mapped;                     /* end of map                           */
     char        restrain_configure;         /* restrant configure event             */
     char        set_transform;              /* surface transform flag               */
-    char        layertype;                  /* surface layer type                   */
-    char        old_layertype;              /* surface old layer type               */
-    char        res[3];                     /* (unused)                             */
+    char        res[1];                     /* (unused)                             */
     struct  _uifw_win_surface_animation {   /* wndow animation                      */
         struct weston_animation animation;  /* weston animation control             */
         uint16_t    type;                   /* current animation type               */
@@ -161,19 +148,11 @@ struct uifw_win_surface {
         uint32_t    starttime;              /* start time(ms)                       */
         void        *animadata;             /* animation data                       */
     }           animation;
-    struct wl_list  ivi_layer;              /* surface list of same layer           */
     struct wl_list  client_link;            /* surface list of same client          */
     struct wl_list  surf_map;               /* surface map list                     */
     struct wl_list  input_region;           /* surface input region list            */
     struct uifw_win_surface *next_idhash;   /* UIFW SurfaceId hash list             */
     struct uifw_win_surface *next_wshash;   /* Weston SurfaceId hash list           */
-};
-
-/* access control                       */
-#define ICO_UIFW_MAX_SUBJECT_NAME    64
-struct ico_uifw_api_permit  {
-    char     subject[ICO_UIFW_MAX_SUBJECT_NAME];    /* subject smack label  */
-    uint32_t api_permit;                            /* api permission flags */
 };
 
 /* animation operation                  */
@@ -207,20 +186,21 @@ struct ico_uifw_api_permit  {
 /* Prototype for function               */
                                             /* find uifw_client table               */
 struct uifw_client *ico_window_mgr_find_uclient(struct wl_client *client);
-                                            /* surface visible control              */
-void ico_window_mgr_set_visible(struct uifw_win_surface *usurf, const int visible);
                                             /* get client applicationId             */
 char *ico_window_mgr_get_appid(struct wl_client* client);
                                             /* get display coordinate               */
 void ico_window_mgr_get_display_coordinate(int displayno, int *x, int *y);
+                                            /* get buffer width                     */
+int ico_ivi_surface_buffer_width(struct weston_surface *es);
+                                            /* get buffer height                    */
+int ico_ivi_surface_buffer_height(struct weston_surface *es);
+                                            /* get buffer size                      */
+void ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height);
+                                            /* get surface primary view             */
+struct weston_view *ico_ivi_get_primary_view(struct uifw_win_surface *usurf);
                                             /* change weston surface                */
 void ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf, int x, int y,
                                        int width, int height);
-                                            /* surface change                       */
-void ico_window_mgr_change_surface(struct uifw_win_surface *usurf,
-                                   const int to, const int manager);
-                                            /* check active keyboard surface        */
-int ico_window_mgr_ismykeyboard(struct uifw_win_surface *usurf);
                                             /* get UIFW client table                */
 struct uifw_client *ico_window_mgr_get_uclient(const char *appid);
                                             /* get UIFW surface table               */
@@ -230,22 +210,6 @@ struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfacei
                                                          struct wl_client *client);
                                             /* get application surface              */
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
-                                            /* rebuild surface layer list           */
-void ico_window_mgr_restack_layer(struct uifw_win_surface *usurf);
-                                            /* touch layer control for input manager*/
-void ico_window_mgr_touch_layer(int omit);
-                                            /* chek surface visibility              */
-int ico_window_mgr_is_visible(struct uifw_win_surface *usurf);
-                                            /* set active surface                   */
-void ico_window_mgr_active_surface(struct weston_surface *surface);
-                                            /* get buffer width                     */
-int ico_ivi_surface_buffer_width(struct weston_surface *es);
-                                            /* get buffer height                    */
-int ico_ivi_surface_buffer_height(struct weston_surface *es);
-                                            /* get buffer size                      */
-void ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height);
-                                            /* get surface primary view             */
-struct weston_view *ico_ivi_get_primary_view(struct uifw_win_surface *usurf);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
                                             /* set surface attribute change hook    */

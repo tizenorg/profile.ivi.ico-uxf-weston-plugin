@@ -24,7 +24,7 @@
 /**
  * @brief   The common functions that each Plugin is available.
  *
- * @date    Jul-26-2013
+ * @date    Feb-21-2014
  */
 
 #ifndef _ICO_IVI_COMMON_PRIVATE_H_
@@ -48,6 +48,7 @@
 #define ICO_IVI_APPID_LENGTH     (80)       /* Maximum length of applicationId(AppCore) */
                                             /* (with terminate NULL)                */
 #define ICO_IVI_WINNAME_LENGTH   (40)       /* Maximum length of window name (with NULL)*/
+#define ICO_IVI_FILEPATH_LENGTH  (80)       /* Maximum length of file path (with NULL)*/
 #define ICO_IVI_ANIMATION_LENGTH (16)       /* Maximum length of animation name (w NULL)*/
 #define ICO_IVI_MAX_COORDINATE   (16383)    /* Maximum X or Y coordinate            */
 
