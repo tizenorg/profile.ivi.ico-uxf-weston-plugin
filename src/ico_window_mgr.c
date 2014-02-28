@@ -174,6 +174,8 @@ static void bind_ico_win_mgr(struct wl_client *client,
 static void unbind_ico_win_mgr(struct wl_resource *resource);
                                             /* convert animation name to Id value   */
 static int ico_get_animation_name(const char *animation);
+                                            /* send event to controller             */
+static void win_mgr_send_event(int event, uint32_t surfaceid, uint32_t arg1);
                                             /* touch/click select surface           */
 static void win_mgr_select_surface(struct weston_seat *seat,
                                    struct weston_surface *focus, int target);
@@ -511,11 +513,11 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
             height = buf_height;
             usurf->height = buf_height;
         }
-        if ((usurf->width > buf_width) && (usurf->scalex <= 1.0f))  {
+        if (usurf->width > buf_width)   {
             width = buf_width;
             x += (usurf->width - buf_width)/2;
         }
-        if ((usurf->height > buf_height) && (usurf->scaley <= 1.0f))    {
+        if (usurf->height > buf_height) {
             height = buf_height;
             y += (usurf->height - buf_height)/2;
         }
@@ -1002,6 +1004,40 @@ ico_get_animation_name(const char *animation)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   win_mgr_send_event: send event to controller
+ *
+ * @param[in]   event           event code
+ * @param[in]   surfaceid       surface id
+ * @param[in]   arg1            argument 1
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+win_mgr_send_event(int event, uint32_t surfaceid, uint32_t arg1)
+{
+    struct uifw_manager     *mgr;
+
+    /* send event to manager     */
+    wl_list_for_each (mgr, &_ico_win_mgr->manager_list, link)   {
+        switch (event)  {
+        case ICO_WINDOW_MGR_WINDOW_ACTIVE:      /* active event             */
+            uifw_trace("win_mgr_send_event: Send ACTIVE(surf=%08x, select=%x)",
+                       surfaceid, arg1);
+            ico_window_mgr_send_window_active(mgr->resource, surfaceid, arg1);
+            break;
+        case ICO_WINDOW_MGR_DESTROY_SURFACE:    /* surface destroy event    */
+            uifw_trace("win_mgr_send_event: Send DESTROY_SURFACE(surf=%08x)", surfaceid);
+            ico_window_mgr_send_destroy_surface(mgr->resource, surfaceid);
+            break;
+        default:
+            uifw_error("win_mgr_send_event: Unknown event(%d)", event);
+            break;
+        }
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   win_mgr_select_surface: select surface by mouse click
  *
  * @param[in]   seat            weston seat
@@ -1183,9 +1219,6 @@ ico_ivi_surfaceConfigureNotification(struct weston_layout_surface *ivisurf, void
     struct weston_view *view;
     struct weston_surface *surface;
     uint32_t    id_surface;
-#if 1   /* for check genivi     */
-    struct weston_layout_SurfaceProperties  prop;
-#endif
 
     id_surface = weston_layout_getIdOfSurface(ivisurf);
     view = weston_layout_get_weston_view(ivisurf);
@@ -1200,29 +1233,10 @@ ico_ivi_surfaceConfigureNotification(struct weston_layout_surface *ivisurf, void
                        id_surface);
         }
         else    {
-#if 1   /* for check genivi     */
-            if (weston_layout_getPropertiesOfSurface(ivisurf, &prop) != 0)  {
-                uifw_trace("ico_ivi_surfaceConfigureNotification: Properties get Error");
-                uifw_trace("ico_ivi_surfaceConfigureNotification: Configure %08x "
-                           "x/y=%d/%d w/h=%d/%d",
-                           id_surface, (int)view->geometry.x, (int)view->geometry.y,
-                           surface->width, surface->height);
-            }
-            else    {
-                uifw_trace("ico_ivi_surfaceConfigureNotification: Configure %08x "
-                           "x/y=%d/%d->%d/%d w/h=%d/%d(%d/%d)->%d/%d",
-                           id_surface, prop.destX, prop.destY,
-                           (int)view->geometry.x, (int)view->geometry.y,
-                           prop.sourceWidth, prop.sourceHeight,
-                           prop.origSourceWidth, prop.origSourceHeight,
-                           surface->width, surface->height);
-            }
-#else
             uifw_trace("ico_ivi_surfaceConfigureNotification: Configure %08x "
                        "x/y=%d/%d w/h=%d/%d",
                        id_surface, (int)view->geometry.x, (int)view->geometry.y,
                        surface->width, surface->height);
-#endif
             weston_layout_surfaceSetSourceRectangle(ivisurf,
                         0, 0, surface->width, surface->height);
             weston_layout_surfaceSetDestinationRectangle(ivisurf,
@@ -1248,16 +1262,48 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                                     enum weston_layout_notification_mask mask,
                                     void *userdata)
 {
+    struct uifw_manager *mgr;
     uint32_t    id_surface;
     int         retanima;
+    uint32_t    newmask;
     struct uifw_win_surface *usurf;
 
+    newmask = ((uint32_t)mask) & (~(IVI_NOTIFICATION_OPACITY|IVI_NOTIFICATION_ORIENTATION|
+                                    IVI_NOTIFICATION_PIXELFORMAT));
     id_surface = weston_layout_getIdOfSurface(ivisurf);
-    if (mask != 0)  {
-        usurf = ico_window_mgr_get_usurf(id_surface);
+    usurf = ico_window_mgr_get_usurf(id_surface);
+
+    if ((newmask != 0) && (usurf != NULL))  {
         uifw_trace("ico_ivi_surfacePropertyNotification: Property %x(%08x) usurf=%08x",
-                   id_surface, mask, (int)usurf);
-        if ((mask & IVI_NOTIFICATION_VISIBILITY) && (usurf != NULL))    {
+                   id_surface, newmask, (int)usurf);
+        if (newmask & (IVI_NOTIFICATION_SOURCE_RECT|IVI_NOTIFICATION_DEST_RECT|
+                       IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION))   {
+            /* change position or size  */
+            uifw_trace("ico_ivi_surfacePropertyNotification: %08x x/y=%d/%d->%d/%d "
+                       "w/h=%d/%d->%d/%d(%d/%d)", id_surface, usurf->x, usurf->y,
+                       prop->destX, prop->destY, usurf->width, usurf->height,
+                       prop->destWidth, prop->destHeight,
+                       prop->sourceWidth, prop->sourceHeight);
+            if ((usurf->client_width == prop->sourceWidth) &&
+                (usurf->client_height == prop->sourceHeight))   {
+                newmask &= (~(IVI_NOTIFICATION_SOURCE_RECT|IVI_NOTIFICATION_DIMENSION));
+            }
+            else    {
+                usurf->client_width = prop->sourceWidth;
+                usurf->client_height = prop->sourceHeight;
+            }
+            if ((usurf->x == prop->destX) && (usurf->y == prop->destY) &&
+                (usurf->width == prop->destWidth) && (usurf->height == prop->destHeight)) {
+                newmask &= (~(IVI_NOTIFICATION_DEST_RECT|IVI_NOTIFICATION_POSITION));
+            }
+            else    {
+                usurf->x = prop->destX;
+                usurf->y = prop->destY;
+                usurf->width = prop->destWidth;
+                usurf->height = prop->destHeight;
+            }
+        }
+        if (newmask & IVI_NOTIFICATION_VISIBILITY)  {
             if ((usurf->visible == 0) && (prop->visibility)) {
                 uifw_trace("ico_ivi_surfacePropertyNotification: %08x Visible 0=>1",
                            id_surface);
@@ -1306,6 +1352,18 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
             }
             else    {
                 uifw_trace("ico_ivi_surfacePropertyNotification: visible no change");
+                newmask &= (~IVI_NOTIFICATION_VISIBILITY);
+            }
+        }
+
+        if (newmask)    {
+            /* surface changed, send event to controller    */
+            wl_list_for_each (mgr, &_ico_win_mgr->manager_list, link)   {
+                uifw_trace("win_mgr_send_event: Send UPDATE_SURFACE(surf=%08x)", id_surface);
+                ico_window_mgr_send_update_surface(mgr->resource, id_surface,
+                                usurf->visible, usurf->client_width,
+                                usurf->client_height, usurf->x, usurf->y,
+                                usurf->width, usurf->height);
             }
         }
     }
@@ -2080,7 +2138,7 @@ win_mgr_surface_configure(struct uifw_win_surface *usurf,
 
         /* not set geometry width/height    */
         ev = ico_ivi_get_primary_view(usurf);
-        weston_view_set_position(ev, x + usurf->xadd, y + usurf->yadd);
+        weston_view_set_position(ev, x, y);
     }
 }
 
@@ -2121,6 +2179,9 @@ win_mgr_destroy_surface(struct weston_surface *surface)
     if (win_mgr_hook_animation) {
         (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_DESTROY, (void *)usurf);
     }
+
+    /* send destroy event to controller */
+    win_mgr_send_event(ICO_WINDOW_MGR_DESTROY_SURFACE, usurf->surfaceid, 0);
 
     /* delete from cleint list      */
     wl_list_remove(&usurf->client_link);

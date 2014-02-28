@@ -97,28 +97,15 @@ struct uifw_win_surface {
     struct weston_surface *surface;         /* Weston surface                       */
     struct weston_layout_surface *ivisurf;  /* Weston layout surface                */
     struct uifw_client    *uclient;         /* Client                               */
-    struct weston_transform transform;      /* transform matrix                     */
-    float       scalex;                     /* surface transform scale of X         */
-    float       scaley;                     /* surface transform scale of Y         */
     int         x;                          /* X-coordinate                         */
     int         y;                          /* Y-coordinate                         */
-    short       xadd;                       /* X-coordinate delta                   */
-    short       yadd;                       /* Y-coordinate delta                   */
     uint16_t    width;                      /* Width                                */
     uint16_t    height;                     /* Height                               */
     uint16_t    client_width;               /* Widht that a client(App) required    */
     uint16_t    client_height;              /* Height that a client(App) required   */
-    uint16_t    conf_width;                 /* Width that notified to client        */
-    uint16_t    conf_height;                /* Height that notified to client       */
-    uint32_t    attributes;                 /* surface attributes                   */
     char        winname[ICO_IVI_WINNAME_LENGTH];/* Window name                      */
-    char        disable;                    /* can not display                      */
     char        visible;                    /* visibility                           */
-    char        raise;                      /* raise(top of the layer)              */
-    char        created;                    /* sended created event to manager      */
-    char        mapped;                     /* end of map                           */
     char        restrain_configure;         /* restrant configure event             */
-    char        set_transform;              /* surface transform flag               */
     char        res[1];                     /* (unused)                             */
     struct  _uifw_win_surface_animation {   /* wndow animation                      */
         struct weston_animation animation;  /* weston animation control             */

@@ -25,6 +25,15 @@
       <arg name="device" type="string" summary="input device name, if NULL, all devices with out fixed assign"/>
       <arg name="input" type="int" summary="input switch number, if -1, all input with out dixed assign"/>
     </request>
+
+    <request name="send_key_event">
+      <description summary="send key input event to application">
+        Keyboard event sent to application.
+      </description>
+      <arg name="target" type="string" summary="target surface@application for input switch"/>
+      <arg name="code" type="int" summary="event code"/>
+      <arg name="value" type="int" summary="event value"/>
+    </request>
   </interface>
 
   <interface name="ico_exinput" version="1">

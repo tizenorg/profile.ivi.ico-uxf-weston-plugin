@@ -61,7 +61,6 @@ struct ico_input_mgr {
     struct weston_compositor *compositor;   /* Weston Compositor                    */
     struct wl_list  ictl_list;              /* Input Controller List                */
     struct wl_list  app_list;               /* application List                     */
-    struct wl_list  dev_list;               /* pseudo device List                   */
     struct wl_list  free_region;            /* free input region table list         */
     struct weston_seat *seat;               /* input seat                           */
     struct wl_resource *inputmgr;
@@ -112,22 +111,6 @@ struct ico_app_mgr {
 #define PENDING_X           0x01            /* pending X coordinate                 */
 #define PENDING_Y           0x02            /* pending Y coordinate                 */
 
-/* Pseudo Input Device Table    */
-struct uifw_input_device    {
-    struct wl_list  link;                   /* link to next device                  */
-    uint16_t    type;                       /* device type                          */
-    uint16_t    no;                         /* device number                        */
-    int         disp_x;                     /* display X coordinate                 */
-    int         disp_y;                     /* display Y coordinate                 */
-    int         x;                          /* current X coordinate                 */
-    int         y;                          /* current Y coordinate                 */
-    int         pend_x;                     /* pending X coordinate                 */
-    int         pend_y;                     /* pending Y coordinate                 */
-    uint16_t    node;                       /* display number                       */
-    uint16_t    pending;                    /* pending flag                         */
-    struct weston_view *grab;               /* current grab surface view            */
-};
-
 /* Input Region Table           */
 struct uifw_region_mng  {
     struct wl_list  link;                   /* link pointer                         */
@@ -165,6 +148,9 @@ static void ico_mgr_add_input_app(struct wl_client *client, struct wl_resource *
                                             /* delete input event to application    */
 static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
                                   const char *appid, const char *device, int32_t input);
+                                            /* send key input event from device     */
+static void ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
+                                   const char *target, int32_t code, int32_t value);
                                             /* set input region                     */
 static void ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                                      const char *target, int32_t x, int32_t y,
@@ -202,7 +188,8 @@ static void ico_input_send_region_event(struct wl_array *array);
 /* Input Manager Control interface      */
 static const struct ico_input_mgr_control_interface ico_input_mgr_implementation = {
     ico_mgr_add_input_app,
-    ico_mgr_del_input_app
+    ico_mgr_del_input_app,
+    ico_mgr_send_key_event
 };
 
 /* Extended Input interface             */
@@ -416,6 +403,93 @@ ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *resource,
         }
     }
     uifw_trace("ico_mgr_del_input_app: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_mgr_send_key_event: send key input event from device input controller
+ *
+ * @param[in]   client          client(HomeScreen)
+ * @param[in]   resource        resource of request
+ * @param[in]   target          target window name and application id
+ * @param[in]   code            event code
+ * @param[in]   value           event value
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
+                       const char *target, int32_t code, int32_t value)
+{
+    struct uifw_win_surface *usurf;         /* UIFW surface                 */
+    struct wl_resource      *cres;          /* event send client resource   */
+    struct wl_array dummy_array;            /* dummy array for wayland API  */
+    uint32_t    ctime;                      /* current time(ms)             */
+    uint32_t    serial;                     /* event serial number          */
+    int         keyboard_active;            /* keyborad active surface flag */
+
+    uifw_trace("ico_mgr_send_key_event: Enter(target=%s code=%x value=%d)",
+               target ? target : "(NULL)", code, value);
+
+    if (! pInputMgr->seat->keyboard)    {
+        uifw_error("ico_mgr_send_key_event: Leave(system has no keyboard)");
+        return;
+    }
+
+    ctime = weston_compositor_get_time();
+
+    if ((target == NULL) || (*target == 0) || (*target == ' ')) {
+        /* send event to surface via weston */
+
+        uifw_trace("ico_mgr_send_key_event: notify_key(%d,%d)", code, value);
+        notify_key(pInputMgr->seat, ctime, code,
+                   value ? WL_KEYBOARD_KEY_STATE_PRESSED :
+                           WL_KEYBOARD_KEY_STATE_RELEASED, STATE_UPDATE_NONE);
+    }
+    else    {
+        /* send event to fixed application  */
+        /* get application surface       */
+        usurf = ico_window_mgr_get_client_usurf(target);
+        if (! usurf)  {
+            uifw_trace("ico_mgr_send_key_event: Leave(window=%s dose not exist)",
+                       target);
+            return;
+        }
+
+        /* send event                   */
+        cres = wl_resource_find_for_client(
+                            &pInputMgr->seat->keyboard->resource_list,
+                            wl_resource_get_client(usurf->surface->resource));
+        if (cres)   {
+            if (pInputMgr->seat->keyboard->focus == usurf->surface) {
+                keyboard_active = 1;
+            }
+            else    {
+                keyboard_active = 0;
+            }
+            if (! keyboard_active)  {
+                wl_array_init(&dummy_array);
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_keyboard_send_enter(cres, serial,
+                                       usurf->surface->resource, &dummy_array);
+            }
+            serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+            uifw_trace("ico_mgr_send_key_event: send Key (%d, %d) to %08x",
+                       code, value, usurf->surfaceid);
+            wl_keyboard_send_key(cres, serial, ctime, code,
+                                 value ? WL_KEYBOARD_KEY_STATE_PRESSED :
+                                         WL_KEYBOARD_KEY_STATE_RELEASED);
+           if (! keyboard_active)  {
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_keyboard_send_leave(cres, serial, usurf->surface->resource);
+            }
+        }
+        else    {
+            uifw_trace("ico_mgr_send_key_event: Key client %08x dose not exist",
+                       (int)usurf->surface->resource);
+        }
+    }
+    uifw_debug("ico_mgr_send_key_event: Leave");
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1420,7 +1494,6 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     /* initialize list */
     wl_list_init(&pInputMgr->ictl_list);
     wl_list_init(&pInputMgr->app_list);
-    wl_list_init(&pInputMgr->dev_list);
     wl_list_init(&pInputMgr->free_region);
     p = malloc(sizeof(struct uifw_region_mng)*100);
     if (p)  {

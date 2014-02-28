@@ -91,7 +91,26 @@
       <arg name="format" type="uint"/>
     </event>
 
+    <event name="update_surface">
+      <description summary="event of surface property changed">
+       Event of surface property changed.
+      </description>
+      <arg name="surfaceid" type="uint"/>
+      <arg name="visible" type="int"/>
+      <arg name="srcwidth" type="int"/>
+      <arg name="srcheight" type="int"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+
+    <event name="destroy_surface">
+      <description summary="event of surface destroy">
+       Event of surface destroy.
+      </description>
+      <arg name="surfaceid" type="uint"/>
+    </event>
   </interface>
 
 </protocol>
-

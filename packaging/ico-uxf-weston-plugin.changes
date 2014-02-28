@@ -1,3 +1,8 @@
+* Fri Feb 28 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140214.223342@8dc903b
+- 0.9.21 release
+-- Some interfaces were added for SystemController corresponding to GENIVI layer management.
+-- It changes so that the layer controlling function of GENIVI may be used for surface management and layer management.
+
 * Thu Feb 13 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140128.174118@4018b9f
 - bugfix:  TIVI-2396: Virtual Keyboard doesn't catch the mouse event with the ICO UI
 
