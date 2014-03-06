@@ -125,6 +125,7 @@ struct uifw_win_surface {
         uint16_t    pos_y;                  /* start/end Y-coordinate               */
         uint16_t    pos_width;              /* start/end width                      */
         uint16_t    pos_height;             /* start/end height                     */
+        float       alpha;                  /* original alpha                       */
         short       current;                /* animation current percentage         */
         char        state;                  /* animation state                      */
         char        visible;                /* need hide(1)/show(2) at end of animation*/

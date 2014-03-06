@@ -54,6 +54,7 @@
 #include <GLES2/gl2.h>
 
 #include <weston/compositor.h>
+#include <weston/weston-layout.h>
 
 /* detail debug log */
 #define UIFW_DETAIL_OUT 0                   /* 1=detail debug log/0=no detail log   */
@@ -1267,6 +1268,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
     int         retanima;
     uint32_t    newmask;
     struct uifw_win_surface *usurf;
+    struct weston_view  *ev;
 
     newmask = ((uint32_t)mask) & (~(IVI_NOTIFICATION_OPACITY|IVI_NOTIFICATION_ORIENTATION|
                                     IVI_NOTIFICATION_PIXELFORMAT));
@@ -1315,6 +1317,13 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                     usurf->animation.pos_y = usurf->y;
                     usurf->animation.pos_width = usurf->width;
                     usurf->animation.pos_height = usurf->height;
+                    ev = weston_layout_get_weston_view(ivisurf);
+                    if (ev) {
+                        usurf->animation.alpha = ev->alpha;
+                    }
+                    else    {
+                        usurf->animation.alpha = 0.9999f;
+                    }
                     retanima =
                         (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPSHOW,
                                                   (void *)usurf);
@@ -1332,6 +1341,13 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                     usurf->animation.pos_y = usurf->y;
                     usurf->animation.pos_width = usurf->width;
                     usurf->animation.pos_height = usurf->height;
+                    ev = weston_layout_get_weston_view(ivisurf);
+                    if (ev) {
+                        usurf->animation.alpha = ev->alpha;
+                    }
+                    else    {
+                        usurf->animation.alpha = 0.99999999f;
+                    }
                     retanima =
                         (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPHIDE,
                                                   (void *)usurf);
@@ -1494,7 +1510,7 @@ uifw_set_animation(struct wl_client *client, struct wl_resource *resource,
     int     animaid;
     struct uifw_win_surface *usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
 
-    uifw_trace("uifw_set_transition: surf=%08x,type=%x,anim=%s,time=%d",
+    uifw_trace("uifw_set_animation: surf=%08x,type=%x,anim=%s,time=%d",
                surfaceid, type, animation, time);
 
     if (usurf) {

@@ -453,6 +453,8 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
     }
     if (disp)   {
         usurf->restrain_configure = 0;
+        uifw_trace("animation_end: %08x vis=%d(%x)",
+                   usurf->surfaceid, usurf->visible, usurf->animation.visible);
         if ((usurf->animation.visible == ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
             usurf->visible = 0;
@@ -887,8 +889,9 @@ animation_swing_end(struct weston_animation *animation)
     if (usurf && usurf->surface)    {
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
-        ev->alpha = 1.0;
-
+        ev->alpha = usurf->animation.alpha;
+        uifw_debug("animation_swing_end: %08x set alpha=%f",
+                   usurf->surfaceid, usurf->animation.alpha);
         if ((ev->output) && (es->buffer_ref.buffer))    {
             weston_surface_damage(es);
         }
@@ -973,13 +976,14 @@ animation_fade(struct weston_animation *animation,
             ev->alpha = 1.0f - (((float)(par*2)) / 100.0f);
         }
     }
-    if (ev->alpha < 0.0)        ev->alpha = 0.0;
-    else if (ev->alpha > 1.0)   ev->alpha = 1.0;
+    if (ev->alpha < 0.0f)       ev->alpha = 0.0f;
+    else if (ev->alpha > 1.0f)  ev->alpha = 1.0f;
 
-    uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
-               usurf->surfaceid, animation->frame_counter, par,
-               ev->alpha, usurf->animation.anima, usurf->animation.state);
-
+    if ((par < 5) || (par > 95))    {
+        uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
+                   usurf->surfaceid, animation->frame_counter, par,
+                   ev->alpha, usurf->animation.anima, usurf->animation.state);
+    }
     if ((ev->output) && (es->buffer_ref.buffer) &&
         (es->width > 0) && (es->height > 0))    {
         weston_surface_damage(es);
@@ -1014,8 +1018,9 @@ animation_fade_end(struct weston_animation *animation)
     if (usurf && usurf->surface)    {
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
-        ev->alpha = 1.0;
-
+        ev->alpha = usurf->animation.alpha;
+        uifw_debug("animation_fade_end: %08x set alpha=%f",
+                   usurf->surfaceid, usurf->animation.alpha);
         if ((ev->output) && (es->buffer_ref.buffer) &&
             (es->width > 0) && (es->height > 0))    {
             weston_surface_damage(es);
@@ -1161,8 +1166,7 @@ animation_zoom_end(struct weston_animation *animation)
     if (usurf && usurf->surface)    {
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
-        ev->alpha = 1.0;
-
+        ev->alpha = usurf->animation.alpha;
         if ((ev->output) && (es->buffer_ref.buffer) &&
             (es->width > 0) && (es->height > 0))    {
             weston_surface_damage(es);
