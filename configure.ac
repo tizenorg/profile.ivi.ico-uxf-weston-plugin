@@ -46,5 +46,6 @@ WAYLAND_SCANNER_RULES(['$(top_srcdir)/protocol'])
 
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
+		 tools/Makefile
 		 tests/Makefile])
 AC_OUTPUT

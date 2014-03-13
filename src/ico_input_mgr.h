@@ -28,6 +28,11 @@
 #ifndef _ICO_INPUT_MGR_H_
 #define _ICO_INPUT_MGR_H_
 
+/* Pseudo input device name                         */
+#define ICO_PSEUDO_INPUT_POINTER    "ico-pseudo-input-pointer"
+#define ICO_PSEUDO_INPUT_TOUCH      "ico-pseudo-input-touch"
+#define ICO_PSEUDO_INPUT_KEY        "ico-pseudo-input-key"
+
 /* Input Region struct for Haptic Device Controller */
 struct ico_uifw_input_region    {
     uint16_t    change;                 /* change method                        */
@@ -53,4 +58,3 @@ struct ico_uifw_input_region    {
 };
 
 #endif  /*_ICO_INPUT_MGR_H_*/
-

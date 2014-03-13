@@ -206,4 +206,3 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
 
     return 0;
 }
-

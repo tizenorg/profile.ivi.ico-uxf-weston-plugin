@@ -97,12 +97,15 @@ struct uifw_win_surface {
     struct weston_surface *surface;         /* Weston surface                       */
     struct weston_layout_surface *ivisurf;  /* Weston layout surface                */
     struct uifw_client    *uclient;         /* Client                               */
+    struct wl_resource    *shsurf_resource; /* wl_shell_surface resource            */
     int         x;                          /* X-coordinate                         */
     int         y;                          /* Y-coordinate                         */
     uint16_t    width;                      /* Width                                */
     uint16_t    height;                     /* Height                               */
     uint16_t    client_width;               /* Widht that a client(App) required    */
     uint16_t    client_height;              /* Height that a client(App) required   */
+    uint16_t    configure_width;            /* Widht that a client(App) configured  */
+    uint16_t    configure_height;           /* Height that a client(App) configured */
     char        winname[ICO_IVI_WINNAME_LENGTH];/* Window name                      */
     char        visible;                    /* visibility                           */
     char        restrain_configure;         /* restrant configure event             */

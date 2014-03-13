@@ -38,6 +38,11 @@
 #include <math.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <linux/input.h>
+#include <linux/uinput.h>
+#include <errno.h>
 
 #include <pixman.h>
 #include <wayland-server.h>
@@ -182,6 +187,7 @@ static void ico_device_configure_code(struct wl_client *client,
 static void ico_device_input_event(struct wl_client *client, struct wl_resource *resource,
                                    uint32_t time, const char *device,
                                    int32_t input, int32_t code, int32_t state);
+                                            /* send region event                    */
 static void ico_input_send_region_event(struct wl_array *array);
 
 /* definition of Wayland protocol       */
@@ -1514,4 +1520,3 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     uifw_info("ico_input_mgr: Leave(module_init)");
     return 0;
 }
-

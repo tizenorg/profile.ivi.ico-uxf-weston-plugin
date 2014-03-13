@@ -126,6 +126,8 @@ static void animation_fade(struct weston_animation *animation,
                            struct weston_output *output, uint32_t msecs);
                                             /* fade animation end                   */
 static void animation_fade_end(struct weston_animation *animation);
+                                            /* slide animation end                  */
+static void animation_slide_end(struct weston_animation *animation);
                                             /* zoom animation                       */
 static void animation_zoom(struct weston_animation *animation,
                            struct weston_output *output, uint32_t msecs);
@@ -521,12 +523,10 @@ animation_slide(struct weston_animation *animation,
                 struct weston_output *output, uint32_t msecs)
 {
     struct uifw_win_surface *usurf;
-    struct weston_surface   *es;
-    struct weston_view      *ev;
+    struct animation_data   *animadata;
+    struct weston_layout_SurfaceProperties  prop;
     int         dwidth, dheight;
-    int         par;
-    int         x;
-    int         y;
+    int         par, x, y;
 
     usurf = container_of(animation, struct uifw_win_surface, animation.animation);
 
@@ -538,14 +538,16 @@ animation_slide(struct weston_animation *animation,
         }
         return;
     }
-    ev = ico_ivi_get_primary_view(usurf);
+    if (animation->frame_counter == 1)  {
+        animadata = (struct animation_data *)usurf->animation.animadata;
+        animadata->end_function = animation_slide_end;
+    }
     par = usurf->animation.current;
 
     uifw_debug("animation_slide: %08x count=%d %d%% anima=%d state=%d",
                usurf->surfaceid, animation->frame_counter, par,
                usurf->animation.anima, usurf->animation.state);
 
-    es = usurf->surface;
     x = usurf->x;
     y = usurf->y;
 
@@ -599,24 +601,42 @@ animation_slide(struct weston_animation *animation,
         }
         break;
     }
-
-    uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d)",
-               usurf->surfaceid, par, x, y, usurf->x, usurf->y);
-    ev->geometry.x = usurf->node_tbl->disp_x + x;
-    ev->geometry.y = usurf->node_tbl->disp_y + y;
-    if ((ev->output) && (es->buffer_ref.buffer) &&
-        (es->width > 0) && (es->height > 0))    {
-        weston_view_geometry_dirty(ev);
-        weston_surface_damage(es);
+    if ((par < 8) || (par > 92))    {
+        uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d) %08x",
+                   usurf->surfaceid, par, x, y, usurf->x, usurf->y, (int)usurf->ivisurf);
+    }
+    if (weston_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+        if (weston_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
+                                             prop.destWidth, prop.destHeight) == 0) {
+            weston_layout_commitChanges();
+        }
     }
     if (par >= 100) {
         /* end of animation     */
         animation_end(usurf, 1);
         uifw_trace("animation_slide: End of animation");
     }
-    else    {
-        /* continue animation   */
-        weston_compositor_schedule_repaint(weston_ec);
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   animation_slide_end: slide animation end
+ *
+ * @param[in]   animation   weston animation table
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+animation_slide_end(struct weston_animation *animation)
+{
+    struct uifw_win_surface *usurf;
+
+    usurf = container_of(animation, struct uifw_win_surface, animation.animation);
+    if (usurf)  {
+        ico_window_mgr_set_weston_surface(usurf,
+                                          usurf->animation.pos_x, usurf->animation.pos_y,
+                                          usurf->animation.pos_width,
+                                          usurf->animation.pos_height);
     }
 }
 
@@ -890,7 +910,7 @@ animation_swing_end(struct weston_animation *animation)
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
         ev->alpha = usurf->animation.alpha;
-        uifw_debug("animation_swing_end: %08x set alpha=%f",
+        uifw_debug("animation_swing_end: %08x set alpha=%.2f",
                    usurf->surfaceid, usurf->animation.alpha);
         if ((ev->output) && (es->buffer_ref.buffer))    {
             weston_surface_damage(es);
@@ -979,7 +999,7 @@ animation_fade(struct weston_animation *animation,
     if (ev->alpha < 0.0f)       ev->alpha = 0.0f;
     else if (ev->alpha > 1.0f)  ev->alpha = 1.0f;
 
-    if ((par < 5) || (par > 95))    {
+    if ((par < 8) || (par > 92))    {
         uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
                    usurf->surfaceid, animation->frame_counter, par,
                    ev->alpha, usurf->animation.anima, usurf->animation.state);
@@ -1019,7 +1039,7 @@ animation_fade_end(struct weston_animation *animation)
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
         ev->alpha = usurf->animation.alpha;
-        uifw_debug("animation_fade_end: %08x set alpha=%f",
+        uifw_debug("animation_fade_end: %08x set alpha=%.2f",
                    usurf->surfaceid, usurf->animation.alpha);
         if ((ev->output) && (es->buffer_ref.buffer) &&
             (es->width > 0) && (es->height > 0))    {
@@ -1219,4 +1239,3 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
 
     return 0;
 }
-

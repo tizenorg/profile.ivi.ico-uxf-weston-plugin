@@ -28,6 +28,7 @@
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <unistd.h>
+#include    <stdarg.h>
 #include    <string.h>
 #include    <errno.h>
 #include    <pthread.h>
@@ -42,7 +43,6 @@
 #include    <linux/input.h>
 #include    <linux/uinput.h>
 #include    <linux/joystick.h>
-#include    "test-common.h"
 
 #define DEV_TOUCH   0
 #define DEV_JS      1
@@ -81,6 +81,11 @@ static int  mqid = -1;
 static int  mDebug = 0;
 static int  mRun = 1;
 static int  mTouch = 1;
+static int  mWidth = 1080;
+static int  mHeight = 1920;
+static int  mConvert = 0;
+
+static void print_log(const char *fmt, ...);
 
 static void
 term_signal(const int signo)
@@ -128,9 +133,9 @@ init_device(const char *device)
     }
 
     memset(&uinputDevice, 0, sizeof(uinputDevice));
-    strcpy(uinputDevice.name, device);
-    uinputDevice.absmax[ABS_X] = 1920;
-    uinputDevice.absmax[ABS_Y] = 1080;
+    strncpy(uinputDevice.name, device, UINPUT_MAX_NAME_SIZE-1);
+    uinputDevice.absmax[ABS_X] = mHeight;
+    uinputDevice.absmax[ABS_Y] = mWidth;
 
     /* uinput device configuration  */
     if (write(uifd, &uinputDevice, sizeof(uinputDevice)) < (int)sizeof(uinputDevice)) {
@@ -201,6 +206,7 @@ init_device(const char *device)
         close(fd);
         print_log("%d.event device(%s) is %s", ii+1, devFile, devName);
     }
+    usleep(200*1000);
 }
 
 static int
@@ -307,10 +313,12 @@ send_event(const char *cmd)
         gettimeofday(&event.time, NULL);
         if (event_key[key].type == SPECIALTYPE_XY)  {
             event.type = EV_ABS;
-            event.code = ABS_X;
+            if (mConvert)   event.code = ABS_Y;
+            else            event.code = ABS_X;
             event.value = convert_value(value, &errp, 0);
             if (mDebug) {
-                print_log("Send Event ABS_X=%d\t# %d.%03d", event.value,
+                print_log("Send Event ABS_%c=%d\t# %d.%03d", mConvert ? 'Y' : 'X',
+                          event.value,
                           (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
                 fflush(stderr);
             }
@@ -319,12 +327,16 @@ send_event(const char *cmd)
                 fflush(stderr);
                 return;
             }
-            event.code = ABS_Y;
+            if (mConvert)   event.code = ABS_X;
+            else            event.code = ABS_Y;
             if (*errp == ',')   {
                 event.value = convert_value(errp + 1, (char **)0, 0);
             }
             else    {
                 event.value = 0;
+            }
+            if (mConvert)   {
+                event.value = mHeight - event.value - 1;
             }
             event.time.tv_usec += 200;
             if (event.time.tv_usec >= 1000000)  {
@@ -332,7 +344,8 @@ send_event(const char *cmd)
                 event.time.tv_usec -= 1000000;
             }
             if (mDebug) {
-                print_log("Send Event ABS_Y=%d\t# %d.%03d", event.value,
+                print_log("Send Event ABS_%c=%d\t# %d.%03d", mConvert ? 'X' : 'Y',
+                          event.value,
                           (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
                 fflush(stderr);
             }
@@ -345,7 +358,12 @@ send_event(const char *cmd)
             }
             else    {
                 event.code = event_key[key].code;
-                event.value = convert_value(value, (char **)0, 0);
+                if (value[0] == 0)  {
+                    event.value = event_key[key].value;
+                }
+                else    {
+                    event.value = convert_value(value, (char **)0, 0);
+                }
             }
             if (mDebug) {
                 if ((event.type == EV_ABS) && (event.code == ABS_X))    {
@@ -354,6 +372,16 @@ send_event(const char *cmd)
                 }
                 else if ((event.type == EV_ABS) && (event.code == ABS_Y))    {
                     print_log("Send Event Y=%d\t %d.%03d", event.value,
+                              (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
+                }
+                else if ((event.type == EV_KEY) &&
+                         (event.code == BTN_TOUCH) && (event.value == 1))    {
+                    print_log("Send Event BTN_TOUCH=Down\t# %d.%03d",
+                              (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
+                }
+                else if ((event.type == EV_KEY) &&
+                         (event.code == BTN_TOUCH) && (event.value == 0))    {
+                    print_log("Send Event BTN_TOUCH=Up\t# %d.%03d",
                               (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
                 }
                 else if ((event.type == EV_KEY) &&
@@ -413,11 +441,35 @@ send_event(const char *cmd)
     }
 }
 
+void
+print_log(const char *fmt, ...)
+{
+    va_list     ap;
+    char        log[128];
+    struct timeval  NowTime;
+    extern long timezone;
+    static int  sTimeZone = (99*60*60);
+
+    va_start(ap, fmt);
+    vsnprintf(log, sizeof(log)-2, fmt, ap);
+    va_end(ap);
+
+    gettimeofday( &NowTime, (struct timezone *)0 );
+    if( sTimeZone > (24*60*60) )    {
+        tzset();
+        sTimeZone = timezone;
+    }
+    NowTime.tv_sec -= sTimeZone;
+    fprintf(stderr, "[%02d:%02d:%02d.%03d@%d] %s\n", (int)((NowTime.tv_sec/3600) % 24),
+            (int)((NowTime.tv_sec/60) % 60), (int)(NowTime.tv_sec % 60),
+            (int)NowTime.tv_usec/1000, getpid(), log);
+}
+
 static void
 usage(const char *prog)
 {
-    fprintf(stderr, "Usage: %s [-device=device] [{-m/-t/-j}] [-mq[=key]] "
-            "[-d] [event=value] [event=value] ...\n", prog);
+    fprintf(stderr, "Usage: %s [-device=device] [-w=w] [-h=h] [-c] [{-m/-t/-j/-J}] "
+            "[-mq[=key]] [-d] [event[=value]] [event[=value]] ...\n", prog);
     exit(0);
 }
 
@@ -433,11 +485,22 @@ main(int argc, char *argv[])
     char    buf[240];
 
     j = 0;
+    mWidth = 1080;
+    mHeight = 1920;
     strcpy(buf, "ico_test_device");
     for (i = 1; i < argc; i++)  {
         if (argv[i][0] == '-')  {
             if (strncasecmp(argv[i], "-device=", 8) == 0)   {
                 strcpy(buf, &argv[i][8]);
+            }
+            else if (strncasecmp(argv[i], "-w=", 3) == 0)   {
+                mWidth = strtol(&argv[i][3], (char **)0, 0);
+            }
+            else if (strncasecmp(argv[i], "-h=", 3) == 0)   {
+                mHeight = strtol(&argv[i][3], (char **)0, 0);
+            }
+            else if (strcasecmp(argv[i], "-c") == 0)   {
+                mConvert = 1;               /* Convert logical to physical  */
             }
             else if (strcasecmp(argv[i], "-m") == 0)   {
                 mTouch = 1;                 /* Simulate mouse               */
@@ -485,7 +548,7 @@ main(int argc, char *argv[])
             memset(&mqbuf, 0, sizeof(mqbuf));
             if (msgrcv(mqid, &mqbuf, sizeof(mqbuf)-sizeof(long), 0, 0) < 0) {
                 if (errno == EINTR) continue;
-                print_log("test-send_event: mq(%d) receive error[%d]",
+                print_log("ico_send_inputevent: mq(%d) receive error[%d]",
                           mqkey, errno);
                 fflush(stderr);
                 break;
@@ -525,6 +588,7 @@ main(int argc, char *argv[])
             send_event(argv[i]);
         }
     }
+    usleep(300*1000);
     exit(0);
 }
 

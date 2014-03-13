@@ -71,4 +71,5 @@ install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 %{_includedir}/%{name}/ico_input_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_window_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_input_mgr.h
+%{_bindir}/ico_send_inputevent
 %{_libdir}/libico-uxf-weston-plugin.so

@@ -9,7 +9,7 @@ mkdir ../tests/testlog 2> /dev/null
 rm -fr ../tests/testlog/* 2> /dev/null
 
 # 2 Start Pseudo event device (for Touch Panel)
-../tests/test-send_event -d -mq=5551 2> ../tests/testlog/event_log.log &
+../tools/ico_send_inputevent -d -mq=5551 2> ../tests/testlog/event_log.log &
 sleep 1
 
 # 3 Set Environment for Test
@@ -31,7 +31,7 @@ export LD_LIBRARY_PATH=../src/.libs:$LD_LIBRARY_PATH
 # 7 End of Test
 sleep 2
 /usr/bin/killall weston
-/usr/bin/killall test-send_event
+/usr/bin/killall ico_send_inputevent
 sleep 1
 
 # 8 Check Error

@@ -10,13 +10,12 @@ AM_CFLAGS = $(GCC_CFLAGS) $(EFL_INCLUDE)
 AM_CPPFLAGS = -I$(top_srcdir)/src -DUNIT_TEST $(COMPOSITOR_CFLAGS)
 
 noinst_PROGRAMS =		\
-	test-send_event		\
 	test-homescreen		\
 	test-client			\
 	test-eflapp
 
 check_LTLIBRARIES = $(TESTS)
-check_PROGRAMS = test-homescreen test-client test-eflapp test-send_event
+check_PROGRAMS = test-homescreen test-client test-eflapp
 
 AM_LDFLAGS = -module -avoid-version -rpath $(libdir) -lwayland-egl -lEGL -lGLESv2
 
@@ -24,9 +23,6 @@ test_common_src = test-common.c test-common.h
 test_protocol_lib = ../src/.libs/libico-uxf-weston-plugin.so
 test_efl_libs = -lecore_evas -lecore -levas -lecore_wayland -lelementary
 test_wayland_client = -lwayland-client
-
-test_send_event_SOURCES = test-send_event.c $(test_common_src)
-test_send_event_LDADD = $(SIMPLE_CLIENT_LIBS) $(test_wayland_client)
 
 test_homescreen_SOURCES = test-homescreen.c $(test_common_src) test-thumbnail.c
 test_homescreen_CFLAGS = $(GENIVI_INCLUDE) $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
