@@ -62,7 +62,7 @@
 #define UIFW_DETAIL_OUT 1                   /* 1=detail debug log/0=no detail log   */
 
 #include <weston/weston-layout.h>
-#include <weston/ivi-shell.h>
+#include <weston/ivi-shell-ext.h>
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"
 #include "ico_window_mgr-server-protocol.h"

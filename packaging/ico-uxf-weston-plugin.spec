@@ -18,7 +18,8 @@ BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
 BuildRequires: mesa-devel
-BuildRequires: genivi-shell
+BuildRequires: genivi-shell-devel
+BuildRequires: weston-ivi-shell-devel
 Requires: weston >= 1.4.0
 Requires: genivi-shell
 Requires: weekeyboard
