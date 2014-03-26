@@ -320,6 +320,20 @@ ico_window_animation(const int op, void *data)
             usurf->animation.anima = 0;
             wl_list_remove(&usurf->animation.animation.link);
             ret = ICO_WINDOW_MGR_ANIMATION_RET_NOANIMA;
+            if (usurf->org_animation.saved) {
+                usurf->animation.type = usurf->org_animation.type;
+                usurf->animation.anima = usurf->org_animation.anima;
+                usurf->animation.next_anima = usurf->org_animation.next_anima;
+                usurf->animation.hide_anima = usurf->org_animation.hide_anima;
+                usurf->animation.hide_time = usurf->org_animation.hide_time;
+                usurf->animation.show_anima = usurf->org_animation.show_anima;
+                usurf->animation.show_time = usurf->org_animation.show_time;
+                usurf->animation.move_anima = usurf->org_animation.move_anima;
+                usurf->animation.move_time = usurf->org_animation.move_time;
+                usurf->animation.resize_anima = usurf->org_animation.resize_anima;
+                usurf->animation.resize_time = usurf->org_animation.resize_time;
+                usurf->org_animation.saved = 0;
+            }
         }
         usurf->animation.type = op;
 #if  PERFORMANCE_EVALUATIONS > 0
@@ -435,6 +449,20 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
     struct weston_view      *ev;
 
     usurf->animation.state = ICO_WINDOW_MGR_ANIMATION_STATE_NONE;
+    if (usurf->org_animation.saved) {
+        usurf->animation.type = usurf->org_animation.type;
+        usurf->animation.anima = usurf->org_animation.anima;
+        usurf->animation.next_anima = usurf->org_animation.next_anima;
+        usurf->animation.hide_anima = usurf->org_animation.hide_anima;
+        usurf->animation.hide_time = usurf->org_animation.hide_time;
+        usurf->animation.show_anima = usurf->org_animation.show_anima;
+        usurf->animation.show_time = usurf->org_animation.show_time;
+        usurf->animation.move_anima = usurf->org_animation.move_anima;
+        usurf->animation.move_time = usurf->org_animation.move_time;
+        usurf->animation.resize_anima = usurf->org_animation.resize_anima;
+        usurf->animation.resize_time = usurf->org_animation.resize_time;
+        usurf->org_animation.saved = 0;
+    }
     animadata = (struct animation_data *)usurf->animation.animadata;
 
     if (animation_count > 0)    {

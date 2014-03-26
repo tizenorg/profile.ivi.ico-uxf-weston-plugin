@@ -78,14 +78,59 @@ struct uifw_surface_map {
     uint16_t    width;                      /* width                                */
     uint16_t    height;                     /* height                               */
     uint16_t    stride;                     /* stride                               */
-    uint16_t    framerate;                  /* update frame rate (frame/sec)        */
-    uint16_t    interval;                   /* interval time (ms)                   */
+    int16_t     framerate;                  /* update frame rate (frame/sec)        */
+    int16_t     interval;                   /* interval time (ms)                   */
     uint32_t    lasttime;                   /* last event time (ms)                 */
     char        initflag;                   /* map event send flag(0=no/1=yes)      */
     char        eventque;                   /* send event queue flag                */
     char        res[2];                     /* (unused)                             */
     struct wl_list  map_link;               /* surface map list                     */
     struct wl_list  surf_link;              /* surface map list from UIFW surface   */
+};
+
+/* Animation information    */
+struct uifw_win_surface_animation {         /* wndow animation                      */
+    struct weston_animation animation;      /* weston animation control             */
+    uint16_t    type;                       /* current animation type               */
+    uint16_t    anima;                      /* curremt animation Id                 */
+    uint16_t    next_anima;                 /* next animation Id                    */
+    uint16_t    hide_anima;                 /* animation Id for hide                */
+    uint16_t    hide_time;                  /* animation time(ms) for hide          */
+    uint16_t    show_anima;                 /* animation Id for show                */
+    uint16_t    show_time;                  /* animation time(ms) for show          */
+    uint16_t    move_anima;                 /* animation Id for move                */
+    uint16_t    move_time;                  /* animation time(ms) for move          */
+    uint16_t    resize_anima;               /* animation Id for resize              */
+    uint16_t    resize_time;                /* animation time(ms) for resize        */
+    uint16_t    time;                       /* current animation time(ms)           */
+    uint16_t    pos_x;                      /* start/end X-coordinate               */
+    uint16_t    pos_y;                      /* start/end Y-coordinate               */
+    uint16_t    pos_width;                  /* start/end width                      */
+    uint16_t    pos_height;                 /* start/end height                     */
+    float       alpha;                      /* original alpha                       */
+    short       current;                    /* animation current percentage         */
+    char        state;                      /* animation state                      */
+    char        visible;                    /* need hide(1)/show(2) at end of animation*/
+    char        restrain_configure;         /* restrain surface resize              */
+    char        ahalf;                      /* after half                           */
+    char        no_configure;               /* no send configure to client          */
+    char        res;                        /* (unused)                             */
+    uint32_t    starttime;                  /* start time(ms)                       */
+    void        *animadata;                 /* animation data                       */
+};
+struct uifw_win_surface_anima_save  {       /* wndow animation save                 */
+    uint16_t    saved;                      /* flag for original saved              */
+    uint16_t    type;                       /* current animation type               */
+    uint16_t    anima;                      /* curremt animation Id                 */
+    uint16_t    next_anima;                 /* next animation Id                    */
+    uint16_t    hide_anima;                 /* animation Id for hide                */
+    uint16_t    hide_time;                  /* animation time(ms) for hide          */
+    uint16_t    show_anima;                 /* animation Id for show                */
+    uint16_t    show_time;                  /* animation time(ms) for show          */
+    uint16_t    move_anima;                 /* animation Id for move                */
+    uint16_t    move_time;                  /* animation time(ms) for move          */
+    uint16_t    resize_anima;               /* animation Id for resize              */
+    uint16_t    resize_time;                /* animation time(ms) for resize        */
 };
 
 /* UIFW surface                         */
@@ -110,35 +155,10 @@ struct uifw_win_surface {
     char        visible;                    /* visibility                           */
     char        restrain_configure;         /* restrant configure event             */
     char        res[1];                     /* (unused)                             */
-    struct  _uifw_win_surface_animation {   /* wndow animation                      */
-        struct weston_animation animation;  /* weston animation control             */
-        uint16_t    type;                   /* current animation type               */
-        uint16_t    anima;                  /* curremt animation Id                 */
-        uint16_t    next_anima;             /* next animation Id                    */
-        uint16_t    hide_anima;             /* animation Id for hide                */
-        uint16_t    hide_time;              /* animation time(ms) for hide          */
-        uint16_t    show_anima;             /* animation Id for show                */
-        uint16_t    show_time;              /* animation time(ms) for show          */
-        uint16_t    move_anima;             /* animation Id for move                */
-        uint16_t    move_time;              /* animation time(ms) for move          */
-        uint16_t    resize_anima;           /* animation Id for resize              */
-        uint16_t    resize_time;            /* animation time(ms) for resize        */
-        uint16_t    time;                   /* current animation time(ms)           */
-        uint16_t    pos_x;                  /* start/end X-coordinate               */
-        uint16_t    pos_y;                  /* start/end Y-coordinate               */
-        uint16_t    pos_width;              /* start/end width                      */
-        uint16_t    pos_height;             /* start/end height                     */
-        float       alpha;                  /* original alpha                       */
-        short       current;                /* animation current percentage         */
-        char        state;                  /* animation state                      */
-        char        visible;                /* need hide(1)/show(2) at end of animation*/
-        char        restrain_configure;     /* restrain surface resize              */
-        char        ahalf;                  /* after half                           */
-        char        no_configure;           /* no send configure to client          */
-        char        res;                    /* (unused)                             */
-        uint32_t    starttime;              /* start time(ms)                       */
-        void        *animadata;             /* animation data                       */
-    }           animation;
+    struct uifw_win_surface_animation
+                animation;                  /* window animation information         */
+    struct uifw_win_surface_anima_save  
+                org_animation;              /* save original wndow animation        */
     struct wl_list  client_link;            /* surface list of same client          */
     struct wl_list  surf_map;               /* surface map list                     */
     struct wl_list  input_region;           /* surface input region list            */

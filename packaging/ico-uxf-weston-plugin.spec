@@ -22,8 +22,10 @@ BuildRequires: genivi-shell-devel
 BuildRequires: weston-ivi-shell-devel
 Requires: weston >= 1.4.0
 Requires: genivi-shell
+Requires: weston-ivi-shell
 Requires: weekeyboard
 Conflicts: weston-ivi-config
+Conflicts: weston-ivi-shell-config
 
 %description
 Weston Plugins for IVI
@@ -50,8 +52,12 @@ make %{?_smp_mflags}
 
 # configurations
 %define weston_conf %{_sysconfdir}/xdg/weston
+%define systemddir /usr/lib/systemd
 mkdir -p %{buildroot}%{weston_conf} > /dev/null 2>&1
+mkdir -p %{buildroot}%{systemddir}/system/multi-user.target.wants > /dev/null 2>&1
 install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
+install -m 0644 settings/ico-pseudo-input-device.service %{buildroot}%{systemddir}/system/ico-pseudo-input-device.service
+ln -s %{systemddir}/system/ico-pseudo-input-device.service %{buildroot}%{systemddir}/system/multi-user.target.wants/ico-pseudo-input-device.service
 
 %post -p /sbin/ldconfig
 
@@ -64,6 +70,10 @@ install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 %dir %{_libdir}/weston/
 %{_libdir}/weston/*.so
 %{_libdir}/libico-uxf-weston-plugin.so.*
+%{_bindir}/ico_send_inputevent
+%{_bindir}/ico_pseudo_input_device
+%{systemddir}/system/ico-pseudo-input-device.service
+%{systemddir}/system/multi-user.target.wants/ico-pseudo-input-device.service
 %{weston_conf}/weston.ini
 
 %files devel
@@ -72,5 +82,4 @@ install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
 %{_includedir}/%{name}/ico_input_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_window_mgr-client-protocol.h
 %{_includedir}/%{name}/ico_input_mgr.h
-%{_bindir}/ico_send_inputevent
 %{_libdir}/libico-uxf-weston-plugin.so

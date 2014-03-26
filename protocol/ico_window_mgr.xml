@@ -13,6 +13,7 @@
       <entry name="show" value="2" summary="animation for shwo surface"/>
       <entry name="move" value="4" summary="animation for move surface"/>
       <entry name="resize" value="8" summary="animation for resize surface"/>
+      <entry name="oneshot" value="0x80" summary="animation chaneg oneshot"/>
     </enum>
 
     <request name="set_animation">
@@ -76,6 +77,19 @@
        Unset event of surface image(contents) change to system application(ex.HomeScreen).
       </description>
       <arg name="surfaceid" type="uint"/>
+    </request>
+
+    <request name="layout_surface">
+      <description summary="set surface layout for privilege application">
+       Set surface layout for privilege application.
+      </description>
+      <arg name="surfaceid" type="uint"/>
+      <arg name="layerid" type="uint"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+      <arg name="visible" type="int"/>
     </request>
 
     <event name="map_surface">

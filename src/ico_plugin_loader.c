@@ -173,12 +173,12 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
 
     if (modules == NULL)    {
         uifw_error("ico_plugin_loader: Leave(No Plugin in config)");
-        if (moddir) free(moddir);
+        free(moddir);
         return -1;
     }
     p = getenv("WESTON_IVI_PLUGIN_DIR");
     if (p)  {
-        if (moddir) free(moddir);
+        free(moddir);
         moddir = strdup(p);
     }
 
@@ -200,7 +200,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
             p++;
         }
     }
-    if (moddir) free(moddir);
+    free(moddir);
     free(modules);
     uifw_info("ico_plugin_loader: Leave(module_init)");
 

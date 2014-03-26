@@ -27,6 +27,7 @@
 
 #include    <stdio.h>
 #include    <stdlib.h>
+#include    <stdint.h>
 #include    <unistd.h>
 #include    <stdarg.h>
 #include    <string.h>
@@ -43,12 +44,14 @@
 #include    <linux/input.h>
 #include    <linux/uinput.h>
 #include    <linux/joystick.h>
+#include    "ico_input_mgr.h"
 
 #define DEV_TOUCH   0
+#define DEV_KEY     2
 #define DEV_JS      1
 #define SPECIALTYPE_XY  9991
 
-static const struct {
+static const struct _event_key  {
     char    *prop;
     short   devtype;
     short   type;
@@ -76,13 +79,102 @@ static const struct {
     { "Triangle", DEV_JS, 1, 3, 6 },
     { "\0", 0, 0, 0, 0 } };
 
+static const struct _event_keyboard {
+    char    *prop;
+    short   code;
+}               event_keyboard[] = {
+    { "ESC", KEY_ESC },
+    { "1", KEY_1 },
+    { "2", KEY_2 },
+    { "3", KEY_3 },
+    { "4", KEY_4 },
+    { "5", KEY_5 },
+    { "6", KEY_6 },
+    { "7", KEY_7 },
+    { "8", KEY_8 },
+    { "9", KEY_9 },
+    { "0", KEY_0 },
+    { "-", KEY_MINUS },
+    { "=", KEY_EQUAL },
+    { "BS", KEY_BACKSPACE },
+    { "TAB", KEY_TAB },
+    { "Q", KEY_Q },
+    { "W", KEY_W },
+    { "E", KEY_E },
+    { "R", KEY_R },
+    { "T", KEY_T },
+    { "Y", KEY_Y },
+    { "U", KEY_U },
+    { "I", KEY_I },
+    { "O", KEY_O },
+    { "P", KEY_P },
+    { "[", KEY_LEFTBRACE },
+    { "]", KEY_RIGHTBRACE },
+    { "ENTER", KEY_ENTER },
+    { "CR", KEY_ENTER },
+    { "NL", KEY_ENTER },
+    { "CTRL", KEY_LEFTCTRL },
+    { "CTL", KEY_LEFTCTRL },
+    { "LEFTCTRL", KEY_LEFTCTRL },
+    { "A", KEY_A },
+    { "S", KEY_S },
+    { "D", KEY_D },
+    { "F", KEY_F },
+    { "G", KEY_G },
+    { "H", KEY_H },
+    { "J", KEY_J },
+    { "K", KEY_K },
+    { "L", KEY_L },
+    { ";", KEY_SEMICOLON },
+    { "'", KEY_APOSTROPHE },
+    { "~", KEY_GRAVE },
+    { "SHIFT", KEY_LEFTSHIFT },
+    { "LEFTSHIFT", KEY_LEFTSHIFT },
+    { "\\", KEY_BACKSLASH },
+    { "Z", KEY_Z },
+    { "X", KEY_X },
+    { "C", KEY_C },
+    { "V", KEY_V },
+    { "B", KEY_B },
+    { "N", KEY_N },
+    { "M", KEY_M },
+    { ",", KEY_COMMA },
+    { ".", KEY_DOT },
+    { "/", KEY_SLASH },
+    { "RIGHTSHIFT", KEY_RIGHTSHIFT },
+    { "*", KEY_KPASTERISK },
+    { "ALT", KEY_LEFTALT },
+    { " ", KEY_SPACE },
+    { "SP", KEY_SPACE },
+    { "SPACE", KEY_SPACE },
+    { "CAPS", KEY_CAPSLOCK },
+    { "CAPSLOCK", KEY_CAPSLOCK },
+    { "F1", KEY_F1 },
+    { "F2", KEY_F2 },
+    { "F3", KEY_F3 },
+    { "F4", KEY_F4 },
+    { "F5", KEY_F5 },
+    { "F6", KEY_F6 },
+    { "F7", KEY_F7 },
+    { "F8", KEY_F8 },
+    { "F9", KEY_F9 },
+    { "F10", KEY_F10 },
+    { "NUM", KEY_NUMLOCK },
+    { "NUMLOCK", KEY_NUMLOCK },
+    { "SCROLL", KEY_SCROLLLOCK },
+    { "SCROLLLOCK", KEY_SCROLLLOCK },
+    { "F11", KEY_F11 },
+    { "F12", KEY_F12 },
+    { "\0", -1 } };
+
 static int  uifd = -1;
 static int  mqid = -1;
 static int  mDebug = 0;
 static int  mRun = 1;
 static int  mTouch = 1;
-static int  mWidth = 1080;
-static int  mHeight = 1920;
+static int  mWidth = 1920;
+static int  mHeight = 1080;
+static int  mRotate = 0;
 static int  mConvert = 0;
 
 static void print_log(const char *fmt, ...);
@@ -119,92 +211,112 @@ init_mq(const int mqkey)
 static void
 init_device(const char *device)
 {
-    int     fd;
     int     ii;
     char    devFile[64];
     char    devName[64];
+    char    wkDev[64];
     struct uinput_user_dev  uinputDevice;
-    uifd = open("/dev/uinput", O_RDWR);
 
-    if (uifd < 0)   {
-        print_log("/dev/uinput open error[%d]", errno);
-        fflush(stderr);
-        exit(1);
-    }
+    if (device[0])  {
+        /* create pseudo input device   */
+        uifd = open("/dev/uinput", O_RDWR);
 
-    memset(&uinputDevice, 0, sizeof(uinputDevice));
-    strncpy(uinputDevice.name, device, UINPUT_MAX_NAME_SIZE-1);
-    uinputDevice.absmax[ABS_X] = mHeight;
-    uinputDevice.absmax[ABS_Y] = mWidth;
+        if (uifd < 0)   {
+            print_log("/dev/uinput open error[%d]", errno);
+            fflush(stderr);
+            exit(1);
+        }
 
-    /* uinput device configuration  */
-    if (write(uifd, &uinputDevice, sizeof(uinputDevice)) < (int)sizeof(uinputDevice)) {
-        print_log("/dev/uinput regist error[%d]", errno);
-        fflush(stderr);
-        close(uifd);
-        exit(1);
-    }
+        memset(&uinputDevice, 0, sizeof(uinputDevice));
+        strncpy(uinputDevice.name, device, UINPUT_MAX_NAME_SIZE-1);
+        uinputDevice.absmax[ABS_X] = mWidth;
+        uinputDevice.absmax[ABS_Y] = mHeight;
 
-    /* uinput set event bits        */
-    ioctl(uifd, UI_SET_EVBIT, EV_SYN);
+        /* uinput device configuration  */
+        if (write(uifd, &uinputDevice, sizeof(uinputDevice)) < (int)sizeof(uinputDevice)) {
+            print_log("/dev/uinput regist error[%d]", errno);
+            fflush(stderr);
+            close(uifd);
+            exit(1);
+        }
 
-    if ((mTouch != 0) && (mTouch != 3)) {
-        ioctl(uifd, UI_SET_EVBIT, EV_ABS);
-        ioctl(uifd, UI_SET_ABSBIT, ABS_X);
-        ioctl(uifd, UI_SET_ABSBIT, ABS_Y);
-        ioctl(uifd, UI_SET_EVBIT, EV_KEY);
-        if (mTouch == 1)    {
-            ioctl(uifd, UI_SET_KEYBIT, BTN_LEFT);
+        /* uinput set event bits        */
+        ioctl(uifd, UI_SET_EVBIT, EV_SYN);
+
+        if ((mTouch != 0) && (mTouch != 3)) {
+            ioctl(uifd, UI_SET_EVBIT, EV_ABS);
+            ioctl(uifd, UI_SET_ABSBIT, ABS_X);
+            ioctl(uifd, UI_SET_ABSBIT, ABS_Y);
+            ioctl(uifd, UI_SET_EVBIT, EV_KEY);
+            if (mTouch == 1)    {
+                ioctl(uifd, UI_SET_KEYBIT, BTN_LEFT);
+            }
+            else    {
+                ioctl(uifd, UI_SET_KEYBIT, BTN_TOUCH);
+                ioctl(uifd, UI_SET_KEYBIT, BTN_TOOL_PEN);
+            }
         }
         else    {
-            ioctl(uifd, UI_SET_KEYBIT, BTN_TOUCH);
-            ioctl(uifd, UI_SET_KEYBIT, BTN_TOOL_PEN);
+            ioctl(uifd, UI_SET_EVBIT, EV_REL);
+            ioctl(uifd, UI_SET_RELBIT, REL_X);
+            ioctl(uifd, UI_SET_RELBIT, REL_Y);
+            ioctl(uifd, UI_SET_RELBIT, REL_Z);
+            ioctl(uifd, UI_SET_RELBIT, REL_RX);
+            ioctl(uifd, UI_SET_RELBIT, REL_RY);
+            ioctl(uifd, UI_SET_RELBIT, REL_RZ);
+            ioctl(uifd, UI_SET_EVBIT, EV_KEY);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_RESERVED);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_ESC);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_1);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_2);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_3);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_4);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_5);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_6);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_7);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_8);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_9);
+            ioctl(uifd, UI_SET_KEYBIT, KEY_0);
         }
+
+        ioctl(uifd, UI_SET_EVBIT, EV_MSC);
+        ioctl(uifd, UI_SET_MSCBIT, MSC_SCAN);
+
+        /* create event device          */
+        if (ioctl(uifd, UI_DEV_CREATE, NULL) < 0)   {
+            print_log("/dev/uinput create error[%d]", errno);
+            fflush(stderr);
+            close(uifd);
+            exit(1);
+        }
+        print_log("## created event device %s", device);
     }
     else    {
-        ioctl(uifd, UI_SET_EVBIT, EV_REL);
-        ioctl(uifd, UI_SET_RELBIT, REL_X);
-        ioctl(uifd, UI_SET_RELBIT, REL_Y);
-        ioctl(uifd, UI_SET_RELBIT, REL_Z);
-        ioctl(uifd, UI_SET_RELBIT, REL_RX);
-        ioctl(uifd, UI_SET_RELBIT, REL_RY);
-        ioctl(uifd, UI_SET_RELBIT, REL_RZ);
-        ioctl(uifd, UI_SET_EVBIT, EV_KEY);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_RESERVED);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_ESC);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_1);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_2);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_3);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_4);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_5);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_6);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_7);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_8);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_9);
-        ioctl(uifd, UI_SET_KEYBIT, KEY_0);
-    }
+        if (mTouch == 2)    {
+            strcpy(wkDev, ICO_PSEUDO_INPUT_TOUCH);
+        }
+        else if (mTouch == 4)   {
+            strcpy(wkDev, ICO_PSEUDO_INPUT_KEY);
+        }
+        else    {
+            strcpy(wkDev, ICO_PSEUDO_INPUT_TOUCH);
+        }
 
-    ioctl(uifd, UI_SET_EVBIT, EV_MSC);
-    ioctl(uifd, UI_SET_MSCBIT, MSC_SCAN);
+        for (ii = 0; ii < 32; ii++) {
+            snprintf(devFile, 64, "/dev/input/event%d", ii);
+            uifd = open(devFile, O_RDWR, 0644);
+            if (uifd < 0)     continue;
 
-    /* create event device          */
-    if (ioctl(uifd, UI_DEV_CREATE, NULL) < 0)   {
-        print_log("/dev/uinput create error[%d]", errno);
-        fflush(stderr);
-        close(uifd);
-        exit(1);
-    }
-    print_log("## created event device %s", device);
-
-    for (ii = 0; ii < 16; ii++) {
-        snprintf(devFile, 64, "/dev/input/event%d", ii);
-        fd = open(devFile, O_RDONLY);
-        if (fd < 0)     continue;
-
-        memset(devName, 0, sizeof(devName));
-        ioctl(fd, EVIOCGNAME(sizeof(devName)), devName);
-        close(fd);
-        print_log("%d.event device(%s) is %s", ii+1, devFile, devName);
+            memset(devName, 0, sizeof(devName));
+            ioctl(uifd, EVIOCGNAME(sizeof(devName)), devName);
+            if (strcasecmp(devName, wkDev) == 0)    break;
+            close(uifd);
+        }
+        if (ii >= 32)   {
+            print_log("<%s> dose not exist.", wkDev);
+            fflush(stderr);
+            exit(1);
+        }
     }
     usleep(200*1000);
 }
@@ -244,8 +356,10 @@ convert_value(const char *value, char **errp, int base)
 static void
 send_event(const char *cmd)
 {
+    static int  keypress = 0;
     int     i, j;
-    int     key;
+    int     wkpress;
+    int     key, key2;
     char    prop[64];
     char    value[128];
     int     sec, msec;
@@ -300,34 +414,67 @@ send_event(const char *cmd)
         return;
     }
 
+    key2 = 0;
+    wkpress = -1;
     for (key = 0; event_key[key].prop[0]; key++)    {
         if (strcasecmp(prop, event_key[key].prop) == 0) break;
     }
     if (! event_key[key].prop[0])   {
-        print_log("UnKnown Event name[%s]", prop);
-        return;
+        for (key2 = 0; event_keyboard[key2].prop[0]; key2++)    {
+            if (strcasecmp(prop, event_key[key2].prop) == 0) break;
+            if ((strncasecmp(prop, "key.", 4) == 0) &&
+                (strcasecmp(&prop[4], event_key[key2].prop) == 0)) break;
+            wkpress = 1;
+            if ((strncasecmp(prop, "press.", 6) == 0) &&
+                (strcasecmp(&prop[6], event_key[key2].prop) == 0)) break;
+            if ((strncasecmp(prop, "keypress.", 9) == 0) &&
+                (strcasecmp(&prop[9], event_key[key2].prop) == 0)) break;
+            wkpress = 0;
+            if ((strncasecmp(prop, "release.", 8) == 0) &&
+                (strcasecmp(&prop[8], event_key[key2].prop) == 0)) break;
+            if ((strncasecmp(prop, "keyrelease.", 11) == 0) &&
+                (strcasecmp(&prop[11], event_key[key2].prop) == 0)) break;
+        }
+        if (! event_key[key2].prop[0])  {
+            print_log("UnKnown Event name[%s]", prop);
+            return;
+        }
+        if (wkpress < 0)    {
+            if (keypress == 0)  keypress = 1;
+            else                keypress = 0;
+            wkpress = keypress;
+        }
+        key = -1;
     }
 
     if (mTouch != 0)    {
         memset(&event, 0, sizeof(event));
         gettimeofday(&event.time, NULL);
-        if (event_key[key].type == SPECIALTYPE_XY)  {
+        if ((key >= 0) &&(event_key[key].type == SPECIALTYPE_XY))   {
             event.type = EV_ABS;
-            if (mConvert)   event.code = ABS_Y;
+            if (mRotate)    event.code = ABS_Y;
             else            event.code = ABS_X;
             event.value = convert_value(value, &errp, 0);
             if (mDebug) {
-                print_log("Send Event ABS_%c=%d\t# %d.%03d", mConvert ? 'Y' : 'X',
+                print_log("Send Event ABS_%c=%d\t# %d.%03d", mRotate ? 'Y' : 'X',
                           event.value,
                           (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
                 fflush(stderr);
+            }
+            if (mConvert != 0)  {
+                if ((mRotate == 0) && (mWidth != 1920))    {
+                    event.value = event.value * 1920 / mWidth;
+                }
+                if ((mRotate != 0) && (mHeight != 1080))    {
+                    event.value = event.value * 1080 / mHeight;
+                }
             }
             if (write(uifd, &event, sizeof(struct input_event)) < 0)    {
                 print_log("event write error 1[%d]", errno);
                 fflush(stderr);
                 return;
             }
-            if (mConvert)   event.code = ABS_X;
+            if (mRotate)    event.code = ABS_X;
             else            event.code = ABS_Y;
             if (*errp == ',')   {
                 event.value = convert_value(errp + 1, (char **)0, 0);
@@ -335,8 +482,16 @@ send_event(const char *cmd)
             else    {
                 event.value = 0;
             }
-            if (mConvert)   {
-                event.value = mHeight - event.value - 1;
+            if (mRotate)    {
+                event.value = mWidth - event.value - 1;
+            }
+            if (mConvert != 0)  {
+                if ((mRotate == 0) && (mHeight != 1080))    {
+                    event.value = event.value * 1080 / mHeight;
+                }
+                else if ((mRotate != 0) && (mWidth != 1920))    {
+                    event.value = event.value * 1920 / mWidth;
+                }
             }
             event.time.tv_usec += 200;
             if (event.time.tv_usec >= 1000000)  {
@@ -344,26 +499,33 @@ send_event(const char *cmd)
                 event.time.tv_usec -= 1000000;
             }
             if (mDebug) {
-                print_log("Send Event ABS_%c=%d\t# %d.%03d", mConvert ? 'X' : 'Y',
+                print_log("Send Event ABS_%c=%d\t# %d.%03d", mRotate ? 'X' : 'Y',
                           event.value,
                           (int)event.time.tv_sec, (int)(event.time.tv_usec/1000));
                 fflush(stderr);
             }
         }
         else    {
-            event.type = event_key[key].type;
+            if (key >= 0)   {
+                event.type = event_key[key].type;
 
-            if (event_key[key].code == -1)   {
-                event.code = convert_value(value, (char **)0, 0);
-            }
-            else    {
-                event.code = event_key[key].code;
-                if (value[0] == 0)  {
-                    event.value = event_key[key].value;
+                if (event_key[key].code == -1)   {
+                    event.code = convert_value(value, (char **)0, 0);
                 }
                 else    {
-                    event.value = convert_value(value, (char **)0, 0);
+                    event.code = event_key[key].code;
+                    if (value[0] == 0)  {
+                        event.value = event_key[key].value;
+                    }
+                    else    {
+                        event.value = convert_value(value, (char **)0, 0);
+                    }
                 }
+            }
+            else    {
+                event.type = EV_KEY;
+                event.code = event_keyboard[key2].code;
+                event.value = wkpress ? 1 : 0;
             }
             if (mDebug) {
                 if ((event.type == EV_ABS) && (event.code == ABS_X))    {
@@ -414,12 +576,14 @@ send_event(const char *cmd)
         }
         else    {
             /* send EV_SYN */
-            memset(&event, 0, sizeof(event));
-            gettimeofday(&event.time, NULL);
-            event.type = EV_SYN;
-            event.code = SYN_REPORT;
-            if (write(uifd, &event, sizeof(struct input_event)) < 0)    {
-                print_log("syn event write error 3[%d]", errno);
+            if (key >= 0)   {
+                memset(&event, 0, sizeof(event));
+                gettimeofday(&event.time, NULL);
+                event.type = EV_SYN;
+                event.code = SYN_REPORT;
+                if (write(uifd, &event, sizeof(struct input_event)) < 0)    {
+                    print_log("syn event write error 3[%d]", errno);
+                }
             }
         }
     }
@@ -468,7 +632,7 @@ print_log(const char *fmt, ...)
 static void
 usage(const char *prog)
 {
-    fprintf(stderr, "Usage: %s [-device=device] [-w=w] [-h=h] [-c] [{-m/-t/-j/-J}] "
+    fprintf(stderr, "Usage: %s [-device=device] [-w=w] [-h=h] [-r] [-c] [{-m/-t/-k/-j/-J}] "
             "[-mq[=key]] [-d] [event[=value]] [event[=value]] ...\n", prog);
     exit(0);
 }
@@ -485,9 +649,9 @@ main(int argc, char *argv[])
     char    buf[240];
 
     j = 0;
-    mWidth = 1080;
-    mHeight = 1920;
-    strcpy(buf, "ico_test_device");
+    mWidth = 1920;
+    mHeight = 1080;
+    memset(buf, 0, sizeof(buf));
     for (i = 1; i < argc; i++)  {
         if (argv[i][0] == '-')  {
             if (strncasecmp(argv[i], "-device=", 8) == 0)   {
@@ -499,14 +663,20 @@ main(int argc, char *argv[])
             else if (strncasecmp(argv[i], "-h=", 3) == 0)   {
                 mHeight = strtol(&argv[i][3], (char **)0, 0);
             }
+            else if (strcasecmp(argv[i], "-r") == 0)   {
+                mRotate = 1;               /* Rotate screen                 */
+            }
             else if (strcasecmp(argv[i], "-c") == 0)   {
-                mConvert = 1;               /* Convert logical to physical  */
+                mConvert = 1;              /* Convert logical to physical   */
             }
             else if (strcasecmp(argv[i], "-m") == 0)   {
                 mTouch = 1;                 /* Simulate mouse               */
             }
             else if (strcasecmp(argv[i], "-t") == 0)   {
                 mTouch = 2;                 /* Simulate touch-panel         */
+            }
+            else if (strcasecmp(argv[i], "-k") == 0)   {
+                mTouch = 4;                 /* Simulate keyboard            */
             }
             else if (strcmp(argv[i], "-j") == 0)   {
                 mTouch = 0;                 /* Simulate joystick            */

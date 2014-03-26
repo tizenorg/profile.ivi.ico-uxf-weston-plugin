@@ -1,3 +1,14 @@
+* Wed Mar 26 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/release/20140312.121542@98097de
+- bug fix: A setup to surface for "no animation" does not function normally.
+- Test tool The name of test_send_input is changed into ico_send_inputevent.
+- Add the tool ico_pseudo_input_device which generates those pseudo devices for a system without a mouse, a touch panel, and a keyboard.
+- The keyboard event function was added to the ico_send_inputevent tool.
+- bug fix: Weston crashes at the time of deletion of surface.
+- Add surface operation interface for a privilege program.
+- Add interface which does not update a thumbnail.
+- Correction of the review indication from a Tizen team.
+- bug fix: TIVI-2946 - Incorrect weston.ini with DP output after manually install ico-uxf-homescreen.
+
 * Fri Feb 28 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140214.223342@8dc903b
 - 0.9.21 release
 -- Some interfaces were added for SystemController corresponding to GENIVI layer management.
