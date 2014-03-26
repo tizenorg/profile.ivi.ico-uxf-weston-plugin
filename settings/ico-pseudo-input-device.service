@@ -1,0 +1,12 @@
+[Unit]
+Description=Pseude Input Devices for ico-uxf-weston-plugin
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/ico_pseudo_input_device -w=1920 -h=1080
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

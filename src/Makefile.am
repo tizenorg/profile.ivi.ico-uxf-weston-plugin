@@ -8,8 +8,6 @@ pkginclude_HEADERS =               \
 libico_uxf_weston_plugin_la_LIBADD = -ldrm_intel -lrt -lm
 libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:9:0
 libico_uxf_weston_plugin_la_SOURCES =          \
-	ivi-application-protocol.c		\
-	ivi-controller-protocol.c		\
 	ico_window_mgr-protocol.c		\
 	ico_input_mgr-protocol.c
 
@@ -81,12 +79,6 @@ ico_input_mgr_la_SOURCES =			\
 
 # Wayland protocol(Build by wayland-scanner)
 BUILT_SOURCES =						\
-	ivi-application-protocol.c		\
-	ivi-application-server-protocol.h	\
-	ivi-application-client-protocol.h	\
-	ivi-controller-protocol.c		\
-	ivi-controller-server-protocol.h	\
-	ivi-controller-client-protocol.h	\
 	ico_window_mgr-protocol.c		\
 	ico_window_mgr-server-protocol.h	\
 	ico_window_mgr-client-protocol.h	\
