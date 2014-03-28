@@ -152,6 +152,8 @@ static void win_mgr_register_surface(uint32_t id_surface, struct weston_surface 
                                      struct weston_layout_surface *ivisurf);
                                             /* surface destroy                      */
 static void win_mgr_destroy_surface(struct weston_surface *surface);
+                                            /* weston_surface destroy listener      */
+static void win_mgr_surface_destroy(struct wl_listener *listener, void *data);
                                             /* read surface pixel                   */
 static int win_mgr_takeSurfaceScreenshot(const char *filename,
                                          struct uifw_win_surface *usurf,
@@ -232,7 +234,6 @@ static int  _ico_ivi_option_flag = 0;           /* option flags                 
 static int  _ico_ivi_debug_level = 3;           /* debug Level                      */
 static char *_ico_ivi_animation_name = NULL;    /* default animation name           */
 static int  _ico_ivi_animation_time = 500;      /* default animation time           */
-static int  _ico_ivi_animation_fps = 30;        /* animation frame rate             */
 
 /* static management table              */
 static struct ico_win_mgr       *_ico_win_mgr = NULL;
@@ -315,20 +316,6 @@ WL_EXPORT   int
 ico_ivi_default_animation_time(void)
 {
     return _ico_ivi_animation_time;
-}
-
-/*--------------------------------------------------------------------------*/
-/**
- * @brief   ico_ivi_default_animation_fps: get default animation frame rate
- *
- * @param       None
- * @return      Default animation frame rate(frames/sec)
- */
-/*--------------------------------------------------------------------------*/
-WL_EXPORT   int
-ico_ivi_default_animation_fps(void)
-{
-    return _ico_ivi_animation_fps;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -571,7 +558,7 @@ ico_window_mgr_get_usurf(const uint32_t surfaceid)
         }
         usurf = usurf->next_idhash;
     }
-    uifw_trace("ico_window_mgr_get_usurf: NULL");
+    uifw_trace("ico_window_mgr_get_usurf: NULL(%08x)", surfaceid);
     return NULL;
 }
 
@@ -1398,9 +1385,9 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
             /* surface changed, send event to controller    */
             wl_list_for_each (mgr, &_ico_win_mgr->manager_list, link)   {
                 uifw_trace("win_mgr_send_event: Send UPDATE_SURFACE(surf=%08x) "
-                           "v=%d src=%d/%d dest=%d/%d(%d/%d)", id_surface,
+                           "v=%d src=%d/%d dest=%d/%d(%d/%d) mgr=%08x", id_surface,
                            usurf->visible, usurf->client_width, usurf->client_height,
-                           usurf->x, usurf->y, usurf->width, usurf->height);
+                           usurf->x, usurf->y, usurf->width, usurf->height, (int)mgr);
                 ico_window_mgr_send_update_surface(mgr->resource, id_surface,
                                 usurf->visible, usurf->client_width,
                                 usurf->client_height, usurf->x, usurf->y,
@@ -1468,6 +1455,10 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
         usurf->configure_width = usurf->client_width;
         usurf->configure_height = usurf->client_height;
     }
+    wl_list_init(&usurf->surface_destroy_listener.link);
+    usurf->surface_destroy_listener.notify = win_mgr_surface_destroy;
+    wl_signal_add(&surface->destroy_signal, &usurf->surface_destroy_listener);
+
     wl_list_init(&usurf->client_link);
     wl_list_init(&usurf->animation.animation.link);
     wl_list_init(&usurf->surf_map);
@@ -2375,6 +2366,9 @@ win_mgr_destroy_surface(struct weston_surface *surface)
         (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_DESTROY, (void *)usurf);
     }
 
+    /* remove destroy listener      */
+    wl_list_remove(&usurf->surface_destroy_listener.link);
+
     /* send destroy event to controller */
     win_mgr_send_event(ICO_WINDOW_MGR_DESTROY_SURFACE, usurf->surfaceid, 0);
 
@@ -2412,6 +2406,28 @@ win_mgr_destroy_surface(struct weston_surface *surface)
 
     free(usurf);
     uifw_trace("win_mgr_destroy_surface: Leave(OK)");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   win_mgr_surface_destroy: weston_surface destroy listener
+ *
+ * @param[in]   listener    listener
+ * @param[in]   data        data (unused)
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+win_mgr_surface_destroy(struct wl_listener *listener, void *data)
+{
+    struct uifw_win_surface *usurf = container_of(listener, struct uifw_win_surface,
+                                                  surface_destroy_listener);
+
+    uifw_trace("win_mgr_surface_destroy: Enter(%08x)", usurf->surfaceid);
+
+    win_mgr_destroy_surface(usurf->surface);
+
+    uifw_trace("win_mgr_surface_destroy: Leave");
 }
 
 /*--------------------------------------------------------------------------*/
@@ -2833,12 +2849,10 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     if (section)    {
         weston_config_section_get_string(section, "default", &_ico_ivi_animation_name, NULL);
         weston_config_section_get_int(section, "time", &_ico_ivi_animation_time, 500);
-        weston_config_section_get_int(section, "fps", &_ico_ivi_animation_fps, 30);
     }
     if (_ico_ivi_animation_name == NULL)
         _ico_ivi_animation_name = (char *)"fade";
     if (_ico_ivi_animation_time < 100)  _ico_ivi_animation_time = 500;
-    if (_ico_ivi_animation_fps < 3)     _ico_ivi_animation_fps = 30;
 
     /* create ico_window_mgr management table   */
     _ico_win_mgr = (struct ico_win_mgr *)malloc(sizeof(struct ico_win_mgr));
@@ -2937,8 +2951,8 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
             wl_event_loop_add_timer(loop, win_mgr_timer_mapsurface, NULL);
     wl_event_source_timer_update(_ico_win_mgr->wait_mapevent, 1000);
 
-    uifw_info("ico_window_mgr: animation name=%s time=%d fps=%d",
-              _ico_ivi_animation_name, _ico_ivi_animation_time, _ico_ivi_animation_fps);
+    uifw_info("ico_window_mgr: animation name=%s time=%d",
+              _ico_ivi_animation_name, _ico_ivi_animation_time);
     uifw_info("ico_window_mgr: option flag=0x%04x log level=%d debug flag=0x%04x",
               _ico_ivi_option_flag, _ico_ivi_debug_level & 0x0ffff,
               (_ico_ivi_debug_level >> 16) & 0x0ffff);
