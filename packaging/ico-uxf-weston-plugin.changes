@@ -1,3 +1,7 @@
+* Fri Mar 28 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/panda/20140326.234219@9f2534a
+- It follows in footsteps of change of weston-ivi-shell 0.1.3.
+- bug fix: TIVI-2953 - Don't call callback when destroy surface.
+
 * Wed Mar 26 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/release/20140312.121542@98097de
 - bug fix: A setup to surface for "no animation" does not function normally.
 - Test tool The name of test_send_input is changed into ico_send_inputevent.
