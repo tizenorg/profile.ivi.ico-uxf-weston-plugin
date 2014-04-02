@@ -479,7 +479,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             wl_list_remove(&animadata->transform.link);
             animadata->transform_set = 0;
         }
-        weston_view_geometry_dirty(ev);
+        if (ev) {
+            weston_view_geometry_dirty(ev);
+        }
     }
     if (disp)   {
         usurf->restrain_configure = 0;
@@ -491,7 +493,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             weston_layout_surfaceSetVisibility(usurf->ivisurf, 0);
             weston_layout_commitChanges();
             weston_surface_damage(usurf->surface);
-            weston_view_geometry_dirty(ev);
+            if (ev) {
+                weston_view_geometry_dirty(ev);
+            }
         }
         if ((usurf->animation.visible == ANIMA_SHOW_AT_END) &&
             (usurf->visible == 0))  {
@@ -499,7 +503,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             weston_layout_surfaceSetVisibility(usurf->ivisurf, 1);
             weston_layout_commitChanges();
             weston_surface_damage(usurf->surface);
-            weston_view_geometry_dirty(ev);
+            if (ev) {
+                weston_view_geometry_dirty(ev);
+            }
         }
     }
     usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
@@ -765,13 +771,15 @@ animation_wipe(struct weston_animation *animation,
         }
     }
 
-    ev->geometry.x = usurf->node_tbl->disp_x + x;
-    ev->geometry.y = usurf->node_tbl->disp_y + y;
     es->width = width;
     es->height = height;
-    if ((ev->output) && (es->buffer_ref.buffer))    {
-        weston_view_geometry_dirty(ev);
-        weston_surface_damage(es);
+    if (ev) {
+        ev->geometry.x = usurf->node_tbl->disp_x + x;
+        ev->geometry.y = usurf->node_tbl->disp_y + y;
+        if ((ev->output) && (es->buffer_ref.buffer))    {
+            weston_view_geometry_dirty(ev);
+            weston_surface_damage(es);
+        }
     }
     if (par >= 100) {
         /* end of animation     */
@@ -832,8 +840,10 @@ animation_swing(struct weston_animation *animation,
             animadata->transform_set = 1;
             weston_matrix_init(&animadata->transform.matrix);
             wl_list_init(&animadata->transform.link);
-            wl_list_insert(&ev->geometry.transformation_list,
-                           &animadata->transform.link);
+            if (ev) {
+                wl_list_insert(&ev->geometry.transformation_list,
+                               &animadata->transform.link);
+            }
         }
         animadata->end_function = animation_swing_end;
     }
@@ -894,8 +904,6 @@ animation_swing(struct weston_animation *animation,
         }
     }
 
-    ev->geometry.x = usurf->node_tbl->disp_x + x;
-    ev->geometry.y = usurf->node_tbl->disp_y + y;
     weston_matrix_init(&animadata->transform.matrix);
     weston_matrix_translate(&animadata->transform.matrix,
                             -0.5f * usurf->width, -0.5f * usurf->height, 0);
@@ -903,9 +911,13 @@ animation_swing(struct weston_animation *animation,
     weston_matrix_translate(&animadata->transform.matrix,
                             0.5f * usurf->width, 0.5f * usurf->height, 0);
 
-    if ((ev->output) && (es->buffer_ref.buffer))    {
-        weston_view_geometry_dirty(ev);
-        weston_surface_damage(es);
+    if (ev) {
+        ev->geometry.x = usurf->node_tbl->disp_x + x;
+        ev->geometry.y = usurf->node_tbl->disp_y + y;
+        if ((ev->output) && (es->buffer_ref.buffer))    {
+            weston_view_geometry_dirty(ev);
+            weston_surface_damage(es);
+        }
     }
     if (par >= 100) {
         /* end of animation     */
@@ -937,11 +949,13 @@ animation_swing_end(struct weston_animation *animation)
     if (usurf && usurf->surface)    {
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
-        ev->alpha = usurf->animation.alpha;
-        uifw_debug("animation_swing_end: %08x set alpha=%.2f",
-                   usurf->surfaceid, usurf->animation.alpha);
-        if ((ev->output) && (es->buffer_ref.buffer))    {
-            weston_surface_damage(es);
+        if (ev) {
+            ev->alpha = usurf->animation.alpha;
+            uifw_debug("animation_swing_end: %08x set alpha=%.2f",
+                       usurf->surfaceid, usurf->animation.alpha);
+            if ((ev->output) && (es->buffer_ref.buffer))    {
+                weston_surface_damage(es);
+            }
         }
     }
 }
@@ -986,55 +1000,60 @@ animation_fade(struct weston_animation *animation,
             animadata->transform_set = 1;
             weston_matrix_init(&animadata->transform.matrix);
             wl_list_init(&animadata->transform.link);
-            wl_list_insert(&ev->geometry.transformation_list,
-                           &animadata->transform.link);
+            if (ev) {
+                wl_list_insert(&ev->geometry.transformation_list,
+                               &animadata->transform.link);
+            }
         }
         animadata->end_function = animation_fade_end;
 
         if ((usurf->animation.type == ICO_WINDOW_MGR_ANIMATION_OPHIDEPOS) ||
             (usurf->animation.type == ICO_WINDOW_MGR_ANIMATION_OPSHOWPOS))  {
             ico_window_mgr_set_weston_surface(usurf,
-                                              usurf->animation.pos_x, usurf->animation.pos_y,
+                                              usurf->animation.pos_x,
+                                              usurf->animation.pos_y,
                                               usurf->animation.pos_width,
                                               usurf->animation.pos_height);
         }
     }
 
-    if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_SHOW)    {
-        /* fade in                  */
-        ev->alpha = ((float)par) / 100.0f;
-    }
-    else if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_HIDE)    {
-        /* fade out                 */
-        ev->alpha = 1.0f - (((float)par) / 100.0f);
-    }
-    else    {
-        /* fade move/resize         */
-        if ((par >= 50) || (usurf->animation.ahalf))    {
-            ev->alpha = ((float)(par*2 - 100)) / 100.0f;
-            if (usurf->animation.ahalf == 0)    {
-                uifw_trace("animation_fade: fade move chaneg to show");
-                usurf->animation.ahalf = 1;
-                ev->alpha = 0.0;
-                ico_window_mgr_set_weston_surface(usurf, usurf->x, usurf->y,
-                                                  usurf->width, usurf->height);
-            }
+    if (ev) {
+        if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_SHOW)    {
+            /* fade in                  */
+            ev->alpha = ((float)par) / 100.0f;
+        }
+        else if (usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_HIDE)    {
+            /* fade out                 */
+            ev->alpha = 1.0f - (((float)par) / 100.0f);
         }
         else    {
-            ev->alpha = 1.0f - (((float)(par*2)) / 100.0f);
+            /* fade move/resize         */
+            if ((par >= 50) || (usurf->animation.ahalf))    {
+                ev->alpha = ((float)(par*2 - 100)) / 100.0f;
+                if (usurf->animation.ahalf == 0)    {
+                    uifw_trace("animation_fade: fade move chaneg to show");
+                    usurf->animation.ahalf = 1;
+                    ev->alpha = 0.0;
+                    ico_window_mgr_set_weston_surface(usurf, usurf->x, usurf->y,
+                                                      usurf->width, usurf->height);
+                }
+            }
+            else    {
+                ev->alpha = 1.0f - (((float)(par*2)) / 100.0f);
+            }
         }
-    }
-    if (ev->alpha < 0.0f)       ev->alpha = 0.0f;
-    else if (ev->alpha > 1.0f)  ev->alpha = 1.0f;
-
-    if ((par < 8) || (par > 92))    {
-        uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
-                   usurf->surfaceid, animation->frame_counter, par,
-                   ev->alpha, usurf->animation.anima, usurf->animation.state);
-    }
-    if ((ev->output) && (es->buffer_ref.buffer) &&
-        (es->width > 0) && (es->height > 0))    {
-        weston_surface_damage(es);
+        if (ev->alpha < 0.0f)       ev->alpha = 0.0f;
+        else if (ev->alpha > 1.0f)  ev->alpha = 1.0f;
+    
+        if ((par < 8) || (par > 92))    {
+            uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
+                       usurf->surfaceid, animation->frame_counter, par,
+                       ev->alpha, usurf->animation.anima, usurf->animation.state);
+        }
+        if ((ev->output) && (es->buffer_ref.buffer) &&
+            (es->width > 0) && (es->height > 0))    {
+            weston_surface_damage(es);
+        }
     }
     if (par >= 100) {
         /* end of animation     */
@@ -1066,12 +1085,14 @@ animation_fade_end(struct weston_animation *animation)
     if (usurf && usurf->surface)    {
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
-        ev->alpha = usurf->animation.alpha;
-        uifw_debug("animation_fade_end: %08x set alpha=%.2f",
-                   usurf->surfaceid, usurf->animation.alpha);
-        if ((ev->output) && (es->buffer_ref.buffer) &&
-            (es->width > 0) && (es->height > 0))    {
-            weston_surface_damage(es);
+        if (ev) {
+            ev->alpha = usurf->animation.alpha;
+            uifw_debug("animation_fade_end: %08x set alpha=%.2f",
+                       usurf->surfaceid, usurf->animation.alpha);
+            if ((ev->output) && (es->buffer_ref.buffer) &&
+                (es->width > 0) && (es->height > 0))    {
+                weston_surface_damage(es);
+            }
         }
     }
 }
@@ -1119,8 +1140,10 @@ animation_zoom(struct weston_animation *animation,
             animadata->transform_set = 1;
             weston_matrix_init(&animadata->transform.matrix);
             wl_list_init(&animadata->transform.link);
-            wl_list_insert(&ev->geometry.transformation_list,
-                           &animadata->transform.link);
+            if (ev) {
+                wl_list_insert(&ev->geometry.transformation_list,
+                               &animadata->transform.link);
+            }   
         }
         animadata->end_function = animation_zoom_end;
 
@@ -1179,10 +1202,12 @@ animation_zoom(struct weston_animation *animation,
                (int)(usurf->height * scaley), usurf->height,
                usurf->animation.anima, usurf->animation.state);
 
-    if ((ev->output) && (es->buffer_ref.buffer) &&
-        (es->width > 0) && (es->height > 0))    {
-        weston_view_geometry_dirty(ev);
-        weston_surface_damage(es);
+    if (ev) {
+        if ((ev->output) && (es->buffer_ref.buffer) &&
+            (es->width > 0) && (es->height > 0))    {
+            weston_view_geometry_dirty(ev);
+            weston_surface_damage(es);
+        }
     }
     if (par >= 100) {
         /* end of animation     */
@@ -1214,10 +1239,12 @@ animation_zoom_end(struct weston_animation *animation)
     if (usurf && usurf->surface)    {
         es = usurf->surface;
         ev = ico_ivi_get_primary_view(usurf);
-        ev->alpha = usurf->animation.alpha;
-        if ((ev->output) && (es->buffer_ref.buffer) &&
-            (es->width > 0) && (es->height > 0))    {
-            weston_surface_damage(es);
+        if (ev) {
+            ev->alpha = usurf->animation.alpha;
+            if ((ev->output) && (es->buffer_ref.buffer) &&
+                (es->width > 0) && (es->height > 0))    {
+                weston_surface_damage(es);
+            }
         }
     }
 }
