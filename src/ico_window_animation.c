@@ -79,7 +79,9 @@ struct animation_data   {
 /* static valiables             */
 static struct weston_compositor *weston_ec; /* Weston compositor                    */
 static char *default_animation;             /* default animation name               */
+static int  animation_fps;                  /* animation frame rate(frame/sec)      */
 static int  animation_time;                 /* default animation time(ms)           */
+static int  animation_count;                /* current number of animations         */
 static struct animation_data    *free_data; /* free data list                       */
 
 /* support animation names      */
@@ -209,6 +211,7 @@ ico_window_animation(const int op, void *data)
                                       struct weston_output, link);
                 wl_list_insert(output->animation_list.prev,
                                &usurf->animation.animation.link);
+                animation_count ++;
             }
         }
         else if (((usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_SHOW) &&
@@ -413,15 +416,17 @@ animation_cont(struct weston_animation *animation, struct weston_output *output,
     if (usurf->animation.time == 0) {
         usurf->animation.time = animation_time;
     }
-    if (((output == NULL) && (msecs == 0)) ||
-        (nowsec >= ((uint32_t)usurf->animation.time)))  {
+    if (((output == NULL) && (msecs == 0)) || (nowsec >= ((uint32_t)usurf->animation.time))) {
         par = 100;
     }
     else    {
         par = (nowsec * 100 + usurf->animation.time / 2) / usurf->animation.time;
-        if (par < 1)    par = 1;
+        if (par < 2)    par = 2;
     }
-    if ((par >= 100) || (par != usurf->animation.current))  {
+    if ((par >= 100) ||
+        (abs(usurf->animation.current - par) >=
+         (((1000 * 100) / animation_fps) / usurf->animation.time)) ||
+        ((animation_count > 1) && (par != usurf->animation.current)))   {
         usurf->animation.current = par;
         return 0;
     }
@@ -460,6 +465,9 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
     }
     animadata = (struct animation_data *)usurf->animation.animadata;
 
+    if (animation_count > 0)    {
+        animation_count --;
+    }
     ev = ico_ivi_get_primary_view(usurf);
 
     if (animadata)  {
@@ -1250,6 +1258,8 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     weston_ec = ec;
     default_animation = (char *)ico_ivi_default_animation_name();
     animation_time = ico_ivi_default_animation_time();
+    animation_fps = ico_ivi_default_animation_fps();
+    animation_count = 0;
 
     ico_window_mgr_set_hook_animation(ico_window_animation);
 

@@ -79,6 +79,7 @@ int ico_ivi_debugflag(void);                /* Get debug flag                   
                                             /* Get default animation name           */
 const char *ico_ivi_default_animation_name(void);
 int ico_ivi_default_animation_time(void);   /* Get default animation time(ms)       */
+int ico_ivi_default_animation_fps(void);    /* Get animation frame rate(fps)        */
 
 /* Debug Traces                         */
 /* Define for debug write               */

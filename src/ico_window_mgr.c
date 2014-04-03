@@ -234,6 +234,7 @@ static int  _ico_ivi_option_flag = 0;           /* option flags                 
 static int  _ico_ivi_debug_level = 3;           /* debug Level                      */
 static char *_ico_ivi_animation_name = NULL;    /* default animation name           */
 static int  _ico_ivi_animation_time = 500;      /* default animation time           */
+static int  _ico_ivi_animation_fps = 30;        /* animation frame rate             */
 
 /* static management table              */
 static struct ico_win_mgr       *_ico_win_mgr = NULL;
@@ -316,6 +317,20 @@ WL_EXPORT   int
 ico_ivi_default_animation_time(void)
 {
     return _ico_ivi_animation_time;
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_ivi_default_animation_fps: get default animation frame rate
+ *
+ * @param       None
+ * @return      Default animation frame rate(frames/sec)
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   int
+ico_ivi_default_animation_fps(void)
+{
+    return _ico_ivi_animation_fps;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -596,6 +611,8 @@ ico_window_mgr_get_usurf_client(const uint32_t surfaceid, struct wl_client *clie
             return NULL;
         }
         usurf = (struct uifw_win_surface *)uclient->surface_link.next;
+        uifw_trace("ico_window_mgr_get_usurf_client: client=%08x 1st surface=%08x",
+                   (int)client, usurf->surfaceid);
     }
     return usurf;
 }
@@ -2849,10 +2866,12 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     if (section)    {
         weston_config_section_get_string(section, "default", &_ico_ivi_animation_name, NULL);
         weston_config_section_get_int(section, "time", &_ico_ivi_animation_time, 500);
+        weston_config_section_get_int(section, "fps", &_ico_ivi_animation_fps, 30);
     }
     if (_ico_ivi_animation_name == NULL)
         _ico_ivi_animation_name = (char *)"fade";
     if (_ico_ivi_animation_time < 100)  _ico_ivi_animation_time = 500;
+    if (_ico_ivi_animation_fps < 3)     _ico_ivi_animation_fps = 30;
 
     /* create ico_window_mgr management table   */
     _ico_win_mgr = (struct ico_win_mgr *)malloc(sizeof(struct ico_win_mgr));
@@ -2951,8 +2970,8 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
             wl_event_loop_add_timer(loop, win_mgr_timer_mapsurface, NULL);
     wl_event_source_timer_update(_ico_win_mgr->wait_mapevent, 1000);
 
-    uifw_info("ico_window_mgr: animation name=%s time=%d",
-              _ico_ivi_animation_name, _ico_ivi_animation_time);
+    uifw_info("ico_window_mgr: animation name=%s time=%d fps=%d",
+              _ico_ivi_animation_name, _ico_ivi_animation_time, _ico_ivi_animation_fps);
     uifw_info("ico_window_mgr: option flag=0x%04x log level=%d debug flag=0x%04x",
               _ico_ivi_option_flag, _ico_ivi_debug_level & 0x0ffff,
               (_ico_ivi_debug_level >> 16) & 0x0ffff);
