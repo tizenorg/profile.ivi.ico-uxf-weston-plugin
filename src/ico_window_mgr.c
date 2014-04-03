@@ -153,7 +153,7 @@ static void win_mgr_register_surface(uint32_t id_surface, struct weston_surface 
                                             /* surface destroy                      */
 static void win_mgr_destroy_surface(struct weston_surface *surface);
                                             /* weston_surface destroy listener      */
-static void win_mgr_surface_destroy(struct wl_listener *listener, void *data);
+static void win_mgr_surf_destroylistener(struct wl_listener *listener, void *data);
                                             /* read surface pixel                   */
 static int win_mgr_takeSurfaceScreenshot(const char *filename,
                                          struct uifw_win_surface *usurf,
@@ -1219,20 +1219,20 @@ static void
 ico_ivi_surfaceRemoveNotification(struct weston_layout_surface *ivisurf, void *userdata)
 {
     uint32_t    id_surface;
-    struct weston_view      *ev;
     struct weston_surface   *es;
+    struct uifw_win_surface *usurf;
 
     id_surface = weston_layout_getIdOfSurface(ivisurf);
     uifw_trace("ico_ivi_surfaceRemoveNotification: Remove %x", id_surface);
 
-    ev = weston_layout_get_weston_view(ivisurf);
-    if (! ev)   {
-        uifw_error("ico_ivi_surfaceRemoveNotification: weston_layout_get_weston_view Error");
+    usurf = ico_window_mgr_get_usurf(id_surface);
+    if (! usurf)   {
+        uifw_trace("ico_ivi_surfaceRemoveNotification: surface %08x dose not exist", id_surface);
     }
     else    {
-        es = ev->surface;
+        es = usurf->surface;
         if (! es)   {
-            uifw_error("ico_ivi_surfaceRemoveNotification: no weston_surface");
+            uifw_trace("ico_ivi_surfaceRemoveNotification: no weston_surface");
         }
         else    {
             win_mgr_destroy_surface(es);
@@ -1469,7 +1469,7 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
         usurf->configure_height = usurf->client_height;
     }
     wl_list_init(&usurf->surface_destroy_listener.link);
-    usurf->surface_destroy_listener.notify = win_mgr_surface_destroy;
+    usurf->surface_destroy_listener.notify = win_mgr_surf_destroylistener;
     wl_signal_add(&surface->destroy_signal, &usurf->surface_destroy_listener);
 
     wl_list_init(&usurf->client_link);
@@ -2423,7 +2423,7 @@ win_mgr_destroy_surface(struct weston_surface *surface)
 
 /*--------------------------------------------------------------------------*/
 /**
- * @brief   win_mgr_surface_destroy: weston_surface destroy listener
+ * @brief   win_mgr_surf_destroylistener: weston_surface destroy listener
  *
  * @param[in]   listener    listener
  * @param[in]   data        data (unused)
@@ -2431,16 +2431,18 @@ win_mgr_destroy_surface(struct weston_surface *surface)
  */
 /*--------------------------------------------------------------------------*/
 static void
-win_mgr_surface_destroy(struct wl_listener *listener, void *data)
+win_mgr_surf_destroylistener(struct wl_listener *listener, void *data)
 {
     struct uifw_win_surface *usurf = container_of(listener, struct uifw_win_surface,
                                                   surface_destroy_listener);
 
-    uifw_trace("win_mgr_surface_destroy: Enter(%08x)", usurf->surfaceid);
-
-    win_mgr_destroy_surface(usurf->surface);
-
-    uifw_trace("win_mgr_surface_destroy: Leave");
+    if (usurf && usurf->surface && usurf->ivisurf)  {
+        uifw_trace("win_mgr_surf_destroylistener: Enter(%08x)", usurf->surfaceid);
+        if (weston_layout_surfaceRemove(usurf->ivisurf) != 0)   {
+            uifw_trace("win_mgr_surf_destroylistener: weston_layout_surfaceRemove() Error");
+        }
+        uifw_trace("win_mgr_surf_destroylistener: Leave");
+    }
 }
 
 /*--------------------------------------------------------------------------*/
