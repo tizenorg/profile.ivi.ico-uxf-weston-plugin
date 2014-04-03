@@ -573,7 +573,6 @@ ico_window_mgr_get_usurf(const uint32_t surfaceid)
         }
         usurf = usurf->next_idhash;
     }
-    uifw_trace("ico_window_mgr_get_usurf: NULL(%08x)", surfaceid);
     return NULL;
 }
 
@@ -1444,9 +1443,6 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
         uifw_trace("win_mgr_register_surface: Leave(Already Exist)");
         return;
     }
-
-    /* set default color and shader */
-    weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1.0);
 
     /* create UIFW surface management table */
     usurf = malloc(sizeof(struct uifw_win_surface));
