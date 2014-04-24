@@ -39,8 +39,6 @@
 #include <sys/stat.h>
 
 #include <weston/compositor.h>
-#include <pixman.h>
-#include <ilm/ilm_types.h>
 #include <weston/weston-layout.h>
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"
