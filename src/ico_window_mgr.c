@@ -52,6 +52,7 @@
 #include <aul/aul.h>
 #include <bundle.h>
 
+#define MESA_EGL_NO_X11_HEADERS
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 
