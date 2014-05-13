@@ -31,6 +31,9 @@ AC_CHECK_HEADERS([execinfo.h])
 AC_CHECK_FUNCS([mkostemp strchrnul])
 
 PKG_CHECK_MODULES([PLUGIN], [weston >= 1.4 pixman-1])
+PKG_CHECK_MODULES([EGL], [egl])
+
+CFLAGS="$CFLAGS $EGL_CFLAGS"
 
 if test "x$GCC" = "xyes"; then
 	my_common_gcc_flags="-Wall -Wextra -Wno-unused-parameter \
@@ -39,6 +42,7 @@ if test "x$GCC" = "xyes"; then
 		-Wstrict-prototypes -Wmissing-prototypes"
 	GCC_CXXFLAGS="$my_common_gcc_flags"
 fi
+AC_SUBST(CFLAGS)
 AC_SUBST(GCC_CFLAGS)
 AC_SUBST(GCC_CXXFLAGS)
 

@@ -12,6 +12,7 @@ BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(evas)
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
+BuildRequires: pkgconfig(egl)
 BuildRequires: mesa-devel
 BuildRequires: genivi-shell-devel
 BuildRequires: weston-ivi-shell-devel
