@@ -44,6 +44,7 @@
 #include <linux/uinput.h>
 #include <errno.h>
 
+#include <pixman.h>
 #include <wayland-server.h>
 #include <weston/compositor.h>
 #include "ico_ivi_common_private.h"
@@ -68,6 +69,7 @@ struct ico_input_mgr {
     struct wl_list  free_region;            /* free input region table list         */
     struct weston_seat *seat;               /* input seat                           */
     struct wl_resource *inputmgr;
+    int             last_pointer;           /* pointer/touch device flag            */
 };
 
 /* Input Switch Table                   */
@@ -155,6 +157,10 @@ static void ico_mgr_del_input_app(struct wl_client *client, struct wl_resource *
                                             /* send key input event from device     */
 static void ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
                                    const char *target, int32_t code, int32_t value);
+                                            /* send pointer input event from device */
+static void ico_mgr_send_pointer_event(struct wl_client *client,
+                                       struct wl_resource *resource,
+                                       const char *target, int32_t code, int32_t value);
                                             /* set input region                     */
 static void ico_mgr_set_input_region(struct wl_client *client, struct wl_resource *resource,
                                      const char *target, int32_t x, int32_t y,
@@ -194,7 +200,8 @@ static void ico_input_send_region_event(struct wl_array *array);
 static const struct ico_input_mgr_control_interface ico_input_mgr_implementation = {
     ico_mgr_add_input_app,
     ico_mgr_del_input_app,
-    ico_mgr_send_key_event
+    ico_mgr_send_key_event,
+    ico_mgr_send_pointer_event
 };
 
 /* Extended Input interface             */
@@ -427,8 +434,7 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
                        const char *target, int32_t code, int32_t value)
 {
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
-    struct wl_resource      *cres;          /* event send client resource   */
-    struct wl_array dummy_array;            /* dummy array for wayland API  */
+    struct wl_array         dummy_array;    /* dummy array for wayland API  */
     uint32_t    ctime;                      /* current time(ms)             */
     uint32_t    serial;                     /* event serial number          */
     int         keyboard_active;            /* keyborad active surface flag */
@@ -445,8 +451,8 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
 
     if ((target == NULL) || (*target == 0) || (*target == ' ')) {
         /* send event to surface via weston */
-
         uifw_trace("ico_mgr_send_key_event: notify_key(%d,%d)", code, value);
+
         notify_key(pInputMgr->seat, ctime, code,
                    value ? WL_KEYBOARD_KEY_STATE_PRESSED :
                            WL_KEYBOARD_KEY_STATE_RELEASED, STATE_UPDATE_NONE);
@@ -462,10 +468,7 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
         }
 
         /* send event                   */
-        cres = wl_resource_find_for_client(
-                            &pInputMgr->seat->keyboard->resource_list,
-                            wl_resource_get_client(usurf->surface->resource));
-        if (cres)   {
+        if (usurf->uclient->res_keyboard)   {
             if (pInputMgr->seat->keyboard->focus == usurf->surface) {
                 keyboard_active = 1;
             }
@@ -475,18 +478,19 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
             if (! keyboard_active)  {
                 wl_array_init(&dummy_array);
                 serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                wl_keyboard_send_enter(cres, serial,
+                wl_keyboard_send_enter(usurf->uclient->res_keyboard, serial,
                                        usurf->surface->resource, &dummy_array);
             }
             serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
             uifw_trace("ico_mgr_send_key_event: send Key (%d, %d) to %08x",
                        code, value, usurf->surfaceid);
-            wl_keyboard_send_key(cres, serial, ctime, code,
+            wl_keyboard_send_key(usurf->uclient->res_keyboard, serial, ctime, code,
                                  value ? WL_KEYBOARD_KEY_STATE_PRESSED :
                                          WL_KEYBOARD_KEY_STATE_RELEASED);
            if (! keyboard_active)  {
                 serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                wl_keyboard_send_leave(cres, serial, usurf->surface->resource);
+                wl_keyboard_send_leave(usurf->uclient->res_keyboard,
+                                       serial, usurf->surface->resource);
             }
         }
         else    {
@@ -495,6 +499,276 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
         }
     }
     uifw_debug("ico_mgr_send_key_event: Leave");
+}
+
+/*--------------------------------------------------------------------------*/
+/**
+ * @brief   ico_mgr_send_pointer_event: send pointer input event
+ *
+ * @param[in]   client          client(HomeScreen)
+ * @param[in]   resource        resource of request
+ * @param[in]   target          target window name and application id
+ * @param[in]   code            event code
+ * @param[in]   value           event value
+ * @return      none
+ */
+/*--------------------------------------------------------------------------*/
+static void
+ico_mgr_send_pointer_event(struct wl_client *client, struct wl_resource *resource,
+                           const char *target, int32_t code, int32_t value)
+{
+    struct uifw_win_surface *usurf;         /* UIFW surface                 */
+    uint32_t    ctime;                      /* current time(ms)             */
+    uint32_t    serial;                     /* event serial number          */
+    int         fx;                         /* x as wl_fixed                */
+    int         fy;                         /* y as wl_fixed                */
+    int         pointer_active;             /* pointerborad active surface flag */
+
+    uifw_trace("ico_mgr_send_pointer_event: Enter(target=%s code=%x value=%d)",
+               target ? target : "(NULL)", code, value);
+
+    if ((! pInputMgr->seat->touch) && (! pInputMgr->seat->pointer)) {
+        uifw_error("ico_mgr_send_pointer_event: Leave(system has no pointer/touch)");
+        return;
+    }
+
+    ctime = weston_compositor_get_time();
+    if ((pInputMgr->seat->touch != NULL) &&
+        (pInputMgr->seat->touch->num_tp > 0))   {
+        pInputMgr->last_pointer = 0;
+    }
+    else if ((pInputMgr->seat->pointer != NULL) &&
+             (pInputMgr->seat->pointer->button_count > 0))  {
+        pInputMgr->last_pointer = 1;
+    }
+
+    fx = wl_fixed_from_int((value >> 16) & 0x7fff),
+    fy = wl_fixed_from_int(value & 0x7fff);
+
+    if ((target == NULL) || (*target == 0) || (*target == ' ')) {
+        /* send event to surface via weston */
+
+        if (pInputMgr->last_pointer)    {
+            /* pointer(mouse) event */
+            if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_CANCEL)    {
+                for (pointer_active = pInputMgr->seat->pointer->button_count;
+                     pointer_active > 0; pointer_active--)  {
+                    notify_button(pInputMgr->seat, ctime, BTN_LEFT,
+                                  WL_POINTER_BUTTON_STATE_RELEASED);
+                }
+            }
+
+            /* hide touch-layer */
+            ico_window_mgr_set_touch_layer(0);
+
+            switch (code & ICO_INPUT_MGR_CONTROL_EVENT_CODE_MASK)   {
+            case ABS_Z:
+                uifw_trace("ico_mgr_send_pointer_event: motion_absolute(%d,%d)",
+                           fx/256, fy/256);
+                notify_motion_absolute(pInputMgr->seat, ctime, fx, fy);
+                break;
+            case BTN_TOUCH:
+            case BTN_LEFT:
+            case BTN_MIDDLE:
+            case BTN_RIGHT:
+                if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_UP)    {
+                    value = WL_POINTER_BUTTON_STATE_RELEASED;
+                }
+                else if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_DOWN) {
+                    value = WL_POINTER_BUTTON_STATE_PRESSED;
+                }
+                else if (value != 0)    {
+                    value = WL_POINTER_BUTTON_STATE_PRESSED;
+                }
+                else    {
+                    value = WL_POINTER_BUTTON_STATE_PRESSED;
+                }
+                if ((code & ICO_INPUT_MGR_CONTROL_EVENT_CODE_MASK) == BTN_TOUCH)    {
+                    code = BTN_LEFT;
+                }
+                uifw_trace("ico_mgr_send_pointer_event: button(%d,%d)", code, value);
+                notify_button(pInputMgr->seat, ctime, code, value);
+                break;
+            case 0:
+                break;          /*not operation */
+            default:
+                uifw_trace("ico_mgr_send_pointer_event: unknown pointer code=0x%02x(%d)",
+                           code, code);
+                break;
+            }
+        }
+        else    {
+            /* touch event          */
+            if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_CANCEL)    {
+                for (pointer_active = pInputMgr->seat->touch->num_tp;
+                     pointer_active > 0; pointer_active--)  {
+                    uifw_trace("ico_mgr_send_pointer_event: touch UP for cancel(%d,%d)",
+                               fx/256, fy/256);
+                    notify_touch(pInputMgr->seat, ctime, 0, fx, fy, WL_TOUCH_UP);
+                }
+            }
+
+            /* hide touch-layer */
+            ico_window_mgr_set_touch_layer(0);
+
+            switch (code & ICO_INPUT_MGR_CONTROL_EVENT_CODE_MASK)   {
+            case ABS_Z:
+                uifw_trace("ico_mgr_send_pointer_event: touch MOTION(%d,%d)",
+                           fx/256, fy/256);
+                notify_touch(pInputMgr->seat, ctime, 0, fx, fy, WL_TOUCH_MOTION);
+                break;
+            case BTN_TOUCH:
+            case BTN_LEFT:
+            case BTN_MIDDLE:
+            case BTN_RIGHT:
+                if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_UP)    {
+                    value = WL_TOUCH_UP;
+                }
+                else    {
+                    value = WL_TOUCH_DOWN;
+                }
+                uifw_trace("ico_mgr_send_pointer_event: touch %s(%d,%d)",
+                           (value == WL_TOUCH_UP) ? "UP" : "DOWN", fx/256, fy/256);
+                notify_touch(pInputMgr->seat, ctime, 0, fx, fy, value);
+                break;
+            case 0:
+                break;          /*not operation */
+            default:
+                uifw_trace("ico_mgr_send_pointer_event: unknown touch code=0x%02x(%d)",
+                           code, code);
+                break;
+            }
+        }
+        /* show touch-layer */
+        ico_window_mgr_set_touch_layer(1);
+    }
+    else    {
+        /* send event to fixed application  */
+        /* get application surface       */
+        usurf = ico_window_mgr_get_client_usurf(target);
+        if (! usurf)  {
+            uifw_trace("ico_mgr_send_pointer_event: Leave(window=%s dose not exist)",
+                       target);
+            return;
+        }
+
+        /* send event                   */
+        if ((pInputMgr->last_pointer != 0) &&
+            (usurf->uclient->res_pointer))  {
+            /* pointer(mouse) event */
+            if ((pInputMgr->seat->pointer->focus != NULL) &&
+                (pInputMgr->seat->pointer->focus->surface == usurf->surface))   {
+                pointer_active = 1;
+            }
+            else    {
+                pointer_active = 0;
+            }
+            if (! pointer_active)  {
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_pointer_send_enter(usurf->uclient->res_pointer, serial,
+                                      usurf->surface->resource,
+                                      fx - wl_fixed_from_int(usurf->x),
+                                      fy - wl_fixed_from_int(usurf->y));
+            }
+            uifw_trace("ico_mgr_send_pointer_event: send pointer event (%d, %d) to %08x",
+                       code, value, usurf->surfaceid);
+
+            switch (code & ICO_INPUT_MGR_CONTROL_EVENT_CODE_MASK)   {
+            case ABS_Z:
+                wl_pointer_send_motion(usurf->uclient->res_pointer, ctime,
+                                       fx - wl_fixed_from_int(usurf->x),
+                                       fy - wl_fixed_from_int(usurf->y));
+                break;
+            case BTN_TOUCH:
+            case BTN_LEFT:
+            case BTN_MIDDLE:
+            case BTN_RIGHT:
+                if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_UP)    {
+                    value = WL_POINTER_BUTTON_STATE_RELEASED;
+                }
+                else if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_DOWN) {
+                    value = WL_POINTER_BUTTON_STATE_PRESSED;
+                }
+                else if (value != 0)    {
+                    value = WL_POINTER_BUTTON_STATE_PRESSED;
+                }
+                else    {
+                    value = WL_POINTER_BUTTON_STATE_PRESSED;
+                }
+                code &= ICO_INPUT_MGR_CONTROL_EVENT_CODE_MASK;
+                if (code == BTN_TOUCH)  code = BTN_LEFT;
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_pointer_send_button(usurf->uclient->res_pointer, serial, ctime,
+                                       code, value);
+                break;
+            case 0:
+                break;          /*not operation */
+            default:
+                uifw_trace("ico_mgr_send_pointer_event: unknown pointer code=0x%02x(%d)",
+                           code, code);
+                break;
+            }
+           if (! pointer_active)  {
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_pointer_send_leave(usurf->uclient->res_pointer,
+                                      serial, usurf->surface->resource);
+            }
+        }
+        else if ((pInputMgr->last_pointer == 0) &&
+                 (usurf->uclient->res_touch))   {
+            /* touch event          */
+            if ((pInputMgr->seat->touch->focus != NULL) &&
+                (pInputMgr->seat->touch->focus->surface == usurf->surface)) {
+                pointer_active = 1;
+            }
+            else    {
+                pointer_active = 0;
+            }
+            if (! pointer_active)  {
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_pointer_send_enter(usurf->uclient->res_touch, serial,
+                                      usurf->surface->resource,
+                                      fx - wl_fixed_from_int(usurf->x),
+                                      fy - wl_fixed_from_int(usurf->y));
+            }
+            uifw_trace("ico_mgr_send_pointer_event: send touch event (%d, %d) to %08x",
+                       code, value, usurf->surfaceid);
+            switch (code & ICO_INPUT_MGR_CONTROL_EVENT_CODE_MASK)   {
+            case ABS_Z:
+                wl_touch_send_motion(usurf->uclient->res_touch, ctime, 0, fx, fy);
+                break;
+            case BTN_TOUCH:
+            case BTN_LEFT:
+            case BTN_MIDDLE:
+            case BTN_RIGHT:
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                if (code & ICO_INPUT_MGR_CONTROL_EVENT_TOUCH_UP)    {
+                    wl_touch_send_up(usurf->uclient->res_touch, serial, ctime, 0);
+                }
+                else    {
+                    wl_touch_send_down(usurf->uclient->res_touch, serial, ctime,
+                                       usurf->surface->resource, 0, fx, fy);
+                }
+                break;
+            case 0:
+                break;          /*not operation */
+            default:
+                uifw_trace("ico_mgr_send_pointer_event: unknown touch code=0x%02x(%d)",
+                           code, code);
+                break;
+            }
+            if (! pointer_active)  {
+                serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
+                wl_pointer_send_leave(usurf->uclient->res_touch,
+                                      serial, usurf->surface->resource);
+            }
+        }
+        else    {
+            uifw_trace("ico_mgr_send_pointer_event: pointer client %08x dose not exist",
+                       (int)usurf->surface->resource);
+        }
+    }
+    uifw_debug("ico_mgr_send_pointer_event: Leave");
 }
 
 /*--------------------------------------------------------------------------*/

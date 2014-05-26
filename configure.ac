@@ -30,7 +30,7 @@ AC_CHECK_HEADERS([execinfo.h])
 
 AC_CHECK_FUNCS([mkostemp strchrnul])
 
-PKG_CHECK_MODULES([PLUGIN], [weston >= 1.4 pixman-1])
+PKG_CHECK_MODULES([PLUGIN], [weston >= 1.1.1 pixman-1 xkbcommon])
 PKG_CHECK_MODULES([EGL], [egl])
 
 CFLAGS="$CFLAGS $EGL_CFLAGS"

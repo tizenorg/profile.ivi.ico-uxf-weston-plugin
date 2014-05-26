@@ -2,7 +2,7 @@ TESTS_ENVIRONMENT = $(SHELL) $(top_srcdir)/tests/weston-plugin-test
 
 export abs_builddir
 
-EFL_INCLUDE = `pkg-config --cflags ecore-evas ecore evas`
+EFL_INCLUDE = `pkg-config --cflags ecore-evas ecore evas ecore-wayland elementary`
 GENIVI_INCLUDE = -I/usr/include/ilm -I/usr/include/layermanager
 GENIVI_LIBS = -lilmCommon -lilmControl -lilmClient
 
@@ -21,7 +21,7 @@ AM_LDFLAGS = -module -avoid-version -rpath $(libdir) -lwayland-egl -lEGL -lGLESv
 
 test_common_src = test-common.c test-common.h
 test_protocol_lib = ../src/.libs/libico-uxf-weston-plugin.so
-test_efl_libs = -lecore_evas -lecore -levas
+test_efl_libs = -lecore_evas -lecore -levas -lecore_wayland -lelementary
 test_wayland_client = -lwayland-client
 
 test_homescreen_SOURCES = test-homescreen.c $(test_common_src) test-thumbnail.c

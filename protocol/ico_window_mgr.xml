@@ -5,6 +5,13 @@
       for IVI SystemController interface.
     </description>
 
+    <enum name="misc">
+      <description summary="definition of various general-purpose values">
+       The definition of various general-purpose values.
+      </description>
+      <entry name="over_screen" value="0x4000" summary="position of over screen"/>
+    </enum>
+
     <enum name="animation_type">
       <description summary="type of the cutaway for animation">
        Type of the cutaway for surface animation.
@@ -90,6 +97,7 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
       <arg name="visible" type="int"/>
+      <arg name="winname" type="string"/>
     </request>
 
     <event name="map_surface">

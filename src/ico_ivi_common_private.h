@@ -61,12 +61,8 @@
 #endif
 
 /* Option flags                         */
-#define ICO_IVI_OPTION_SHOW_SURFACE     0x0001  /* new surface show on create       */
-#define ICO_IVI_OPTION_SHOW_NODISP      0x0002  /* show if display not exist        */
-#define ICO_IVI_OPTION_SHOW_INPUTLAYER  0x0004  /* show input panel layer           */
 #define ICO_IVI_OPTION_SUPPORT_SHM      0x0010  /* support shm_buffer thumbnail     */
-#define ICO_IVI_OPTION_FIXED_ASPECT     0x0080  /* surface fixed aspect rate        */
-#define ICO_IVI_OPTION_GPU_DEPEND       0x8000  /* Acceleration depending on GPU    */
+#define ICO_IVI_OPTION_SAVE_BITMAP      0x0100  /* save thumbnail bitmap files      */
 
 /* Debug flags                          */
 #define ICO_IVI_DEBUG_PERF_LOG          0x0001  /* performance log                  */

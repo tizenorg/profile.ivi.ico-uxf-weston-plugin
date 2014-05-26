@@ -102,6 +102,9 @@ struct uifw_gl_surface_state {      /* struct gl_surface_state  */
                                             /* show/hide animation with position    */
 #define ICO_WINDOW_MGR_ANIMATION_POS    0x10000000
 
+/* Waiting time for updating of livethumbnail(ms)   */
+#define ICO_WINDOW_MGR_THUMBNAIL_WAITTIME   1000
+
 /* Multi Windiw Manager                 */
 struct ico_win_mgr {
     struct weston_compositor *compositor;   /* Weston compositor                    */
@@ -123,6 +126,11 @@ struct ico_win_mgr {
     struct uifw_win_surface *wshash[UIFW_HASH];  /* Weston Surface                  */
 
     char    shell_init;                     /* shell initialize flag                */
+    struct weston_layout_layer  *touch_layer;
+                                            /* touch layer                          */
+    struct weston_layout_surface **ptouch_surfs;
+                                            /* touch layer surfaces                 */
+    int                         touch_surfs;/* number of touch layer surfaces       */
     char    res[3];                         /* (unused)                             */
 };
 
@@ -179,7 +187,7 @@ static void uifw_unmap_surface(struct wl_client *client, struct wl_resource *res
                                             /* direct layout surface                */
 static void uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                                 uint32_t surfaceid, uint32_t layerid, int x, int y,
-                                int width, int height, int visible);
+                                int width, int height, int visible, const char *winname);
                                             /* bind manager                         */
 static void bind_ico_win_mgr(struct wl_client *client,
                              void *data, uint32_t version, uint32_t id);
@@ -235,12 +243,14 @@ static int  _ico_ivi_debug_level = 3;           /* debug Level                  
 static char *_ico_ivi_animation_name = NULL;    /* default animation name           */
 static int  _ico_ivi_animation_time = 500;      /* default animation time           */
 static int  _ico_ivi_animation_fps = 30;        /* animation frame rate             */
+static int  _ico_touch_layer = 6;               /* layer number of touch layer      */
 
 /* static management table              */
 static struct ico_win_mgr       *_ico_win_mgr = NULL;
 static int                      _ico_num_nodes = 0;
 static struct uifw_node_table   _ico_node_table[ICO_IVI_MAX_DISPLAY];
 static struct weston_seat       *touch_check_seat = NULL;
+static uint32_t ico_bmp_seq = 0;
 
 
 /*--------------------------------------------------------------------------*/
@@ -723,6 +733,7 @@ static void
 win_mgr_bind_client(struct wl_client *client, void *shell)
 {
     struct uifw_client  *uclient;
+    struct weston_seat  *seat;
     int     newclient;
     pid_t   pid;
     uid_t   uid;
@@ -752,6 +763,22 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         newclient = 1;
         uclient->destroy_listener.notify = win_mgr_destroy_client;
         wl_client_add_destroy_listener(client, &uclient->destroy_listener);
+
+        /* get client input device resource */
+        wl_list_for_each (seat, &_ico_win_mgr->compositor->seat_list, link)    {
+            if ((uclient->res_keyboard == NULL) && (seat->keyboard != NULL))    {
+                uclient->res_keyboard =
+                    wl_resource_find_for_client(&seat->keyboard->resource_list, client);
+            }
+            if ((uclient->res_pointer == NULL) && (seat->pointer != NULL))  {
+                uclient->res_pointer =
+                    wl_resource_find_for_client(&seat->pointer->resource_list, client);
+            }
+            if ((uclient->res_touch == NULL) && (seat->touch != NULL))  {
+                uclient->res_touch =
+                    wl_resource_find_for_client(&seat->touch->resource_list, client);
+            }
+        }
     }
     else    {
         newclient = 0;
@@ -1259,156 +1286,187 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
     uint32_t    id_surface;
     int         retanima;
     uint32_t    newmask;
+    int         send_event;
+    int         send_visible;
     struct uifw_win_surface *usurf;
     struct weston_view      *ev;
+    struct wl_array surfaces;
+    struct          shell_surface;
+    void            **shsurf;
 
-    newmask = ((uint32_t)mask) & (~(IVI_NOTIFICATION_OPACITY|IVI_NOTIFICATION_ORIENTATION|
-                                    IVI_NOTIFICATION_PIXELFORMAT));
     id_surface = weston_layout_getIdOfSurface(ivisurf);
     usurf = ico_window_mgr_get_usurf(id_surface);
+    newmask = ((uint32_t)mask) & (~(IVI_NOTIFICATION_OPACITY|IVI_NOTIFICATION_ORIENTATION|
+                                    IVI_NOTIFICATION_PIXELFORMAT));
 
-    if ((newmask != 0) && (usurf != NULL))  {
-        uifw_trace("ico_ivi_surfacePropertyNotification: Property %x(%08x) usurf=%08x",
-                   id_surface, newmask, (int)usurf);
-        if (newmask & (IVI_NOTIFICATION_SOURCE_RECT|IVI_NOTIFICATION_DEST_RECT|
-                       IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION))   {
-            /* change position or size  */
-            uifw_trace("ico_ivi_surfacePropertyNotification: %08x x/y=%d/%d->%d/%d "
-                       "w/h=%d/%d->%d/%d(%d/%d)", id_surface, usurf->x, usurf->y,
-                       prop->destX, prop->destY, usurf->width, usurf->height,
-                       prop->destWidth, prop->destHeight,
-                       prop->sourceWidth, prop->sourceHeight);
-            if ((usurf->client_width == prop->sourceWidth) &&
-                (usurf->client_height == prop->sourceHeight))   {
-                newmask &= (~IVI_NOTIFICATION_SOURCE_RECT);
-            }
-            else    {
-                usurf->client_width = prop->sourceWidth;
-                usurf->client_height = prop->sourceHeight;
-            }
-            if ((usurf->x == prop->destX) && (usurf->y == prop->destY) &&
-                (usurf->width == prop->destWidth) && (usurf->height == prop->destHeight)) {
-                newmask &= (~(IVI_NOTIFICATION_DEST_RECT|
-                              IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION));
-            }
-            else    {
-                usurf->x = prop->destX;
-                usurf->y = prop->destY;
-                usurf->width = prop->destWidth;
-                usurf->height = prop->destHeight;
-                if ((usurf->width != usurf->configure_width) ||
-                    (usurf->height != usurf->configure_height)) {
-                    /* send configure to client(App)        */
-                    uifw_trace("ico_ivi_surfacePropertyNotification: send configure "
-                               "%08x(%d,%d->%d,%d)", usurf->surfaceid,
-                               usurf->configure_width, usurf->configure_height,
-                               usurf->width, usurf->height);
-                    usurf->configure_width = usurf->width;
-                    usurf->configure_height = usurf->height;
+    if ((usurf == NULL) || (newmask == 0) || (usurf->internal_propchange != 0)) {
+#if 0       /* too many log */
+        uifw_trace("ico_ivi_surfacePropertyNotification: %08x internal change, NOP",
+                   id_surface);
+#endif
+        return;
+    }
 
-                    struct wl_array surfaces;
-                    struct shell_surface;
-                    void    **shsurf;
-                    if (! usurf->shsurf_resource)   {
-                        /* get shell surface if not get */
-                        ivi_shell_get_shell_surfaces(&surfaces);
-                        wl_array_for_each(shsurf, &surfaces)    {
-                            if (shell_surface_get_surface(*shsurf) == usurf->surface)   {
-                                usurf->shsurf_resource = *((struct wl_resource **)*shsurf);
-                                break;
-                            }
+    uifw_trace("ico_ivi_surfacePropertyNotification: Property %08x(%04x) usurf=%08x",
+               id_surface, newmask, (int)usurf);
+
+    send_event = 0;
+    send_visible = usurf->visible;
+    if (newmask & (IVI_NOTIFICATION_SOURCE_RECT|IVI_NOTIFICATION_DEST_RECT|
+                   IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION))   {
+        /* change position or size  */
+        uifw_trace("ico_ivi_surfacePropertyNotification: %08x x/y=%d/%d->%d/%d "
+                   "w/h=%d/%d->%d/%d(%d/%d)", id_surface, usurf->x, usurf->y,
+                   prop->destX, prop->destY, usurf->width, usurf->height,
+                   prop->destWidth, prop->destHeight,
+                   prop->sourceWidth, prop->sourceHeight);
+        if ((usurf->client_width == prop->sourceWidth) &&
+            (usurf->client_height == prop->sourceHeight))   {
+            newmask &= (~IVI_NOTIFICATION_SOURCE_RECT);
+        }
+        else    {
+            usurf->client_width = prop->sourceWidth;
+            usurf->client_height = prop->sourceHeight;
+            send_event ++;
+        }
+        if (((usurf->x == prop->destX) ||
+             (prop->destX == ICO_WINDOW_MGR_MISC_OVER_SCREEN)) &&
+            ((usurf->y == prop->destY) ||
+             (prop->destY == ICO_WINDOW_MGR_MISC_OVER_SCREEN)) &&
+            (usurf->width == prop->destWidth) && (usurf->height == prop->destHeight)) {
+            newmask &= (~(IVI_NOTIFICATION_DEST_RECT|
+                          IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION));
+        }
+        else    {
+            send_event ++;
+            if (prop->destX != ICO_WINDOW_MGR_MISC_OVER_SCREEN) usurf->x = prop->destX;
+            if (prop->destY != ICO_WINDOW_MGR_MISC_OVER_SCREEN) usurf->y = prop->destY;
+            usurf->width = prop->destWidth;
+            usurf->height = prop->destHeight;
+            if ((usurf->width != usurf->configure_width) ||
+                (usurf->height != usurf->configure_height)) {
+                /* send configure to client(App)        */
+                usurf->configure_width = usurf->width;
+                usurf->configure_height = usurf->height;
+
+                if (! usurf->shsurf_resource)   {
+                    /* get shell surface if not get */
+                    ivi_shell_get_shell_surfaces(&surfaces);
+                    wl_array_for_each(shsurf, &surfaces)    {
+                        if (shell_surface_get_surface(*shsurf) == usurf->surface)   {
+                            usurf->shsurf_resource = *((struct wl_resource **)*shsurf);
+                            break;
                         }
-                        wl_array_release(&surfaces);
                     }
-                    if (usurf->shsurf_resource) {
-                        uifw_trace("ico_ivi_surfacePropertyNotification: surface %08x "
-                                   "resource=%08x",
-                                   usurf->surfaceid, (int)usurf->shsurf_resource);
-                        wl_shell_surface_send_configure(usurf->shsurf_resource,
-                                        WL_SHELL_SURFACE_RESIZE_RIGHT|
-                                            WL_SHELL_SURFACE_RESIZE_BOTTOM,
-                                        usurf->configure_width, usurf->configure_height);
-                    }
-                    else    {
-                        uifw_trace("ico_ivi_surfacePropertyNotification: surface %08x "
-                                   "shell_surface resource not found", usurf->surfaceid);
-                    }
+                    wl_array_release(&surfaces);
+                }
+                if (usurf->shsurf_resource) {
+                    uifw_trace("ico_ivi_surfacePropertyNotification: send_configure %08x "
+                               "resource=%08x w/h=%d/%d",
+                               usurf->surfaceid, (int)usurf->shsurf_resource,
+                               usurf->configure_width, usurf->configure_height);
+                    wl_shell_surface_send_configure(usurf->shsurf_resource,
+                                    WL_SHELL_SURFACE_RESIZE_RIGHT|
+                                        WL_SHELL_SURFACE_RESIZE_BOTTOM,
+                                    usurf->configure_width, usurf->configure_height);
+                }
+                else    {
+                    uifw_trace("ico_ivi_surfacePropertyNotification: %08x "
+                               "shell_surface resource not found", usurf->surfaceid);
                 }
             }
         }
-        if (newmask & IVI_NOTIFICATION_VISIBILITY)  {
-            if ((usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
-                (win_mgr_hook_animation != NULL))   {
-                /* start animation, save original position of surface   */
-                usurf->animation.pos_x = usurf->x;
-                usurf->animation.pos_y = usurf->y;
-                usurf->animation.pos_width = usurf->width;
-                usurf->animation.pos_height = usurf->height;
-                ev = weston_layout_get_weston_view(ivisurf);
-                if (ev) {
-                    usurf->animation.alpha = ev->alpha;
-                }
-                else    {
-                    usurf->animation.alpha = 1.0;
-                }
-            }
-            if ((usurf->visible == 0) && (prop->visibility)) {
-                uifw_trace("ico_ivi_surfacePropertyNotification: %08x Visible 0=>1",
-                           id_surface);
-                usurf->visible = 1;
-                if ((usurf->animation.show_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
-                    (win_mgr_hook_animation != NULL))   {
-                    /* show with animation      */
-                    retanima =
-                        (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPSHOW,
-                                                  (void *)usurf);
-                    uifw_trace("ico_ivi_surfacePropertyNotification: ret call anima = %d",
-                               retanima);
-                }
-            }
-            else if ((usurf->visible != 0) && (! prop->visibility))  {
-                uifw_trace("ico_ivi_surfacePropertyNotification: %08x Visible 1=>0",
-                           id_surface);
-                usurf->visible = 0;
-                if ((usurf->animation.show_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
-                    (win_mgr_hook_animation != NULL))   {
-                    /* hide with animation      */
-                    retanima =
-                        (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPHIDE,
-                                                  (void *)usurf);
-                }
-                else    {
-                    retanima = ICO_WINDOW_MGR_ANIMATION_RET_ANIMA;
-                }
-                if (retanima != ICO_WINDOW_MGR_ANIMATION_RET_ANIMANOCTL)    {
-                    usurf->visible = 0;
-                    uifw_trace("ico_ivi_surfacePropertyNotification: Change to UnVisible");
-                }
-                else    {
-                    usurf->visible = 1;
-                    uifw_trace("ico_ivi_surfacePropertyNotification: Change to Visible");
-                    weston_layout_surfaceSetVisibility(ivisurf, 1);
-                    weston_layout_commitChanges();
-                }
+    }
+    if (newmask & IVI_NOTIFICATION_VISIBILITY)  {
+        if ((usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
+            (win_mgr_hook_animation != NULL))   {
+            /* start animation, save original position of surface   */
+            usurf->animation.pos_x = usurf->x;
+            usurf->animation.pos_y = usurf->y;
+            usurf->animation.pos_width = usurf->width;
+            usurf->animation.pos_height = usurf->height;
+            ev = weston_layout_get_weston_view(ivisurf);
+            if (ev) {
+                usurf->animation.alpha = ev->alpha;
             }
             else    {
-                uifw_trace("ico_ivi_surfacePropertyNotification: visible no change");
-                newmask &= (~IVI_NOTIFICATION_VISIBILITY);
+                usurf->animation.alpha = 1.0;
             }
         }
-
-        if (newmask)    {
-            /* surface changed, send event to controller    */
-            wl_list_for_each (mgr, &_ico_win_mgr->manager_list, link)   {
-                uifw_trace("win_mgr_send_event: Send UPDATE_SURFACE(surf=%08x) "
-                           "v=%d src=%d/%d dest=%d/%d(%d/%d) mgr=%08x", id_surface,
-                           usurf->visible, usurf->client_width, usurf->client_height,
-                           usurf->x, usurf->y, usurf->width, usurf->height, (int)mgr);
-                ico_window_mgr_send_update_surface(mgr->resource, id_surface,
-                                usurf->visible, usurf->client_width,
-                                usurf->client_height, usurf->x, usurf->y,
-                                usurf->width, usurf->height);
+        if ((prop->visibility != 0) &&
+            ((usurf->org_animation.saved !=0) ||
+             ((usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
+              (usurf->visible == 0)) ||
+             ((usurf->animation.state != ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
+              (usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_HIDE_AT_END)))) {
+            uifw_trace("ico_ivi_surfacePropertyNotification: %08x Visible 0=>1",
+                       id_surface);
+            send_event ++;
+            send_visible = 1;
+            usurf->visible = 1;
+            if ((usurf->animation.show_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
+                (win_mgr_hook_animation != NULL))   {
+                /* show with animation      */
+                retanima =
+                    (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPSHOW,
+                                              (void *)usurf);
+                uifw_trace("ico_ivi_surfacePropertyNotification: ret call anima = %d",
+                           retanima);
             }
+        }
+        else if ((prop->visibility == 0) &&
+                 ((usurf->org_animation.saved !=0) ||
+                  ((usurf->animation.state == ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
+                   (usurf->visible != 0)) ||
+                  ((usurf->animation.state != ICO_WINDOW_MGR_ANIMATION_STATE_NONE) &&
+                   (usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_SHOW_AT_END)))) {
+            uifw_trace("ico_ivi_surfacePropertyNotification: %08x Visible 1=>0",
+                       id_surface);
+            send_event ++;
+            send_visible = 0;
+            usurf->visible = 0;
+            if ((usurf->animation.hide_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
+                (win_mgr_hook_animation != NULL))   {
+                /* hide with animation      */
+                retanima =
+                    (*win_mgr_hook_animation)(ICO_WINDOW_MGR_ANIMATION_OPHIDE,
+                                              (void *)usurf);
+            }
+            else    {
+                retanima = ICO_WINDOW_MGR_ANIMATION_RET_ANIMA;
+            }
+            if (retanima != ICO_WINDOW_MGR_ANIMATION_RET_ANIMANOCTL)    {
+                usurf->visible = 0;
+                uifw_trace("ico_ivi_surfacePropertyNotification: %08x Change to "
+                           "UnVisible", usurf->surfaceid);
+            }
+            else    {
+                usurf->visible = 1;
+                uifw_trace("ico_ivi_surfacePropertyNotification: %08x Change to "
+                           "Visible", usurf->surfaceid);
+                usurf->internal_propchange |= 0x01;
+                weston_layout_surfaceSetVisibility(ivisurf, 1);
+                weston_layout_commitChanges();
+                usurf->internal_propchange &= ~0x01;
+            }
+        }
+        else    {
+            uifw_trace("ico_ivi_surfacePropertyNotification: visible no change");
+            newmask &= (~IVI_NOTIFICATION_VISIBILITY);
+        }
+    }
+
+    if (send_event > 0) {
+        /* surface changed, send event to controller    */
+        wl_list_for_each (mgr, &_ico_win_mgr->manager_list, link)   {
+            uifw_trace("win_mgr_send_event: Send UPDATE_SURFACE(surf=%08x) "
+                       "v=%d src=%d/%d dest=%d/%d(%d/%d) mgr=%08x", id_surface,
+                       send_visible, usurf->client_width, usurf->client_height,
+                       usurf->x, usurf->y, usurf->width, usurf->height, (int)mgr);
+            ico_window_mgr_send_update_surface(mgr->resource, id_surface,
+                            send_visible, usurf->client_width,
+                            usurf->client_height, usurf->x, usurf->y,
+                            usurf->width, usurf->height);
         }
     }
 }
@@ -1439,7 +1497,6 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
 
     /* check new surface                    */
     if (find_uifw_win_surface_by_ws(surface))   {
-        /* surface exist, NOP               */
         uifw_trace("win_mgr_register_surface: Leave(Already Exist)");
         return;
     }
@@ -1686,25 +1743,22 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
     curtime = weston_compositor_get_time();
     wl_list_for_each_safe (sm, sm_tmp, &_ico_win_mgr->map_list, map_link)   {
 #if 0   /* too many log */
-        uifw_detail("win_mgr_check_mapsurface: sm=%08x surf=%08x",
-                    (int)sm, sm->usurf->surfaceid);
+        uifw_detail("win_mgr_check_mapsurface: sm=%08x surf=%08x interval=%d que=%d",
+                    (int)sm, sm->usurf->surfaceid, sm->interval, sm->eventque);
 #endif
-        if ((sm->interval >= 0) || (sm->eventque == 0)) {
-            win_mgr_change_mapsurface(sm, 0, curtime);
-        }
-        if ((sm->interval >= 0) && (sm->eventque != 0)) {
-            if (sm->interval < wait)    {
-                wait = sm->interval;
-            }
+        win_mgr_change_mapsurface(sm, 0, curtime);
+        if ((sm->interval >= 0) && (sm->interval < wait))   {
+            wait = sm->interval;
         }
     }
 
     /* check frame interval         */
     if (wait < 2000)    {
         wait = wait / 2;
+        if (wait < 33)  wait = 33;          /* mimimum 33ms (30fsp) */
     }
     else    {
-        wait = 1000;
+        wait = 1000;                        /* maximum 1000ms       */
     }
     wl_event_source_timer_update(_ico_win_mgr->wait_mapevent, wait);
 }
@@ -1826,17 +1880,21 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
 #endif /*PERFORMANCE_EVALUATIONS*/
                 }
                 else    {
-                    if (es->buffer_ref.buffer->legacy_buffer != sm->curbuf) {
 #if  PERFORMANCE_EVALUATIONS > 0
+                    if (es->buffer_ref.buffer->legacy_buffer != sm->curbuf) {
                         uifw_perf("SWAP_BUFFER appid=%s surface=%08x CONTENTS",
                                   sm->usurf->uclient->appid, sm->usurf->surfaceid);
+                    }
 #endif /*PERFORMANCE_EVALUATIONS*/
+                    dtime = (int)((curtime - sm->lasttime) & 0x7fffffff);
+                    if ((es->buffer_ref.buffer->legacy_buffer != sm->curbuf) ||
+                        ((sm->interval >= 0) &&
+                         (dtime >= ICO_WINDOW_MGR_THUMBNAIL_WAITTIME))) {
                         if (sm->interval < 0)   {
                             sm->eventque = 1;
                             event = 0;
                         }
                         else if (sm->interval > 0)  {
-                            dtime = (int)(curtime - sm->lasttime);
                             if (dtime < sm->interval)   {
                                 sm->eventque = 1;
                                 event = 0;
@@ -1848,7 +1906,6 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
                             event = 0;
                         }
                         else if (sm->interval > 0)  {
-                            dtime = (int)(curtime - sm->lasttime);
                             if (dtime < sm->interval)   {
                                 event = 0;
                             }
@@ -1866,8 +1923,11 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
             sm->curbuf = es->buffer_ref.buffer->legacy_buffer;
         }
         else    {
+            dtime = (int)((curtime - sm->lasttime) & 0x7fffffff);
             if ((sm->eventque != 0) ||
-                (es->buffer_ref.buffer == NULL) || (es->buffer_ref.buffer != sm->curbuf)) {
+                (es->buffer_ref.buffer == NULL) || (es->buffer_ref.buffer != sm->curbuf) ||
+                ((sm->interval >= 0) &&
+                 (dtime >= ICO_WINDOW_MGR_THUMBNAIL_WAITTIME))) {
                 sm->curbuf = es->buffer_ref.buffer;
                 if (es->buffer_ref.buffer != NULL)  {
                     width = es->buffer_ref.buffer->width;
@@ -1906,7 +1966,6 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
                                 event = 0;
                             }
                             else if (sm->interval > 0)  {
-                                dtime = (int)(curtime - sm->lasttime);
                                 if (dtime < sm->interval)   {
                                     sm->eventque = 1;
                                     event = 0;
@@ -2250,21 +2309,24 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
  * @param[in]   width       width
  * @param[in]   height      height
  * @param[in]   visible     visiblity
+ * @param[in]   winname     window name(surface title)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
 uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                     uint32_t surfaceid, uint32_t layerid, int x, int y,
-                    int width, int height, int visible)
+                    int width, int height, int visible, const char *winname)
 {
     struct uifw_win_surface     *usurf;
     struct weston_layout_layer  *layout_layer;
+    int                         needcommit = 0;
     int32_t                     position[2];
     uint32_t                    dimension[2];
 
-    uifw_trace("uifw_layout_surface: Enter(surf=%08x,layer=%d,x/y=%d/%d,w/h=%d,%d,vis=%d)",
-               surfaceid, layerid, x, y, width, height, visible);
+    uifw_trace("uifw_layout_surface: Enter(surf=%08x,layer=%d,x/y=%d/%d,w/h=%d,%d,vis=%d,"
+               "winname=<%s>)", surfaceid, layerid, x, y, width, height, visible,
+               winname ? winname : "NULL");
 
     usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
     if (! usurf)    {
@@ -2279,6 +2341,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
             uifw_trace("uifw_layout_surface: Leave(layer=%d dose not exist)", layerid);
             return;
         }
+        needcommit ++;
         if (weston_layout_layerAddSurface(layout_layer, usurf->ivisurf) == 0)   {
             if (weston_layout_layerSetVisibility(layout_layer, 1) != 0) {
                 uifw_warn("uifw_layout_surface: layer(%d) visible Error", layerid);
@@ -2291,6 +2354,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     }
 
     if ((x >= 0) && (y >= 0) && (width > 0) && (height > 0))    {
+        needcommit ++;
         if (weston_layout_surfaceSetSourceRectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
@@ -2305,12 +2369,14 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     else if ((x >= 0) && (y >= 0))  {
         position[0] = x;
         position[1] = y;
+        needcommit ++;
         if (weston_layout_surfaceSetPosition(usurf->ivisurf, position) != 0)    {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source position",
                       usurf->surfaceid);
         }
     }
     else if ((width > 0) && (height > 0))   {
+        needcommit ++;
         if (weston_layout_surfaceSetSourceRectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
@@ -2324,13 +2390,24 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
         }
     }
     if (visible >= 0)   {
+        needcommit ++;
         if (weston_layout_surfaceSetVisibility(usurf->ivisurf, visible) != 0)   {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set visibility",
                       usurf->surfaceid);
         }
     }
-    if (weston_layout_commitChanges() != 0) {
-        uifw_warn("uifw_layout_surface: surface(%08x) commit Error", usurf->surfaceid);
+    if ((winname != NULL) && (*winname != 0))   {
+        memset(usurf->winname, 0, ICO_IVI_WINNAME_LENGTH);
+        if (*winname != ' ')    {
+            strncpy(usurf->winname, winname, ICO_IVI_WINNAME_LENGTH-1);
+        }
+    }
+    if (needcommit) {
+        usurf->internal_propchange |= 0x02;
+        if (weston_layout_commitChanges() != 0) {
+            uifw_warn("uifw_layout_surface: surface(%08x) commit Error", usurf->surfaceid);
+        }
+        usurf->internal_propchange &= ~0x02;
     }
     uifw_trace("uifw_layout_surface: Leave");
 }
@@ -2467,6 +2544,8 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
     int     bitperpixel;
     int     bmphead_size;
     int     fd;
+    int     fd2;
+    int     bmpformat;
     int     pathlen;
     int     linesize;
     char    *sp, *dp;
@@ -2517,8 +2596,12 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
         _ico_win_mgr->pixel_readsize = bufsize;
     }
     pathlen = strlen(filename);
+    bmpformat = ico_ivi_optionflag() ? 2 : 0;
     if ((pathlen >= 4) && (strcmp(&filename[pathlen-4], ".bmp") == 0))  {
-        /* BMP format   */
+        bmpformat |= 1;
+    }
+    if (bmpformat)  {
+        /* woek buffer for BMP format   */
         wkbuf = malloc(datasize);
         if (! wkbuf)    {
             uifw_error("win_mgr_takeSurfaceScreenshot: Leave(can not allocate buffer)");
@@ -2532,6 +2615,23 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
         free(wkbuf);
         return -1;
     }
+    if (bmpformat & 2)  {
+        /* BMP save for Debug (optionflag in weston.ini)    */
+        memcpy(wkbuf, filename, pathlen);
+        for (linesize = pathlen - 1; linesize > 0; linesize--)  {
+            if (wkbuf[linesize] == '.') break;
+        }
+        if (linesize <= 0)  {
+            linesize = pathlen;
+        }
+        ico_bmp_seq ++;
+        sprintf(&wkbuf[linesize], "_%s_%dx%d_%04d.bmp",
+                usurf->uclient->appid, width, height, ico_bmp_seq);
+        fd2 = open(wkbuf, O_WRONLY|O_CREAT, 0644);
+    }
+    else    {
+        fd2 = -1;
+    }
 
     uifw_detail("win_mgr_takeSurfaceScreenshot: call read_surface_pixels(%d,%d)",
                 width, height);
@@ -2541,14 +2641,29 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
                                               (_ico_win_mgr->pixel_readbuf + bmphead_size),
                                             0, 0, width, height) != 0)  {
         close(fd);
-        uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(read_surface_pixels Error)");
+        if (fd2 >= 0)   close(fd2);
         free(wkbuf);
+        uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(read_surface_pixels Error)");
         return -1;
     }
     uifw_detail("win_mgr_takeSurfaceScreenshot: end  read_surface_pixels");
 
-    if (wkbuf)  {
-        /* BMP format   */
+    /* Save Binary format   */
+    if ((bmpformat & 1) == 0)   {
+        if (write(fd, wkbuf ? wkbuf :
+                              _ico_win_mgr->pixel_readbuf + bmphead_size, datasize) < 0) {
+            uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
+                      filename, errno);
+            close(fd);
+            if (fd2 >= 0)   close(fd2);
+            free(wkbuf);
+            return -1;
+        }
+        close(fd);
+    }
+
+    if (bmpformat)  {
+        /* Create BMP format    */
         bmphead = (struct _bmphead *)(_ico_win_mgr->pixel_readbuf +
                                       (bmphead_size - sizeof(struct _bmphead)));
         memset(bmphead, 0, sizeof(struct _bmphead));
@@ -2576,24 +2691,25 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
         }
         free(wkbuf);
 
-        if (write(fd, bmphead, sizeof(struct _bmphead) + datasize) < 0) {
-            uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
-                      filename, errno);
+        if (bmpformat & 1)  {
+            if (write(fd2, bmphead, sizeof(struct _bmphead) + datasize) < 0)    {
+                uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
+                          filename, errno);
+                close(fd);
+                if (fd2 >= 0)   close(fd2);
+                return -1;
+            }
             close(fd);
-            return -1;
         }
-    }
-    else    {
-        /* Binary format    */
-        if (write(fd, _ico_win_mgr->pixel_readbuf + bmphead_size, datasize) < 0)    {
-            uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
-                      filename, errno);
-            close(fd);
-            return -1;
-        }
-    }
-    close(fd);
 
+        if (fd2 >= 0)   {
+            if (write(fd2, bmphead, sizeof(struct _bmphead) + datasize) < 0)    {
+                uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
+                          filename, errno);
+            }
+            close(fd2);
+        }
+    }
     uifw_trace("win_mgr_takeSurfaceScreenshot: Leave");
     return 0;
 }
@@ -2760,6 +2876,89 @@ ico_window_mgr_get_client_usurf(const char *target)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_get_client_usurf: get client UIFW surface table
+ *
+ * @param[in]   target      surface window name and application Id(winname@appid)
+ * @return      UIFW surface table
+ * @retval      !=NULL      success(UIFW surface table address)
+ * @retval      = NULL      error(appid or winname not exist)
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   void
+ico_window_mgr_set_touch_layer(const int show)
+{
+    struct weston_layout_surface    **psurf;
+    struct weston_layout_SurfaceProperties  prop;
+    int         idx;
+    int32_t     position[2];
+
+    if (! _ico_win_mgr->touch_layer)    {
+        _ico_win_mgr->touch_layer = weston_layout_getLayerFromId(_ico_touch_layer);
+        if (! _ico_win_mgr->touch_layer)    {
+            uifw_error("ico_window_mgr_set_touch_layer: layer=%d not exist",
+                       _ico_touch_layer);
+            return;
+        }
+    }
+
+    if ((show == 0) && (_ico_win_mgr->ptouch_surfs != NULL))    {
+        free(_ico_win_mgr->ptouch_surfs);
+        _ico_win_mgr->ptouch_surfs = NULL;
+    }
+    if (_ico_win_mgr->ptouch_surfs == NULL) {
+        _ico_win_mgr->touch_surfs = 0;
+        if (weston_layout_getSurfacesOnLayer(_ico_win_mgr->touch_layer,
+                                             (uint32_t *)&_ico_win_mgr->touch_surfs,
+                                             &_ico_win_mgr->ptouch_surfs) != 0) {
+            uifw_error("ico_window_mgr_set_touch_layer: "
+                       "weston_layout_getSurfacesOnLayer(%d) Error", _ico_touch_layer);
+            _ico_win_mgr->ptouch_surfs = NULL;
+        }
+    }
+    if (_ico_win_mgr->ptouch_surfs != NULL) {
+        psurf = _ico_win_mgr->ptouch_surfs;
+        for (idx = 0; idx < _ico_win_mgr->touch_surfs; idx++, psurf++)  {
+            (void) weston_layout_surfaceRemoveNotification(*psurf);
+            if (weston_layout_getPropertiesOfSurface(*psurf, &prop) == 0)   {
+                if (show)   {
+                    position[0] = prop.destX & ~(0x00004000);
+                    position[1] = prop.destY & ~(0x00004000);
+                }
+                else    {
+                    position[0] = prop.destX | 0x00004000;
+                    position[1] = prop.destY | 0x00004000;
+                }
+                if (weston_layout_surfaceSetPosition(*psurf, position) != 0)    {
+                    uifw_error("ico_window_mgr_set_touch_layer: "
+                               "weston_layout_surfaceSetPosition(%d) Error",
+                               _ico_touch_layer);
+                }
+            }
+            else    {
+                uifw_error("ico_window_mgr_set_touch_layer: "
+                           "weston_layout_getPropertiesOfSurface(%d) Error",
+                           _ico_touch_layer);
+            }
+        }
+        weston_layout_commitChanges();
+        uifw_trace("ico_window_mgr_set_touch_layer: change layer=%d vis=%d",
+                   _ico_touch_layer, show);
+
+        psurf = _ico_win_mgr->ptouch_surfs;
+        for (idx = 0; idx < _ico_win_mgr->touch_surfs; idx++, psurf++)  {
+            (void) weston_layout_surfaceAddNotification(*psurf,
+                            ico_ivi_surfacePropertyNotification, NULL);
+        }
+
+        if (show != 0)  {
+            free(_ico_win_mgr->ptouch_surfs);
+            _ico_win_mgr->ptouch_surfs = NULL;
+        }
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   ico_window_mgr_set_hook_animation: set animation hook routine
  *
  * @param[in]   hook_animation  hook routine
@@ -2857,6 +3056,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     section = weston_config_get_section(ec->config, "ivi-display", NULL, NULL);
     if (section)    {
         weston_config_section_get_string(section, "displayno", &displayno, NULL);
+        weston_config_section_get_int(section, "touch-layer", &_ico_touch_layer, 6);
     }
 
     /* get animation default                    */
@@ -2958,8 +3158,8 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     nodeId = ico_ivi_get_mynode();
 
     _ico_win_mgr->surface_head = ICO_IVI_SURFACEID_BASE(nodeId);
-    uifw_trace("ico_window_mgr: NoedId=%04x SurfaceIdBase=%08x",
-                nodeId, _ico_win_mgr->surface_head);
+    uifw_trace("ico_window_mgr: NoedId=%04x SurfaceIdBase=%08x Touch-Layer=%d",
+                nodeId, _ico_win_mgr->surface_head, _ico_touch_layer);
 
     /* get seat for touch down counter check    */
     touch_check_seat = container_of(ec->seat_list.next, struct weston_seat, link);

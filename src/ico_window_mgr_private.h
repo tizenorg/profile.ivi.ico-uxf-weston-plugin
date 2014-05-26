@@ -39,6 +39,9 @@ struct uifw_manager {
 /* Cleint management table              */
 struct uifw_client  {
     struct wl_client *client;               /* Wayland client                       */
+    struct wl_resource *res_keyboard;       /* Keyboard resource                    */
+    struct wl_resource *res_pointer;        /* Pointer resource                     */
+    struct wl_resource *res_touch;          /* Touch resource                       */
     int         pid;                        /* ProcessId (pid)                      */
     char        appid[ICO_IVI_APPID_LENGTH];/* ApplicationId(from AppCore AUL)      */
     struct uifw_manager *mgr;               /* Manager table (if manager)           */
@@ -154,11 +157,11 @@ struct uifw_win_surface {
     uint16_t    configure_height;           /* Height that a client(App) configured */
     char        winname[ICO_IVI_WINNAME_LENGTH];/* Window name                      */
     char        visible;                    /* visibility                           */
+    char        internal_propchange;        /* internal surface property change     */
     char        restrain_configure;         /* restrant configure event             */
-    char        res[1];                     /* (unused)                             */
     struct uifw_win_surface_animation
                 animation;                  /* window animation information         */
-    struct uifw_win_surface_anima_save  
+    struct uifw_win_surface_anima_save
                 org_animation;              /* save original wndow animation        */
     struct wl_list  client_link;            /* surface list of same client          */
     struct wl_list  surf_map;               /* surface map list                     */
@@ -195,6 +198,11 @@ struct uifw_win_surface {
 #define ICO_WINDOW_MGR_ANIMATION_OPHIDEPOS 11       /* change to hide with position */
 #define ICO_WINDOW_MGR_ANIMATION_OPSHOWPOS 12       /* change to show with position */
 
+/* Visible control at end of animation  */
+#define ICO_WINDOW_MGR_ANIMA_NOCONTROL_AT_END  0    /* no need show/hide at end of anima*/
+#define ICO_WINDOW_MGR_ANIMA_SHOW_AT_END       1    /* surface show at end of animation*/
+#define ICO_WINDOW_MGR_ANIMA_HIDE_AT_END       2    /* surface hide at end of animation*/
+
 /* Prototype for function               */
                                             /* find uifw_client table               */
 struct uifw_client *ico_window_mgr_find_uclient(struct wl_client *client);
@@ -222,6 +230,8 @@ struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfacei
                                                          struct wl_client *client);
                                             /* get application surface              */
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
+                                            /* show/hide touch layer                */
+void ico_window_mgr_set_touch_layer(const int show);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
                                             /* set surface attribute change hook    */
