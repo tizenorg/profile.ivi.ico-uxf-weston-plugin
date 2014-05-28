@@ -44,6 +44,7 @@
 #include <linux/uinput.h>
 #include <errno.h>
 
+#include <pixman.h>
 #include <wayland-server.h>
 #include <weston/compositor.h>
 #include "ico_ivi_common_private.h"
