@@ -244,6 +244,7 @@ static struct ico_win_mgr       *_ico_win_mgr = NULL;
 static int                      _ico_num_nodes = 0;
 static struct uifw_node_table   _ico_node_table[ICO_IVI_MAX_DISPLAY];
 static struct weston_seat       *touch_check_seat = NULL;
+static uint32_t ico_bmp_seq = 0;
 
 
 /*--------------------------------------------------------------------------*/
@@ -1722,11 +1723,9 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
         uifw_detail("win_mgr_check_mapsurface: sm=%08x surf=%08x interval=%d que=%d",
                     (int)sm, sm->usurf->surfaceid, sm->interval, sm->eventque);
 #endif
-        if ((sm->interval >= 0) || (sm->eventque == 0)) {
-            win_mgr_change_mapsurface(sm, 0, curtime);
-            if (sm->interval < wait)    {
-                wait = sm->interval;
-            }
+        win_mgr_change_mapsurface(sm, 0, curtime);
+        if ((sm->interval >= 0) && (sm->interval < wait))   {
+            wait = sm->interval;
         }
     }
 
@@ -1858,16 +1857,16 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
 #endif /*PERFORMANCE_EVALUATIONS*/
                 }
                 else    {
+#if  PERFORMANCE_EVALUATIONS > 0
+                    if (es->buffer_ref.buffer->legacy_buffer != sm->curbuf) {
+                        uifw_perf("SWAP_BUFFER appid=%s surface=%08x CONTENTS",
+                                  sm->usurf->uclient->appid, sm->usurf->surfaceid);
+                    }
+#endif /*PERFORMANCE_EVALUATIONS*/
                     dtime = (int)((curtime - sm->lasttime) & 0x7fffffff);
                     if ((es->buffer_ref.buffer->legacy_buffer != sm->curbuf) ||
                         ((sm->interval >= 0) &&
                          (dtime >= ICO_WINDOW_MGR_THUMBNAIL_WAITTIME))) {
-#if  PERFORMANCE_EVALUATIONS > 0
-                        if (es->buffer_ref.buffer->legacy_buffer != sm->curbuf) {
-                            uifw_perf("SWAP_BUFFER appid=%s surface=%08x CONTENTS",
-                                      sm->usurf->uclient->appid, sm->usurf->surfaceid);
-                        }
-#endif /*PERFORMANCE_EVALUATIONS*/
                         if (sm->interval < 0)   {
                             sm->eventque = 1;
                             event = 0;
@@ -2506,6 +2505,8 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
     int     bitperpixel;
     int     bmphead_size;
     int     fd;
+    int     fd2;
+    int     bmpformat;
     int     pathlen;
     int     linesize;
     char    *sp, *dp;
@@ -2556,8 +2557,12 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
         _ico_win_mgr->pixel_readsize = bufsize;
     }
     pathlen = strlen(filename);
+    bmpformat = ico_ivi_optionflag() ? 2 : 0;
     if ((pathlen >= 4) && (strcmp(&filename[pathlen-4], ".bmp") == 0))  {
-        /* BMP format   */
+        bmpformat |= 1;
+    }
+    if (bmpformat)  {
+        /* woek buffer for BMP format   */
         wkbuf = malloc(datasize);
         if (! wkbuf)    {
             uifw_error("win_mgr_takeSurfaceScreenshot: Leave(can not allocate buffer)");
@@ -2571,6 +2576,23 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
         free(wkbuf);
         return -1;
     }
+    if (bmpformat & 2)  {
+        /* BMP save for Debug (optionflag in weston.ini)    */
+        memcpy(wkbuf, filename, pathlen);
+        for (linesize = pathlen - 1; linesize > 0; linesize--)  {
+            if (wkbuf[linesize] == '.') break;
+        }
+        if (linesize <= 0)  {
+            linesize = pathlen;
+        }
+        ico_bmp_seq ++;
+        sprintf(&wkbuf[linesize], "_%s_%dx%d_%04d.bmp",
+                usurf->uclient->appid, width, height, ico_bmp_seq);
+        fd2 = open(wkbuf, O_WRONLY|O_CREAT, 0644);
+    }
+    else    {
+        fd2 = -1;
+    }
 
     uifw_detail("win_mgr_takeSurfaceScreenshot: call read_surface_pixels(%d,%d)",
                 width, height);
@@ -2580,14 +2602,29 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
                                               (_ico_win_mgr->pixel_readbuf + bmphead_size),
                                             0, 0, width, height) != 0)  {
         close(fd);
-        uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(read_surface_pixels Error)");
+        if (fd2 >= 0)   close(fd2);
         free(wkbuf);
+        uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(read_surface_pixels Error)");
         return -1;
     }
     uifw_detail("win_mgr_takeSurfaceScreenshot: end  read_surface_pixels");
 
-    if (wkbuf)  {
-        /* BMP format   */
+    /* Save Binary format   */
+    if ((bmpformat & 1) == 0)   {
+        if (write(fd, wkbuf ? wkbuf :
+                              _ico_win_mgr->pixel_readbuf + bmphead_size, datasize) < 0) {
+            uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
+                      filename, errno);
+            close(fd);
+            if (fd2 >= 0)   close(fd2);
+            free(wkbuf);
+            return -1;
+        }
+        close(fd);
+    }
+
+    if (bmpformat)  {
+        /* Create BMP format    */
         bmphead = (struct _bmphead *)(_ico_win_mgr->pixel_readbuf +
                                       (bmphead_size - sizeof(struct _bmphead)));
         memset(bmphead, 0, sizeof(struct _bmphead));
@@ -2615,24 +2652,25 @@ win_mgr_takeSurfaceScreenshot(const char *filename, struct uifw_win_surface *usu
         }
         free(wkbuf);
 
-        if (write(fd, bmphead, sizeof(struct _bmphead) + datasize) < 0) {
-            uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
-                      filename, errno);
+        if (bmpformat & 1)  {
+            if (write(fd2, bmphead, sizeof(struct _bmphead) + datasize) < 0)    {
+                uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
+                          filename, errno);
+                close(fd);
+                if (fd2 >= 0)   close(fd2);
+                return -1;
+            }
             close(fd);
-            return -1;
         }
-    }
-    else    {
-        /* Binary format    */
-        if (write(fd, _ico_win_mgr->pixel_readbuf + bmphead_size, datasize) < 0)    {
-            uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
-                      filename, errno);
-            close(fd);
-            return -1;
-        }
-    }
-    close(fd);
 
+        if (fd2 >= 0)   {
+            if (write(fd2, bmphead, sizeof(struct _bmphead) + datasize) < 0)    {
+                uifw_warn("win_mgr_takeSurfaceScreenshot: Leave(file<%s> write Error<%d>)",
+                          filename, errno);
+            }
+            close(fd2);
+        }
+    }
     uifw_trace("win_mgr_takeSurfaceScreenshot: Leave");
     return 0;
 }
