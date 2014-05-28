@@ -1294,7 +1294,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
         return;
     }
 
-    uifw_trace("ico_ivi_surfacePropertyNotification: Property %x(%08x) usurf=%08x",
+    uifw_trace("ico_ivi_surfacePropertyNotification: Property %08x(%04x) usurf=%08x",
                id_surface, newmask, (int)usurf);
 
     send_event = 0;
@@ -1316,24 +1316,23 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
             usurf->client_height = prop->sourceHeight;
             send_event ++;
         }
-        if ((usurf->x == prop->destX) && (usurf->y == prop->destY) &&
+        if (((usurf->x == prop->destX) ||
+             (prop->destX == ICO_WINDOW_MGR_MISC_OVER_SCREEN)) &&
+            ((usurf->y == prop->destY) ||
+             (prop->destY == ICO_WINDOW_MGR_MISC_OVER_SCREEN)) &&
             (usurf->width == prop->destWidth) && (usurf->height == prop->destHeight)) {
             newmask &= (~(IVI_NOTIFICATION_DEST_RECT|
                           IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION));
         }
         else    {
             send_event ++;
-            usurf->x = prop->destX;
-            usurf->y = prop->destY;
+            if (prop->destX != ICO_WINDOW_MGR_MISC_OVER_SCREEN) usurf->x = prop->destX;
+            if (prop->destY != ICO_WINDOW_MGR_MISC_OVER_SCREEN) usurf->y = prop->destY;
             usurf->width = prop->destWidth;
             usurf->height = prop->destHeight;
             if ((usurf->width != usurf->configure_width) ||
                 (usurf->height != usurf->configure_height)) {
                 /* send configure to client(App)        */
-                uifw_trace("ico_ivi_surfacePropertyNotification: send configure "
-                           "%08x(%d,%d->%d,%d)", usurf->surfaceid,
-                           usurf->configure_width, usurf->configure_height,
-                           usurf->width, usurf->height);
                 usurf->configure_width = usurf->width;
                 usurf->configure_height = usurf->height;
 
@@ -1349,16 +1348,17 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                     wl_array_release(&surfaces);
                 }
                 if (usurf->shsurf_resource) {
-                    uifw_trace("ico_ivi_surfacePropertyNotification: surface %08x "
-                               "resource=%08x",
-                               usurf->surfaceid, (int)usurf->shsurf_resource);
+                    uifw_trace("ico_ivi_surfacePropertyNotification: send_configure %08x "
+                               "resource=%08x w/h=%d/%d",
+                               usurf->surfaceid, (int)usurf->shsurf_resource,
+                               usurf->configure_width, usurf->configure_height);
                     wl_shell_surface_send_configure(usurf->shsurf_resource,
                                     WL_SHELL_SURFACE_RESIZE_RIGHT|
                                         WL_SHELL_SURFACE_RESIZE_BOTTOM,
                                     usurf->configure_width, usurf->configure_height);
                 }
                 else    {
-                    uifw_trace("ico_ivi_surfacePropertyNotification: surface %08x "
+                    uifw_trace("ico_ivi_surfacePropertyNotification: %08x "
                                "shell_surface resource not found", usurf->surfaceid);
                 }
             }
@@ -1410,7 +1410,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
             uifw_trace("ico_ivi_surfacePropertyNotification: %08x Visible 1=>0",
                        id_surface);
             send_event ++;
-            send_visible = 1;
+            send_visible = 0;
             usurf->visible = 0;
             if ((usurf->animation.hide_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
                 (win_mgr_hook_animation != NULL))   {
@@ -1443,12 +1443,12 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
         }
     }
 
-    if (send_visible > 0)   {
+    if (send_event > 0) {
         /* surface changed, send event to controller    */
         wl_list_for_each (mgr, &_ico_win_mgr->manager_list, link)   {
             uifw_trace("win_mgr_send_event: Send UPDATE_SURFACE(surf=%08x) "
                        "v=%d src=%d/%d dest=%d/%d(%d/%d) mgr=%08x", id_surface,
-                       usurf->visible, usurf->client_width, usurf->client_height,
+                       send_visible, usurf->client_width, usurf->client_height,
                        usurf->x, usurf->y, usurf->width, usurf->height, (int)mgr);
             ico_window_mgr_send_update_surface(mgr->resource, id_surface,
                             send_visible, usurf->client_width,
