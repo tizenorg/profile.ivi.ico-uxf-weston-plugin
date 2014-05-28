@@ -1,3 +1,19 @@
+* Wed May 28 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/20140410.192017@6a8a078
+- 0.9.23 release
+-- bug fix: TIVI-3010 - Sometimes launched app not shown in ico homescreen in last user mode
+-- bug fix: TIVI-3015 - Sometimes MediaPlayer cannot be launched in last user mode of ICO Homescreen(same cause as TIVI-3010)
+-- bug fix: TIVI-3102 - Wayland Terminal loses UI in gesture swithcing of ICO Homescreen(same cause as TIVI-3010)
+-- bug fix: If input data is mistaken, ico_send_inputevent tool will crash.
+-- bug fix: A motion of the slide animation at the time of gesture operation is sometimes amusing.
+-- bug fix: A live thumbnail sometimes is not updated.
+-- bug fix: When the menu is not displayed, the log of SwapBuffer of an application is not outputted.
+-- The function to save the contents of drawing of an application at a file for debugging is added.
+-- bug fix: The HomeScreen operation by the switch of a handle is not effective.
+-- bug fix: The coordinates of Surface notified to SysemController are inaccurate.
+-- merge tizen review https://review.tizen.org/gerrit/#/c/20152/, It enabled it to build by TizenIVI M14.2.
+-- bug fix: TIVI-3103 - Settings app is unable to be activated on ICO after wifi tethering failed
+-- bug fix: TIVI-3104 - It is hard to trigger On/Off "Automatic time zone" in ICO Homescreen
+
 * Thu Apr 03 2014 Shibata Makoto <shibata@mac.tec.toyota.co.jp> accepted/tizen/ivi/panda/20140403.020007@ff3b8c9
 - 0.9.22 release
 -- bug fix: CPU is occupied in surface animation.

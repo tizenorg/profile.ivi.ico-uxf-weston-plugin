@@ -10,13 +10,13 @@ Source0:    %{name}-%{version}.tar.bz2
 BuildRequires: pkgconfig(weston) >= 1.4.0
 BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(xkbcommon) >= 0.0.578
-BuildRequires: pkgconfig(eina)
 BuildRequires: pkgconfig(evas)
 BuildRequires: pkgconfig(eina)
 BuildRequires: pkgconfig(elementary)
 BuildRequires: pkgconfig(ecore-wayland)
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
+BuildRequires: pkgconfig(egl)
 BuildRequires: mesa-devel
 BuildRequires: genivi-shell-devel
 BuildRequires: weston-ivi-shell-devel

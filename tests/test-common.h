@@ -28,7 +28,6 @@
 #ifndef _TEST_COMMON_H_
 #define _TEST_COMMON_H_
 
-#define MESA_EGL_NO_X11_HEADERS
 #include    <EGL/egl.h>                 /* EGL                              */
 #include    <GLES2/gl2.h>               /* OpenGL ES 2.x                    */
 #include    <wayland-client.h>          /* Wayland client library           */
