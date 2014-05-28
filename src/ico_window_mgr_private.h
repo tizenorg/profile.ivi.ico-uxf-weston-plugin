@@ -40,6 +40,8 @@ struct uifw_manager {
 struct uifw_client  {
     struct wl_client *client;               /* Wayland client                       */
     struct wl_resource *res_keyboard;       /* Keyboard resource                    */
+    struct wl_resource *res_pointer;        /* Pointer resource                     */
+    struct wl_resource *res_touch;          /* Touch resource                       */
     int         pid;                        /* ProcessId (pid)                      */
     char        appid[ICO_IVI_APPID_LENGTH];/* ApplicationId(from AppCore AUL)      */
     struct uifw_manager *mgr;               /* Manager table (if manager)           */
@@ -228,6 +230,8 @@ struct uifw_win_surface *ico_window_mgr_get_usurf_client(const uint32_t surfacei
                                                          struct wl_client *client);
                                             /* get application surface              */
 struct uifw_win_surface *ico_window_mgr_get_client_usurf(const char *target);
+                                            /* show/hide touch layer                */
+void ico_window_mgr_set_touch_layer(const int show);
                                             /* set window animation hook            */
 void ico_window_mgr_set_hook_animation(int (*hook_animation)(const int op, void *data));
                                             /* set surface attribute change hook    */

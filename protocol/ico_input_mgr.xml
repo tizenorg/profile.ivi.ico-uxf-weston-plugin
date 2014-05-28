@@ -2,7 +2,7 @@
 
   <interface name="ico_input_mgr_control" version="1">
     <description summary="interface for manager(ex.HomeScreen)">
-      Order a correspondence charge account to the application of the input switch
+      Order a correspondence charge account to the application of the input event
       to Multi Input Manager from HomeScreen.
     </description>
 
@@ -10,7 +10,7 @@
       <description summary="assign input switch to application">
         Assign input switch to application from HomeScreen.
       </description>
-      <arg name="appid" type="string" summary="application Id for input switch"/>
+      <arg name="appid" type="string" summary="application Id for input event"/>
       <arg name="device" type="string" summary="input device name"/>
       <arg name="input" type="int" summary="input switch number"/>
       <arg name="fix" type="int" summary="fixed assign to application"/>
@@ -21,7 +21,7 @@
       <description summary="de-assign input switch to application">
         De-assign input switch to application from HomeScreen.
       </description>
-      <arg name="appid" type="string" summary="application Id for input switch, if NULL all applications with out fixed assign"/>
+      <arg name="appid" type="string" summary="application Id for input event, if NULL all applications with out fixed assign"/>
       <arg name="device" type="string" summary="input device name, if NULL, all devices with out fixed assign"/>
       <arg name="input" type="int" summary="input switch number, if -1, all input with out dixed assign"/>
     </request>
@@ -30,7 +30,26 @@
       <description summary="send key input event to application">
         Keyboard event sent to application.
       </description>
-      <arg name="target" type="string" summary="target surface@application for input switch"/>
+      <arg name="target" type="string" summary="target surface@application for input event"/>
+      <arg name="code" type="int" summary="event code"/>
+      <arg name="value" type="int" summary="event value"/>
+    </request>
+
+    <enum name="event">
+      <description summary="definition of special event code">
+       The definition of special event code for pointer event.
+      </description>
+      <entry name="code_mask"    value="0x00ffffff" summary="event code mask"/>
+      <entry name="touch_up"     value="0x01000000" summary="up event"/>
+      <entry name="touch_down"   value="0x02000000" summary="down event"/>
+      <entry name="touch_cancel" value="0x08000000" summary="cancel touch/click event"/>
+    </enum>
+
+    <request name="send_pointer_event">
+      <description summary="send pointer input event to application">
+        Pointer(mouse or touch) event sent to application.
+      </description>
+      <arg name="target" type="string" summary="target surface@application for input event"/>
       <arg name="code" type="int" summary="event code"/>
       <arg name="value" type="int" summary="event value"/>
     </request>

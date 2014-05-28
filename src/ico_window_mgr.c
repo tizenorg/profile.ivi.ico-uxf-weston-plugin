@@ -127,6 +127,11 @@ struct ico_win_mgr {
     struct uifw_win_surface *wshash[UIFW_HASH];  /* Weston Surface                  */
 
     char    shell_init;                     /* shell initialize flag                */
+    struct weston_layout_layer  *touch_layer;
+                                            /* touch layer                          */
+    struct weston_layout_surface **ptouch_surfs;
+                                            /* touch layer surfaces                 */
+    int                         touch_surfs;/* number of touch layer surfaces       */
     char    res[3];                         /* (unused)                             */
 };
 
@@ -239,6 +244,7 @@ static int  _ico_ivi_debug_level = 3;           /* debug Level                  
 static char *_ico_ivi_animation_name = NULL;    /* default animation name           */
 static int  _ico_ivi_animation_time = 500;      /* default animation time           */
 static int  _ico_ivi_animation_fps = 30;        /* animation frame rate             */
+static int  _ico_touch_layer = 6;               /* layer number of touch layer      */
 
 /* static management table              */
 static struct ico_win_mgr       *_ico_win_mgr = NULL;
@@ -759,12 +765,19 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         uclient->destroy_listener.notify = win_mgr_destroy_client;
         wl_client_add_destroy_listener(client, &uclient->destroy_listener);
 
-        /* get client keyboard resource */
+        /* get client input device resource */
         wl_list_for_each (seat, &_ico_win_mgr->compositor->seat_list, link)    {
-            if (seat->keyboard) {
+            if ((uclient->res_keyboard == NULL) && (seat->keyboard != NULL))    {
                 uclient->res_keyboard =
                     wl_resource_find_for_client(&seat->keyboard->resource_list, client);
-                if (uclient->res_keyboard)  break;
+            }
+            if ((uclient->res_pointer == NULL) && (seat->pointer != NULL))  {
+                uclient->res_pointer =
+                    wl_resource_find_for_client(&seat->pointer->resource_list, client);
+            }
+            if ((uclient->res_touch == NULL) && (seat->touch != NULL))  {
+                uclient->res_touch =
+                    wl_resource_find_for_client(&seat->touch->resource_list, client);
             }
         }
     }
@@ -2864,6 +2877,89 @@ ico_window_mgr_get_client_usurf(const char *target)
 
 /*--------------------------------------------------------------------------*/
 /**
+ * @brief   ico_window_mgr_get_client_usurf: get client UIFW surface table
+ *
+ * @param[in]   target      surface window name and application Id(winname@appid)
+ * @return      UIFW surface table
+ * @retval      !=NULL      success(UIFW surface table address)
+ * @retval      = NULL      error(appid or winname not exist)
+ */
+/*--------------------------------------------------------------------------*/
+WL_EXPORT   void
+ico_window_mgr_set_touch_layer(const int show)
+{
+    struct weston_layout_surface    **psurf;
+    struct weston_layout_SurfaceProperties  prop;
+    int         idx;
+    int32_t     position[2];
+
+    if (! _ico_win_mgr->touch_layer)    {
+        _ico_win_mgr->touch_layer = weston_layout_getLayerFromId(_ico_touch_layer);
+        if (! _ico_win_mgr->touch_layer)    {
+            uifw_error("ico_window_mgr_set_touch_layer: layer=%d not exist",
+                       _ico_touch_layer);
+            return;
+        }
+    }
+
+    if ((show == 0) && (_ico_win_mgr->ptouch_surfs != NULL))    {
+        free(_ico_win_mgr->ptouch_surfs);
+        _ico_win_mgr->ptouch_surfs = NULL;
+    }
+    if (_ico_win_mgr->ptouch_surfs == NULL) {
+        _ico_win_mgr->touch_surfs = 0;
+        if (weston_layout_getSurfacesOnLayer(_ico_win_mgr->touch_layer,
+                                             (uint32_t *)&_ico_win_mgr->touch_surfs,
+                                             &_ico_win_mgr->ptouch_surfs) != 0) {
+            uifw_error("ico_window_mgr_set_touch_layer: "
+                       "weston_layout_getSurfacesOnLayer(%d) Error", _ico_touch_layer);
+            _ico_win_mgr->ptouch_surfs = NULL;
+        }
+    }
+    if (_ico_win_mgr->ptouch_surfs != NULL) {
+        psurf = _ico_win_mgr->ptouch_surfs;
+        for (idx = 0; idx < _ico_win_mgr->touch_surfs; idx++, psurf++)  {
+            (void) weston_layout_surfaceRemoveNotification(*psurf);
+            if (weston_layout_getPropertiesOfSurface(*psurf, &prop) == 0)   {
+                if (show)   {
+                    position[0] = prop.destX & ~(0x00004000);
+                    position[1] = prop.destY & ~(0x00004000);
+                }
+                else    {
+                    position[0] = prop.destX | 0x00004000;
+                    position[1] = prop.destY | 0x00004000;
+                }
+                if (weston_layout_surfaceSetPosition(*psurf, position) != 0)    {
+                    uifw_error("ico_window_mgr_set_touch_layer: "
+                               "weston_layout_surfaceSetPosition(%d) Error",
+                               _ico_touch_layer);
+                }
+            }
+            else    {
+                uifw_error("ico_window_mgr_set_touch_layer: "
+                           "weston_layout_getPropertiesOfSurface(%d) Error",
+                           _ico_touch_layer);
+            }
+        }
+        weston_layout_commitChanges();
+        uifw_trace("ico_window_mgr_set_touch_layer: change layer=%d vis=%d",
+                   _ico_touch_layer, show);
+
+        psurf = _ico_win_mgr->ptouch_surfs;
+        for (idx = 0; idx < _ico_win_mgr->touch_surfs; idx++, psurf++)  {
+            (void) weston_layout_surfaceAddNotification(*psurf,
+                            ico_ivi_surfacePropertyNotification, NULL);
+        }
+
+        if (show != 0)  {
+            free(_ico_win_mgr->ptouch_surfs);
+            _ico_win_mgr->ptouch_surfs = NULL;
+        }
+    }
+}
+
+/*--------------------------------------------------------------------------*/
+/**
  * @brief   ico_window_mgr_set_hook_animation: set animation hook routine
  *
  * @param[in]   hook_animation  hook routine
@@ -2961,6 +3057,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     section = weston_config_get_section(ec->config, "ivi-display", NULL, NULL);
     if (section)    {
         weston_config_section_get_string(section, "displayno", &displayno, NULL);
+        weston_config_section_get_int(section, "touch-layer", &_ico_touch_layer, 6);
     }
 
     /* get animation default                    */
@@ -3062,8 +3159,8 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     nodeId = ico_ivi_get_mynode();
 
     _ico_win_mgr->surface_head = ICO_IVI_SURFACEID_BASE(nodeId);
-    uifw_trace("ico_window_mgr: NoedId=%04x SurfaceIdBase=%08x",
-                nodeId, _ico_win_mgr->surface_head);
+    uifw_trace("ico_window_mgr: NoedId=%04x SurfaceIdBase=%08x Touch-Layer=%d",
+                nodeId, _ico_win_mgr->surface_head, _ico_touch_layer);
 
     /* get seat for touch down counter check    */
     touch_check_seat = container_of(ec->seat_list.next, struct weston_seat, link);
