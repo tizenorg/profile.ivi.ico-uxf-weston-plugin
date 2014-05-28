@@ -39,6 +39,7 @@ struct uifw_manager {
 /* Cleint management table              */
 struct uifw_client  {
     struct wl_client *client;               /* Wayland client                       */
+    struct wl_resource *res_keyboard;       /* Keyboard resource                    */
     int         pid;                        /* ProcessId (pid)                      */
     char        appid[ICO_IVI_APPID_LENGTH];/* ApplicationId(from AppCore AUL)      */
     struct uifw_manager *mgr;               /* Manager table (if manager)           */

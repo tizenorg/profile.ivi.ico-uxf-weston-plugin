@@ -90,6 +90,7 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
       <arg name="visible" type="int"/>
+      <arg name="winname" type="string"/>
     </request>
 
     <event name="map_surface">

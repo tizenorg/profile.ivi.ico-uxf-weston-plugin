@@ -182,7 +182,7 @@ static void uifw_unmap_surface(struct wl_client *client, struct wl_resource *res
                                             /* direct layout surface                */
 static void uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                                 uint32_t surfaceid, uint32_t layerid, int x, int y,
-                                int width, int height, int visible);
+                                int width, int height, int visible, const char *winname);
                                             /* bind manager                         */
 static void bind_ico_win_mgr(struct wl_client *client,
                              void *data, uint32_t version, uint32_t id);
@@ -727,6 +727,7 @@ static void
 win_mgr_bind_client(struct wl_client *client, void *shell)
 {
     struct uifw_client  *uclient;
+    struct weston_seat  *seat;
     int     newclient;
     pid_t   pid;
     uid_t   uid;
@@ -756,6 +757,15 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         newclient = 1;
         uclient->destroy_listener.notify = win_mgr_destroy_client;
         wl_client_add_destroy_listener(client, &uclient->destroy_listener);
+
+        /* get client keyboard resource */
+        wl_list_for_each (seat, &_ico_win_mgr->compositor->seat_list, link)    {
+            if (seat->keyboard) {
+                uclient->res_keyboard =
+                    wl_resource_find_for_client(&seat->keyboard->resource_list, client);
+                if (uclient->res_keyboard)  break;
+            }
+        }
     }
     else    {
         newclient = 0;
@@ -2286,21 +2296,24 @@ uifw_unmap_surface(struct wl_client *client, struct wl_resource *resource,
  * @param[in]   width       width
  * @param[in]   height      height
  * @param[in]   visible     visiblity
+ * @param[in]   winname     window name(surface title)
  * @return      none
  */
 /*--------------------------------------------------------------------------*/
 static void
 uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                     uint32_t surfaceid, uint32_t layerid, int x, int y,
-                    int width, int height, int visible)
+                    int width, int height, int visible, const char *winname)
 {
     struct uifw_win_surface     *usurf;
     struct weston_layout_layer  *layout_layer;
+    int                         needcommit = 0;
     int32_t                     position[2];
     uint32_t                    dimension[2];
 
-    uifw_trace("uifw_layout_surface: Enter(surf=%08x,layer=%d,x/y=%d/%d,w/h=%d,%d,vis=%d)",
-               surfaceid, layerid, x, y, width, height, visible);
+    uifw_trace("uifw_layout_surface: Enter(surf=%08x,layer=%d,x/y=%d/%d,w/h=%d,%d,vis=%d,"
+               "winname=<%s>)", surfaceid, layerid, x, y, width, height, visible,
+               winname ? winname : "NULL");
 
     usurf = ico_window_mgr_get_usurf_client(surfaceid, client);
     if (! usurf)    {
@@ -2315,6 +2328,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
             uifw_trace("uifw_layout_surface: Leave(layer=%d dose not exist)", layerid);
             return;
         }
+        needcommit ++;
         if (weston_layout_layerAddSurface(layout_layer, usurf->ivisurf) == 0)   {
             if (weston_layout_layerSetVisibility(layout_layer, 1) != 0) {
                 uifw_warn("uifw_layout_surface: layer(%d) visible Error", layerid);
@@ -2327,6 +2341,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     }
 
     if ((x >= 0) && (y >= 0) && (width > 0) && (height > 0))    {
+        needcommit ++;
         if (weston_layout_surfaceSetSourceRectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
@@ -2341,12 +2356,14 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     else if ((x >= 0) && (y >= 0))  {
         position[0] = x;
         position[1] = y;
+        needcommit ++;
         if (weston_layout_surfaceSetPosition(usurf->ivisurf, position) != 0)    {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source position",
                       usurf->surfaceid);
         }
     }
     else if ((width > 0) && (height > 0))   {
+        needcommit ++;
         if (weston_layout_surfaceSetSourceRectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
@@ -2359,17 +2376,26 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                       usurf->surfaceid);
         }
     }
-    usurf->internal_propchange |= 0x02;
     if (visible >= 0)   {
+        needcommit ++;
         if (weston_layout_surfaceSetVisibility(usurf->ivisurf, visible) != 0)   {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set visibility",
                       usurf->surfaceid);
         }
     }
-    if (weston_layout_commitChanges() != 0) {
-        uifw_warn("uifw_layout_surface: surface(%08x) commit Error", usurf->surfaceid);
+    if ((winname != NULL) && (*winname != 0))   {
+        memset(usurf->winname, 0, ICO_IVI_WINNAME_LENGTH);
+        if (*winname != ' ')    {
+            strncpy(usurf->winname, winname, ICO_IVI_WINNAME_LENGTH-1);
+        }
     }
-    usurf->internal_propchange &= ~0x02;
+    if (needcommit) {
+        usurf->internal_propchange |= 0x02;
+        if (weston_layout_commitChanges() != 0) {
+            uifw_warn("uifw_layout_surface: surface(%08x) commit Error", usurf->surfaceid);
+        }
+        usurf->internal_propchange &= ~0x02;
+    }
     uifw_trace("uifw_layout_surface: Leave");
 }
 
