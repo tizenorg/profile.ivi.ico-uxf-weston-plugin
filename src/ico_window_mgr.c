@@ -102,6 +102,9 @@ struct uifw_gl_surface_state {      /* struct gl_surface_state  */
                                             /* show/hide animation with position    */
 #define ICO_WINDOW_MGR_ANIMATION_POS    0x10000000
 
+/* Waiting time for updating of livethumbnail(ms)   */
+#define ICO_WINDOW_MGR_THUMBNAIL_WAITTIME   1000
+
 /* Multi Windiw Manager                 */
 struct ico_win_mgr {
     struct weston_compositor *compositor;   /* Weston compositor                    */
@@ -1398,7 +1401,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
             send_event ++;
             send_visible = 1;
             usurf->visible = 0;
-            if ((usurf->animation.show_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
+            if ((usurf->animation.hide_anima != ICO_WINDOW_MGR_ANIMATION_NONE) &&
                 (win_mgr_hook_animation != NULL))   {
                 /* hide with animation      */
                 retanima =
@@ -1716,13 +1719,11 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
     curtime = weston_compositor_get_time();
     wl_list_for_each_safe (sm, sm_tmp, &_ico_win_mgr->map_list, map_link)   {
 #if 0   /* too many log */
-        uifw_detail("win_mgr_check_mapsurface: sm=%08x surf=%08x",
-                    (int)sm, sm->usurf->surfaceid);
+        uifw_detail("win_mgr_check_mapsurface: sm=%08x surf=%08x interval=%d que=%d",
+                    (int)sm, sm->usurf->surfaceid, sm->interval, sm->eventque);
 #endif
         if ((sm->interval >= 0) || (sm->eventque == 0)) {
             win_mgr_change_mapsurface(sm, 0, curtime);
-        }
-        if ((sm->interval >= 0) && (sm->eventque != 0)) {
             if (sm->interval < wait)    {
                 wait = sm->interval;
             }
@@ -1732,9 +1733,10 @@ win_mgr_check_mapsurface(struct weston_animation *animation,
     /* check frame interval         */
     if (wait < 2000)    {
         wait = wait / 2;
+        if (wait < 33)  wait = 33;          /* mimimum 33ms (30fsp) */
     }
     else    {
-        wait = 1000;
+        wait = 1000;                        /* maximum 1000ms       */
     }
     wl_event_source_timer_update(_ico_win_mgr->wait_mapevent, wait);
 }
@@ -1856,17 +1858,21 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
 #endif /*PERFORMANCE_EVALUATIONS*/
                 }
                 else    {
-                    if (es->buffer_ref.buffer->legacy_buffer != sm->curbuf) {
+                    dtime = (int)((curtime - sm->lasttime) & 0x7fffffff);
+                    if ((es->buffer_ref.buffer->legacy_buffer != sm->curbuf) ||
+                        ((sm->interval >= 0) &&
+                         (dtime >= ICO_WINDOW_MGR_THUMBNAIL_WAITTIME))) {
 #if  PERFORMANCE_EVALUATIONS > 0
-                        uifw_perf("SWAP_BUFFER appid=%s surface=%08x CONTENTS",
-                                  sm->usurf->uclient->appid, sm->usurf->surfaceid);
+                        if (es->buffer_ref.buffer->legacy_buffer != sm->curbuf) {
+                            uifw_perf("SWAP_BUFFER appid=%s surface=%08x CONTENTS",
+                                      sm->usurf->uclient->appid, sm->usurf->surfaceid);
+                        }
 #endif /*PERFORMANCE_EVALUATIONS*/
                         if (sm->interval < 0)   {
                             sm->eventque = 1;
                             event = 0;
                         }
                         else if (sm->interval > 0)  {
-                            dtime = (int)(curtime - sm->lasttime);
                             if (dtime < sm->interval)   {
                                 sm->eventque = 1;
                                 event = 0;
@@ -1878,7 +1884,6 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
                             event = 0;
                         }
                         else if (sm->interval > 0)  {
-                            dtime = (int)(curtime - sm->lasttime);
                             if (dtime < sm->interval)   {
                                 event = 0;
                             }
@@ -1896,8 +1901,11 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
             sm->curbuf = es->buffer_ref.buffer->legacy_buffer;
         }
         else    {
+            dtime = (int)((curtime - sm->lasttime) & 0x7fffffff);
             if ((sm->eventque != 0) ||
-                (es->buffer_ref.buffer == NULL) || (es->buffer_ref.buffer != sm->curbuf)) {
+                (es->buffer_ref.buffer == NULL) || (es->buffer_ref.buffer != sm->curbuf) ||
+                ((sm->interval >= 0) &&
+                 (dtime >= ICO_WINDOW_MGR_THUMBNAIL_WAITTIME))) {
                 sm->curbuf = es->buffer_ref.buffer;
                 if (es->buffer_ref.buffer != NULL)  {
                     width = es->buffer_ref.buffer->width;
@@ -1936,7 +1944,6 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
                                 event = 0;
                             }
                             else if (sm->interval > 0)  {
-                                dtime = (int)(curtime - sm->lasttime);
                                 if (dtime < sm->interval)   {
                                     sm->eventque = 1;
                                     event = 0;
