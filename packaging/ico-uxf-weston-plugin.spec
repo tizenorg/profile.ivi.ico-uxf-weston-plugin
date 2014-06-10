@@ -6,6 +6,7 @@ Group:      Graphics & UI Framework/Automotive UI
 License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
+ExclusiveArch:  %ix86 x86_64
 
 BuildRequires: pkgconfig(weston) >= 1.4.0
 BuildRequires: pkgconfig(pixman-1)
