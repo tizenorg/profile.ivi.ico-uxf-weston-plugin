@@ -5,7 +5,7 @@ pkginclude_HEADERS =               \
 	ico_input_mgr-client-protocol.h		\
 	ico_input_mgr.h
 
-libico_uxf_weston_plugin_la_LIBADD = -ldrm_intel -lrt -lm
+libico_uxf_weston_plugin_la_LIBADD = -lrt -lm
 libico_uxf_weston_plugin_la_LDFLAGS = -version-info 0:9:0
 libico_uxf_weston_plugin_la_SOURCES =          \
 	ico_window_mgr-protocol.c		\
@@ -45,8 +45,8 @@ ico_plugin_loader_la_SOURCES =		\
 # Multi Window Manager
 ico_window_mgr = ico_window_mgr.la
 ico_window_mgr_la_LDFLAGS = -module -avoid-version
-ico_window_mgr_la_LIBADD = -ldrm_intel $(PLUGIN_LIBS) $(AUL_LIBS)
-ico_window_mgr_la_CFLAGS = -I/usr/include/libdrm $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
+ico_window_mgr_la_LIBADD = $(PLUGIN_LIBS) $(AUL_LIBS)
+ico_window_mgr_la_CFLAGS = $(GCC_CFLAGS) $(EXT_CFLAGS) $(PLUGIN_CFLAGS)
 ico_window_mgr_la_SOURCES =			\
 	ico_window_mgr.c				\
 	ico_window_mgr_private.h		\
