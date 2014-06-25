@@ -56,13 +56,13 @@
 #include <GLES2/gl2.h>
 
 #include <weston/compositor.h>
-#include <weston/weston-layout.h>
+#include <weston/ivi-layout.h>
+#include <weston/ivi-layout-export.h>
 
 /* detail debug log */
 #define UIFW_DETAIL_OUT 1                   /* 1=detail debug log/0=no detail log   */
 
-#include <weston/weston-layout.h>
-#include <weston/ivi-shell-ext.h>
+
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"
 #include "ico_window_mgr-server-protocol.h"
@@ -149,7 +149,7 @@ static void win_mgr_get_client_appid(struct uifw_client *uclient);
                                             /* create new surface                   */
 static void win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
                                      struct wl_client *client,
-                                     struct weston_layout_surface *ivisurf);
+                                     struct ivi_layout_surface *ivisurf);
                                             /* surface destroy                      */
 static void win_mgr_destroy_surface(struct weston_surface *surface);
                                             /* weston_surface destroy listener      */
@@ -197,15 +197,15 @@ static void win_mgr_click_to_activate(struct weston_seat *seat, uint32_t time,
 static void win_mgr_touch_to_activate(struct weston_seat *seat, uint32_t time,
                                       void *data);
                                             /* hook for create surface of ivi-shell */
-static void ico_ivi_surfaceCreateNotification(struct weston_layout_surface *ivisurf,
+static void ico_ivi_surfaceCreateNotification(struct ivi_layout_surface *ivisurf,
                                               void *userdata);
                                             /* hook for remove surface of ivi-shell */
-static void ico_ivi_surfaceRemoveNotification(struct weston_layout_surface *ivisurf,
+static void ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf,
                                               void *userdata);
                                             /* hook for property change of ivi-shell*/
-static void ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
-                                                struct weston_layout_SurfaceProperties *prop,
-                                                enum weston_layout_notification_mask mask,
+static void ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
+                                                struct ivi_layout_SurfaceProperties *prop,
+                                                enum ivi_layout_notification_mask mask,
                                                 void *userdata);
                                             /* hook for animation                   */
 static int  (*win_mgr_hook_animation)(const int op, void *data) = NULL;
@@ -241,7 +241,6 @@ static struct ico_win_mgr       *_ico_win_mgr = NULL;
 static int                      _ico_num_nodes = 0;
 static struct uifw_node_table   _ico_node_table[ICO_IVI_MAX_DISPLAY];
 static struct weston_seat       *touch_check_seat = NULL;
-
 
 /*--------------------------------------------------------------------------*/
 /**
@@ -364,10 +363,10 @@ ico_ivi_surface_buffer_width(struct weston_surface *es)
     if (! es->buffer_ref.buffer)    {
         return 0;
     }
-    if (es->buffer_viewport.viewport_set)   {
-        return es->buffer_viewport.dst_width;
+    if (es->buffer_viewport.surface.width >= 0 )   {
+        return es->buffer_viewport.surface.width;
     }
-    switch (es->buffer_viewport.transform) {
+    switch (es->buffer_viewport.buffer.transform) {
     case WL_OUTPUT_TRANSFORM_90:
     case WL_OUTPUT_TRANSFORM_270:
     case WL_OUTPUT_TRANSFORM_FLIPPED_90:
@@ -378,7 +377,7 @@ ico_ivi_surface_buffer_width(struct weston_surface *es)
         v = es->buffer_ref.buffer->width;
         break;
     }
-    return (v / es->buffer_viewport.scale);
+    return (v / es->buffer_viewport.buffer.scale);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -397,10 +396,10 @@ ico_ivi_surface_buffer_height(struct weston_surface *es)
     if (! es->buffer_ref.buffer)    {
         return 0;
     }
-    if (es->buffer_viewport.viewport_set)   {
-        return es->buffer_viewport.dst_height;
+    if (es->buffer_viewport.surface.width >= 0)   {
+        return es->buffer_viewport.surface.height;
     }
-    switch (es->buffer_viewport.transform) {
+    switch (es->buffer_viewport.buffer.transform) {
     case WL_OUTPUT_TRANSFORM_90:
     case WL_OUTPUT_TRANSFORM_270:
     case WL_OUTPUT_TRANSFORM_FLIPPED_90:
@@ -411,7 +410,7 @@ ico_ivi_surface_buffer_height(struct weston_surface *es)
         v = es->buffer_ref.buffer->height;
         break;
     }
-    return (v / es->buffer_viewport.scale);
+    return (v / es->buffer_viewport.buffer.scale);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -431,12 +430,12 @@ ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height)
         *width = 0;
         *height = 0;
     }
-    else if (es->buffer_viewport.viewport_set)  {
-        *width = es->buffer_viewport.dst_width;
-        *height = es->buffer_viewport.dst_height;
+    else if (es->buffer_viewport.surface.width >=0 )  {
+        *width = es->buffer_viewport.surface.width;
+        *height = es->buffer_viewport.surface.height;
     }
     else    {
-        switch (es->buffer_viewport.transform) {
+        switch (es->buffer_viewport.buffer.transform) {
         case WL_OUTPUT_TRANSFORM_90:
         case WL_OUTPUT_TRANSFORM_270:
         case WL_OUTPUT_TRANSFORM_FLIPPED_90:
@@ -449,8 +448,8 @@ ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height)
             *height = es->buffer_ref.buffer->height;
             break;
         }
-        *width = *width / es->buffer_viewport.scale;
-        *height = *height / es->buffer_viewport.scale;
+        *width = *width / es->buffer_viewport.buffer.scale;
+        *height = *height / es->buffer_viewport.buffer.scale;
     }
 }
 
@@ -477,7 +476,7 @@ ico_ivi_get_primary_view(struct uifw_win_surface *usurf)
         }
     }
     if (! ev)   {
-        ev = weston_layout_get_weston_view(usurf->ivisurf);
+        ev = ivi_layout_interface.get_weston_view(usurf->ivisurf);
     }
     if (! ev)   {
         uifw_error("ico_ivi_get_primary_view: usurf=%08x(%x) surface=%08x has no view",
@@ -503,7 +502,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
                                   int x, int y, int width, int height)
 {
     struct weston_surface *es = usurf->surface;
-    struct weston_layout_SurfaceProperties  prop;
+    struct ivi_layout_SurfaceProperties  prop;
     int     buf_width, buf_height;
 
     if ((es == NULL) || (usurf->ivisurf == NULL))    {
@@ -536,13 +535,13 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
             x = ICO_IVI_MAX_COORDINATE+1;
             y = ICO_IVI_MAX_COORDINATE+1;
         }
-        if (weston_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+        if (ivi_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
             if ((prop.destX != x) || (prop.destY != y) ||
                 (prop.destWidth != (uint32_t)width) ||
                 (prop.destHeight != (uint32_t)height))  {
-                if (weston_layout_surfaceSetDestinationRectangle(
+                if (ivi_layout_surfaceSetDestinationRectangle(
                                         usurf->ivisurf, x, y, width, height) == 0)  {
-                    weston_layout_commitChanges();
+                    ivi_layout_commitChanges();
                 }
             }
         }
@@ -1171,23 +1170,23 @@ win_mgr_touch_to_activate(struct weston_seat *seat, uint32_t time, void *data)
  */
 /*--------------------------------------------------------------------------*/
 static void
-ico_ivi_surfaceCreateNotification(struct weston_layout_surface *ivisurf, void *userdata)
+ico_ivi_surfaceCreateNotification(struct ivi_layout_surface *ivisurf, void *userdata)
 {
     uint32_t                id_surface;
     struct weston_view      *ev;
     struct weston_surface   *es;
     struct wl_client        *client;
 
-    id_surface = weston_layout_getIdOfSurface(ivisurf);
+    id_surface = ivi_layout_getIdOfSurface(ivisurf);
     uifw_trace("ico_ivi_surfaceCreateNotification: Create %x", id_surface);
 
     /* set property notification    */
-    if (weston_layout_surfaceAddNotification(ivisurf, ico_ivi_surfacePropertyNotification, NULL) != 0)  {
-        uifw_error("ico_ivi_surfaceCreateNotification: weston_layout_surfaceAddNotification Error");
+    if (ivi_layout_surfaceAddNotification(ivisurf, ico_ivi_surfacePropertyNotification, NULL) != 0)  {
+        uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_surfaceAddNotification Error");
     }
-    ev = weston_layout_get_weston_view(ivisurf);
+    ev = ivi_layout_interface.get_weston_view(ivisurf);
     if (! ev)   {
-        uifw_error("ico_ivi_surfaceCreateNotification: weston_layout_get_weston_view Error");
+        uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_get_weston_view Error");
     }
     else    {
         es = ev->surface;
@@ -1216,13 +1215,13 @@ ico_ivi_surfaceCreateNotification(struct weston_layout_surface *ivisurf, void *u
  */
 /*--------------------------------------------------------------------------*/
 static void
-ico_ivi_surfaceRemoveNotification(struct weston_layout_surface *ivisurf, void *userdata)
+ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf, void *userdata)
 {
     uint32_t    id_surface;
     struct weston_surface   *es;
     struct uifw_win_surface *usurf;
 
-    id_surface = weston_layout_getIdOfSurface(ivisurf);
+    id_surface = ivi_layout_getIdOfSurface(ivisurf);
     uifw_trace("ico_ivi_surfaceRemoveNotification: Remove %x", id_surface);
 
     usurf = ico_window_mgr_get_usurf(id_surface);
@@ -1250,9 +1249,9 @@ ico_ivi_surfaceRemoveNotification(struct weston_layout_surface *ivisurf, void *u
  */
 /*--------------------------------------------------------------------------*/
 static void
-ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
-                                    struct weston_layout_SurfaceProperties *prop,
-                                    enum weston_layout_notification_mask mask,
+ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
+                                    struct ivi_layout_SurfaceProperties *prop,
+                                    enum ivi_layout_notification_mask mask,
                                     void *userdata)
 {
     struct uifw_manager *mgr;
@@ -1264,7 +1263,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
 
     newmask = ((uint32_t)mask) & (~(IVI_NOTIFICATION_OPACITY|IVI_NOTIFICATION_ORIENTATION|
                                     IVI_NOTIFICATION_PIXELFORMAT));
-    id_surface = weston_layout_getIdOfSurface(ivisurf);
+    id_surface = ivi_layout_getIdOfSurface(ivisurf);
     usurf = ico_window_mgr_get_usurf(id_surface);
 
     if ((newmask != 0) && (usurf != NULL))  {
@@ -1305,7 +1304,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                                usurf->width, usurf->height);
                     usurf->configure_width = usurf->width;
                     usurf->configure_height = usurf->height;
-
+#if 0
                     struct wl_array surfaces;
                     struct shell_surface;
                     void    **shsurf;
@@ -1320,6 +1319,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                         }
                         wl_array_release(&surfaces);
                     }
+#endif
                     if (usurf->shsurf_resource) {
                         uifw_trace("ico_ivi_surfacePropertyNotification: surface %08x "
                                    "resource=%08x",
@@ -1344,7 +1344,7 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                 usurf->animation.pos_y = usurf->y;
                 usurf->animation.pos_width = usurf->width;
                 usurf->animation.pos_height = usurf->height;
-                ev = weston_layout_get_weston_view(ivisurf);
+                ev = ivi_layout_interface.get_weston_view(ivisurf);
                 if (ev) {
                     usurf->animation.alpha = ev->alpha;
                 }
@@ -1387,8 +1387,8 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
                 else    {
                     usurf->visible = 1;
                     uifw_trace("ico_ivi_surfacePropertyNotification: Change to Visible");
-                    weston_layout_surfaceSetVisibility(ivisurf, 1);
-                    weston_layout_commitChanges();
+                    ivi_layout_surfaceSetVisibility(ivisurf, 1);
+                    ivi_layout_commitChanges();
                 }
             }
             else    {
@@ -1426,9 +1426,9 @@ ico_ivi_surfacePropertyNotification(struct weston_layout_surface *ivisurf,
 /*--------------------------------------------------------------------------*/
 static void
 win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
-                         struct wl_client *client, struct weston_layout_surface *ivisurf)
+                         struct wl_client *client, struct ivi_layout_surface *ivisurf)
 {
-    struct weston_layout_SurfaceProperties  prop;
+    struct ivi_layout_SurfaceProperties  prop;
     struct uifw_win_surface *usurf;
     struct uifw_win_surface *phash;
     struct uifw_win_surface *bhash;
@@ -1458,7 +1458,7 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
     usurf->ivisurf = ivisurf;
     usurf->node_tbl = &_ico_node_table[0];  /* set default node table (display no=0)    */
 
-    if (weston_layout_getPropertiesOfSurface(ivisurf, &prop) == 0)  {
+    if (ivi_layout_getPropertiesOfSurface(ivisurf, &prop) == 0)  {
         usurf->x = prop.destX;
         usurf->y = prop.destY;
         usurf->width = prop.destWidth;
@@ -1936,13 +1936,13 @@ win_mgr_change_mapsurface(struct uifw_surface_map *sm, int event, uint32_t curti
         if ((event != ICO_WINDOW_MGR_MAP_SURFACE_EVENT_ERROR) &&
             (event != ICO_WINDOW_MGR_MAP_SURFACE_EVENT_UNMAP) &&
             (sm->filepath[0] != 0)) {
-#if 1       /* weston_layout_takeSurfaceScreenshot(GENIVI) is slowly    */
+#if 1       /* ivi_layout_takeSurfaceScreenshot(GENIVI) is slowly    */
             if (win_mgr_takeSurfaceScreenshot(sm->filepath, sm->usurf,
                                               sm->width, sm->height) != 0)
-#else       /* weston_layout_takeSurfaceScreenshot(GENIVI) is slowly    */
-            if (weston_layout_takeSurfaceScreenshot(sm->filepath,
+#else       /* ivi_layout_takeSurfaceScreenshot(GENIVI) is slowly    */
+            if (ivi_layout_takeSurfaceScreenshot(sm->filepath,
                                                     sm->usurf->ivisurf) != 0)
-#endif      /* weston_layout_takeSurfaceScreenshot(GENIVI) is slowly    */
+#endif      /* ivi_layout_takeSurfaceScreenshot(GENIVI) is slowly    */
             {
                 uifw_warn("win_mgr_change_mapsurface: surface.%08x image read(%s) Error",
                           sm->usurf->surfaceid, sm->filepath);
@@ -2259,7 +2259,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                     int width, int height, int visible)
 {
     struct uifw_win_surface     *usurf;
-    struct weston_layout_layer  *layout_layer;
+    struct ivi_layout_layer  *layout_layer;
     int32_t                     position[2];
     uint32_t                    dimension[2];
 
@@ -2273,14 +2273,14 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
         return;
     }
     if (layerid)    {
-        layout_layer = weston_layout_getLayerFromId(layerid);
+        layout_layer = ivi_layout_getLayerFromId(layerid);
         if (! layout_layer) {
             /* layer dose not exist                 */
             uifw_trace("uifw_layout_surface: Leave(layer=%d dose not exist)", layerid);
             return;
         }
-        if (weston_layout_layerAddSurface(layout_layer, usurf->ivisurf) == 0)   {
-            if (weston_layout_layerSetVisibility(layout_layer, 1) != 0) {
+        if (ivi_layout_layerAddSurface(layout_layer, usurf->ivisurf) == 0)   {
+            if (ivi_layout_layerSetVisibility(layout_layer, 1) != 0) {
                 uifw_warn("uifw_layout_surface: layer(%d) visible Error", layerid);
             }
         }
@@ -2291,12 +2291,12 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     }
 
     if ((x >= 0) && (y >= 0) && (width > 0) && (height > 0))    {
-        if (weston_layout_surfaceSetSourceRectangle(usurf->ivisurf,
+        if (ivi_layout_surfaceSetSourceRectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
                       usurf->surfaceid);
         }
-        if (weston_layout_surfaceSetDestinationRectangle(usurf->ivisurf,
+        if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf,
                                                          x, y, width, height) != 0) {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set destination",
                       usurf->surfaceid);
@@ -2305,31 +2305,31 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     else if ((x >= 0) && (y >= 0))  {
         position[0] = x;
         position[1] = y;
-        if (weston_layout_surfaceSetPosition(usurf->ivisurf, position) != 0)    {
+        if (ivi_layout_surfaceSetPosition(usurf->ivisurf, position) != 0)    {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source position",
                       usurf->surfaceid);
         }
     }
     else if ((width > 0) && (height > 0))   {
-        if (weston_layout_surfaceSetSourceRectangle(usurf->ivisurf,
+        if (ivi_layout_surfaceSetSourceRectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
                       usurf->surfaceid);
         }
         dimension[0] = width;
         dimension[1] = height;
-        if (weston_layout_surfaceSetDimension(usurf->ivisurf, dimension) != 0)  {
+        if (ivi_layout_surfaceSetDimension(usurf->ivisurf, dimension) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set destination size",
                       usurf->surfaceid);
         }
     }
     if (visible >= 0)   {
-        if (weston_layout_surfaceSetVisibility(usurf->ivisurf, visible) != 0)   {
+        if (ivi_layout_surfaceSetVisibility(usurf->ivisurf, visible) != 0)   {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set visibility",
                       usurf->surfaceid);
         }
     }
-    if (weston_layout_commitChanges() != 0) {
+    if (ivi_layout_commitChanges() != 0) {
         uifw_warn("uifw_layout_surface: surface(%08x) commit Error", usurf->surfaceid);
     }
     uifw_trace("uifw_layout_surface: Leave");
@@ -2359,8 +2359,8 @@ win_mgr_destroy_surface(struct weston_surface *surface)
     uifw_trace("win_mgr_destroy_surface: Enter(%08x) %08x", (int)surface, usurf->surfaceid);
 
     /* remove notification listener */
-    if (weston_layout_surfaceRemoveNotification(usurf->ivisurf) != 0)   {
-        uifw_warn("win_mgr_destroy_surface: weston_layout_surfaceRemoveNotification(%08x)"
+    if (ivi_layout_surfaceRemoveNotification(usurf->ivisurf) != 0)   {
+        uifw_warn("win_mgr_destroy_surface: ivi_layout_surfaceRemoveNotification(%08x)"
                   " Error", usurf->surfaceid);
     }
 
@@ -2438,8 +2438,8 @@ win_mgr_surf_destroylistener(struct wl_listener *listener, void *data)
 
     if (usurf && usurf->surface && usurf->ivisurf)  {
         uifw_trace("win_mgr_surf_destroylistener: Enter(%08x)", usurf->surfaceid);
-        if (weston_layout_surfaceRemove(usurf->ivisurf) != 0)   {
-            uifw_trace("win_mgr_surf_destroylistener: weston_layout_surfaceRemove() Error");
+        if (ivi_layout_surfaceRemove(usurf->ivisurf) != 0)   {
+            uifw_trace("win_mgr_surf_destroylistener: ivi_layout_surfaceRemove() Error");
         }
         uifw_trace("win_mgr_surf_destroylistener: Leave");
     }
@@ -2979,11 +2979,11 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     weston_compositor_add_touch_binding(ec, 0, win_mgr_touch_to_activate, NULL);
 
     /* set Notification function for GENIVI ivi-shell   */
-    if (weston_layout_setNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
-        uifw_error("ico_window_mgr: weston_layout_setNotificationCreateSurface Error");
+    if (ivi_layout_addNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
+        uifw_error("ico_window_mgr: ivi_layout_setNotificationCreateSurface Error");
     }
-    if (weston_layout_setNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
-        uifw_error("ico_window_mgr: weston_layout_setNotificationRemoveSurface Error");
+    if (ivi_layout_addNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
+        uifw_error("ico_window_mgr: ivi_layout_setNotificationRemoveSurface Error");
     }
     uifw_info("ico_window_mgr: Leave(module_init)");
 
