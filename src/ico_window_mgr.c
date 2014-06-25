@@ -61,8 +61,7 @@
 /* detail debug log */
 #define UIFW_DETAIL_OUT 1                   /* 1=detail debug log/0=no detail log   */
 
-#include <weston/weston-layout.h>
-#include <weston/ivi-shell-ext.h>
+
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"
 #include "ico_window_mgr-server-protocol.h"
@@ -364,10 +363,10 @@ ico_ivi_surface_buffer_width(struct weston_surface *es)
     if (! es->buffer_ref.buffer)    {
         return 0;
     }
-    if (es->buffer_viewport.viewport_set)   {
-        return es->buffer_viewport.dst_width;
+    if (es->buffer_viewport.surface.width >= 0 )   {
+        return es->buffer_viewport.surface.width;
     }
-    switch (es->buffer_viewport.transform) {
+    switch (es->buffer_viewport.buffer.transform) {
     case WL_OUTPUT_TRANSFORM_90:
     case WL_OUTPUT_TRANSFORM_270:
     case WL_OUTPUT_TRANSFORM_FLIPPED_90:
@@ -378,7 +377,7 @@ ico_ivi_surface_buffer_width(struct weston_surface *es)
         v = es->buffer_ref.buffer->width;
         break;
     }
-    return (v / es->buffer_viewport.scale);
+    return (v / es->buffer_viewport.buffer.scale);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -397,10 +396,10 @@ ico_ivi_surface_buffer_height(struct weston_surface *es)
     if (! es->buffer_ref.buffer)    {
         return 0;
     }
-    if (es->buffer_viewport.viewport_set)   {
-        return es->buffer_viewport.dst_height;
+    if (es->buffer_viewport.surface.width >= 0)   {
+        return es->buffer_viewport.surface.height;
     }
-    switch (es->buffer_viewport.transform) {
+    switch (es->buffer_viewport.buffer.transform) {
     case WL_OUTPUT_TRANSFORM_90:
     case WL_OUTPUT_TRANSFORM_270:
     case WL_OUTPUT_TRANSFORM_FLIPPED_90:
@@ -411,7 +410,7 @@ ico_ivi_surface_buffer_height(struct weston_surface *es)
         v = es->buffer_ref.buffer->height;
         break;
     }
-    return (v / es->buffer_viewport.scale);
+    return (v / es->buffer_viewport.buffer.scale);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -431,12 +430,12 @@ ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height)
         *width = 0;
         *height = 0;
     }
-    else if (es->buffer_viewport.viewport_set)  {
-        *width = es->buffer_viewport.dst_width;
-        *height = es->buffer_viewport.dst_height;
+    else if (es->buffer_viewport.surface.width >=0 )  {
+        *width = es->buffer_viewport.surface.width;
+        *height = es->buffer_viewport.surface.height;
     }
     else    {
-        switch (es->buffer_viewport.transform) {
+        switch (es->buffer_viewport.buffer.transform) {
         case WL_OUTPUT_TRANSFORM_90:
         case WL_OUTPUT_TRANSFORM_270:
         case WL_OUTPUT_TRANSFORM_FLIPPED_90:
@@ -449,8 +448,8 @@ ico_ivi_surface_buffer_size(struct weston_surface *es, int *width, int *height)
             *height = es->buffer_ref.buffer->height;
             break;
         }
-        *width = *width / es->buffer_viewport.scale;
-        *height = *height / es->buffer_viewport.scale;
+        *width = *width / es->buffer_viewport.buffer.scale;
+        *height = *height / es->buffer_viewport.buffer.scale;
     }
 }
 
