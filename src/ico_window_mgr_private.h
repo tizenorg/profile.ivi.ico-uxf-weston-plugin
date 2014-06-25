@@ -135,12 +135,12 @@ struct uifw_win_surface_anima_save  {       /* wndow animation save             
 
 /* UIFW surface                         */
 struct shell_surface;
-struct weston_layout_surface;
+struct ivi_layout_surface;
 struct uifw_win_surface {
     uint32_t    surfaceid;                  /* UIFW SurfaceId                       */
     struct uifw_node_table  *node_tbl;      /* Node manager of ico_window_mgr       */
     struct weston_surface   *surface;       /* Weston surface                       */
-    struct weston_layout_surface *ivisurf;  /* Weston layout surface                */
+    struct ivi_layout_surface *ivisurf;  /* Weston layout surface                */
     struct uifw_client      *uclient;       /* Client                               */
     struct wl_resource      *shsurf_resource; /* wl_shell_surface resource          */
     struct wl_listener      surface_destroy_listener; /* destroy listener           */
