@@ -45,6 +45,7 @@
 #include <errno.h>
 
 #include <wayland-server.h>
+#include <weston/ivi-layout.h>
 #include <weston/compositor.h>
 #include "ico_ivi_common_private.h"
 #include "ico_input_mgr.h"
