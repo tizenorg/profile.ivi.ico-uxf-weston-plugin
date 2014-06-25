@@ -39,7 +39,8 @@
 #include <sys/stat.h>
 
 #include <weston/compositor.h>
-#include <weston/weston-layout.h>
+#include <weston/ivi-layout.h>
+#include <weston/ivi-layout-export.h>
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"
 
@@ -488,8 +489,8 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         if ((usurf->animation.visible == ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
             usurf->visible = 0;
-            weston_layout_surfaceSetVisibility(usurf->ivisurf, 0);
-            weston_layout_commitChanges();
+            ivi_layout_surfaceSetVisibility(usurf->ivisurf, 0);
+            ivi_layout_commitChanges();
             weston_surface_damage(usurf->surface);
             if (ev) {
                 weston_view_geometry_dirty(ev);
@@ -498,8 +499,8 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         if ((usurf->animation.visible == ANIMA_SHOW_AT_END) &&
             (usurf->visible == 0))  {
             usurf->visible = 1;
-            weston_layout_surfaceSetVisibility(usurf->ivisurf, 1);
-            weston_layout_commitChanges();
+            ivi_layout_surfaceSetVisibility(usurf->ivisurf, 1);
+            ivi_layout_commitChanges();
             weston_surface_damage(usurf->surface);
             if (ev) {
                 weston_view_geometry_dirty(ev);
@@ -556,7 +557,7 @@ animation_slide(struct weston_animation *animation,
 {
     struct uifw_win_surface *usurf;
     struct animation_data   *animadata;
-    struct weston_layout_SurfaceProperties  prop;
+    struct ivi_layout_SurfaceProperties  prop;
     int         dwidth, dheight;
     int         par, x, y;
 
@@ -637,10 +638,10 @@ animation_slide(struct weston_animation *animation,
         uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d) %08x",
                    usurf->surfaceid, par, x, y, usurf->x, usurf->y, (int)usurf->ivisurf);
     }
-    if (weston_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
-        if (weston_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
+    if (ivi_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+        if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
                                              prop.destWidth, prop.destHeight) == 0) {
-            weston_layout_commitChanges();
+            ivi_layout_commitChanges();
         }
     }
     if (par >= 100) {
