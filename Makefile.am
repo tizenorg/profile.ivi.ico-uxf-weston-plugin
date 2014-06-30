@@ -1,4 +1,4 @@
-SUBDIRS = src tools
+SUBDIRS = src tools tests
 
-DIST_SUBDIRS = src tools
+DIST_SUBDIRS = src tools tests
 
