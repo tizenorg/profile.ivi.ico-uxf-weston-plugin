@@ -242,7 +242,6 @@ static int                      _ico_num_nodes = 0;
 static struct uifw_node_table   _ico_node_table[ICO_IVI_MAX_DISPLAY];
 static struct weston_seat       *touch_check_seat = NULL;
 
-
 /*--------------------------------------------------------------------------*/
 /**
  * @brief   ico_ivi_optionflag: get option flags
@@ -477,7 +476,7 @@ ico_ivi_get_primary_view(struct uifw_win_surface *usurf)
         }
     }
     if (! ev)   {
-        ev = ivi_layout_get_weston_view(usurf->ivisurf);
+        ev = ivi_layout_interface.get_weston_view(usurf->ivisurf);
     }
     if (! ev)   {
         uifw_error("ico_ivi_get_primary_view: usurf=%08x(%x) surface=%08x has no view",
@@ -1185,7 +1184,7 @@ ico_ivi_surfaceCreateNotification(struct ivi_layout_surface *ivisurf, void *user
     if (ivi_layout_surfaceAddNotification(ivisurf, ico_ivi_surfacePropertyNotification, NULL) != 0)  {
         uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_surfaceAddNotification Error");
     }
-    ev = ivi_layout_get_weston_view(ivisurf);
+    ev = ivi_layout_interface.get_weston_view(ivisurf);
     if (! ev)   {
         uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_get_weston_view Error");
     }
@@ -1345,7 +1344,7 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
                 usurf->animation.pos_y = usurf->y;
                 usurf->animation.pos_width = usurf->width;
                 usurf->animation.pos_height = usurf->height;
-                ev = ivi_layout_get_weston_view(ivisurf);
+                ev = ivi_layout_interface.get_weston_view(ivisurf);
                 if (ev) {
                     usurf->animation.alpha = ev->alpha;
                 }
@@ -2981,10 +2980,10 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
 
 #if 0
     /* set Notification function for GENIVI ivi-shell   */
-    if (ivi_layout_setNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
+    if (ivi_layout_addNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationCreateSurface Error");
     }
-    if (ivi_layout_setNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
+    if (ivi_layout_addNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationRemoveSurface Error");
     }
 #endif
