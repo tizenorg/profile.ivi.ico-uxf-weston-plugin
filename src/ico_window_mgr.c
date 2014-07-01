@@ -1266,6 +1266,7 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
     id_surface = ivi_layout_getIdOfSurface(ivisurf);
     usurf = ico_window_mgr_get_usurf(id_surface);
 
+    uifw_trace("# ico_ivi_surfacePropertyNotification");
     if ((newmask != 0) && (usurf != NULL))  {
         uifw_trace("ico_ivi_surfacePropertyNotification: Property %x(%08x) usurf=%08x",
                    id_surface, newmask, (int)usurf);
@@ -1304,11 +1305,11 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
                                usurf->width, usurf->height);
                     usurf->configure_width = usurf->width;
                     usurf->configure_height = usurf->height;
-#if 0
                     struct wl_array surfaces;
                     struct shell_surface;
                     void    **shsurf;
                     if (! usurf->shsurf_resource)   {
+#if 1
                         /* get shell surface if not get */
                         ivi_shell_get_shell_surfaces(&surfaces);
                         wl_array_for_each(shsurf, &surfaces)    {
@@ -1318,8 +1319,14 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
                             }
                         }
                         wl_array_release(&surfaces);
-                    }
+#else
+			uifw_trace("#TODO: ico_ivi_surfacePropertyNotification");
+
+
 #endif
+
+                    }
+
                     if (usurf->shsurf_resource) {
                         uifw_trace("ico_ivi_surfacePropertyNotification: surface %08x "
                                    "resource=%08x",
