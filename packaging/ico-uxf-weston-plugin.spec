@@ -1,10 +1,11 @@
+%define weston_conf %{_sysconfdir}/xdg/weston
+
 Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
 Version:    0.9.22
 Release:    0
 Group:      Graphics & UI Framework/Automotive UI
 License:    MIT
-URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
 BuildRequires: pkgconfig(weston) >= 1.5.0
@@ -24,7 +25,7 @@ Conflicts: weston-ivi-config
 Conflicts: weston-ivi-shell-config
 
 %description
-Weston Plugins for IVI
+Weston Plugins for IVI package
 
 %package devel
 Summary:    Development files for %{name}
@@ -38,22 +39,18 @@ Development files that expose the wayland extended protocols for IVI.
 %setup -q -n %{name}-%{version}
 
 %build
-%autogen
-
-%configure
-make %{?_smp_mflags}
+%reconfigure
+%__make %{?_smp_mflags}
 
 %install
 %make_install
 
 # configurations
-%define weston_conf %{_sysconfdir}/xdg/weston
-%define systemddir /usr/lib/systemd
 mkdir -p %{buildroot}%{weston_conf} > /dev/null 2>&1
-mkdir -p %{buildroot}%{systemddir}/system/multi-user.target.wants > /dev/null 2>&1
+mkdir -p %{buildroot}%{_unitdir}/multi-user.target.wants > /dev/null 2>&1
 install -m 0644 settings/weston.ini %{buildroot}%{weston_conf}
-install -m 0644 settings/ico-pseudo-input-device.service %{buildroot}%{systemddir}/system/ico-pseudo-input-device.service
-ln -s %{systemddir}/system/ico-pseudo-input-device.service %{buildroot}%{systemddir}/system/multi-user.target.wants/ico-pseudo-input-device.service
+install -m 0644 settings/ico-pseudo-input-device.service %{buildroot}%{_unitdir}/ico-pseudo-input-device.service
+ln -s %{_unitdir}/ico-pseudo-input-device.service %{buildroot}%{_unitdir}/multi-user.target.wants/ico-pseudo-input-device.service
 
 %post -p /sbin/ldconfig
 
@@ -68,9 +65,9 @@ ln -s %{systemddir}/system/ico-pseudo-input-device.service %{buildroot}%{systemd
 %{_libdir}/libico-uxf-weston-plugin.so.*
 %{_bindir}/ico_send_inputevent
 %{_bindir}/ico_pseudo_input_device
-%{systemddir}/system/ico-pseudo-input-device.service
-%{systemddir}/system/multi-user.target.wants/ico-pseudo-input-device.service
-%{weston_conf}/weston.ini
+%{_unitdir}/ico-pseudo-input-device.service
+%{_unitdir}/multi-user.target.wants/ico-pseudo-input-device.service
+%config %{weston_conf}/weston.ini
 
 %files devel
 %manifest %{name}.manifest
