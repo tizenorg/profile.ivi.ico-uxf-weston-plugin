@@ -2979,15 +2979,14 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     weston_compositor_add_button_binding(ec, BTN_LEFT, 0, win_mgr_click_to_activate, NULL);
     weston_compositor_add_touch_binding(ec, 0, win_mgr_touch_to_activate, NULL);
 
-#if 0
     /* set Notification function for GENIVI ivi-shell   */
-    if (ivi_layout_setNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
+    if (ivi_layout_addNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationCreateSurface Error");
     }
-    if (ivi_layout_setNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
+    if (ivi_layout_addNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationRemoveSurface Error");
     }
-#endif
+
     uifw_info("ico_window_mgr: Leave(module_init)");
 
     return 0;
