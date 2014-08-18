@@ -477,7 +477,7 @@ ico_ivi_get_primary_view(struct uifw_win_surface *usurf)
         }
     }
     if (! ev)   {
-        ev = ivi_layout_get_weston_view(usurf->ivisurf);
+        ev = ivi_layout_interface.get_weston_view(usurf->ivisurf);
     }
     if (! ev)   {
         uifw_error("ico_ivi_get_primary_view: usurf=%08x(%x) surface=%08x has no view",
@@ -1185,9 +1185,9 @@ ico_ivi_surfaceCreateNotification(struct ivi_layout_surface *ivisurf, void *user
     if (ivi_layout_surfaceAddNotification(ivisurf, ico_ivi_surfacePropertyNotification, NULL) != 0)  {
         uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_surfaceAddNotification Error");
     }
-    ev = ivi_layout_get_weston_view(ivisurf);
+    ev = ivi_layout_interface.get_weston_view(ivisurf);
     if (! ev)   {
-        uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_get_weston_view Error");
+        uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_interface.get_weston_view Error");
     }
     else    {
         es = ev->surface;
@@ -1345,7 +1345,7 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
                 usurf->animation.pos_y = usurf->y;
                 usurf->animation.pos_width = usurf->width;
                 usurf->animation.pos_height = usurf->height;
-                ev = ivi_layout_get_weston_view(ivisurf);
+                ev = ivi_layout_interface.get_weston_view(ivisurf);
                 if (ev) {
                     usurf->animation.alpha = ev->alpha;
                 }
