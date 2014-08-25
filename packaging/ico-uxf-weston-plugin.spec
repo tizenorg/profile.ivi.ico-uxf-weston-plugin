@@ -7,18 +7,18 @@ License:    MIT
 URL:        ""
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(weston) >= 1.4.0
+BuildRequires: pkgconfig(weston) >= 1.5.0
 BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(evas)
 BuildRequires: pkgconfig(aul)
 BuildRequires: pkgconfig(ecore)
 BuildRequires: pkgconfig(egl)
 BuildRequires: mesa-devel
-BuildRequires: genivi-shell-devel
-BuildRequires: weston-ivi-shell-devel
-Requires: weston >= 1.4.0
-Requires: genivi-shell
-Requires: weston-ivi-shell
+BuildRequires: genivi-shell-devel >= 0.2.3
+BuildRequires: weston-ivi-shell-devel >= 0.1.7
+Requires: weston >= 1.5.0
+Requires: genivi-shell >= 0.2.3
+Requires: weston-ivi-shell >= 0.1.7
 Requires: weekeyboard
 Conflicts: weston-ivi-config
 Conflicts: weston-ivi-shell-config
