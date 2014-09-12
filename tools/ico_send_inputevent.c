@@ -370,7 +370,7 @@ send_event(const char *cmd)
     j = 0;
     for (i = 0; cmd[i]; i++)    {
         if ((cmd[i] == '=') || (cmd[i] == ' ')) break;
-        if (j < (int)(sizeof(prop)-1))  {
+        if (j < (int)(sizeof(prop)-2))  {
             prop[j++] = cmd[i];
         }
     }
@@ -380,7 +380,7 @@ send_event(const char *cmd)
     if (cmd[i] != 0)    {
         for (i++; cmd[i]; i++)  {
             if (cmd[i] == ' ')  continue;
-            if (j < (int)(sizeof(value)-1)) {
+            if (j < (int)(sizeof(value)-2)) {
                 value[j++] = cmd[i];
             }
         }
@@ -421,21 +421,21 @@ send_event(const char *cmd)
     }
     if (! event_key[key].prop[0])   {
         for (key2 = 0; event_keyboard[key2].prop[0]; key2++)    {
-            if (strcasecmp(prop, event_key[key2].prop) == 0) break;
+            if (strcasecmp(prop, event_keyboard[key2].prop) == 0)           break;
             if ((strncasecmp(prop, "key.", 4) == 0) &&
-                (strcasecmp(&prop[4], event_key[key2].prop) == 0)) break;
+                (strcasecmp(&prop[4], event_keyboard[key2].prop) == 0))     break;
             wkpress = 1;
             if ((strncasecmp(prop, "press.", 6) == 0) &&
-                (strcasecmp(&prop[6], event_key[key2].prop) == 0)) break;
+                (strcasecmp(&prop[6], event_keyboard[key2].prop) == 0))     break;
             if ((strncasecmp(prop, "keypress.", 9) == 0) &&
-                (strcasecmp(&prop[9], event_key[key2].prop) == 0)) break;
+                (strcasecmp(&prop[9], event_keyboard[key2].prop) == 0))     break;
             wkpress = 0;
             if ((strncasecmp(prop, "release.", 8) == 0) &&
-                (strcasecmp(&prop[8], event_key[key2].prop) == 0)) break;
+                (strcasecmp(&prop[8], event_keyboard[key2].prop) == 0))     break;
             if ((strncasecmp(prop, "keyrelease.", 11) == 0) &&
-                (strcasecmp(&prop[11], event_key[key2].prop) == 0)) break;
+                (strcasecmp(&prop[11], event_keyboard[key2].prop) == 0))    break;
         }
-        if (! event_key[key2].prop[0])  {
+        if (! event_keyboard[key2].prop[0]) {
             print_log("UnKnown Event name[%s]", prop);
             return;
         }
