@@ -154,11 +154,11 @@ struct uifw_win_surface {
     uint16_t    configure_height;           /* Height that a client(App) configured */
     char        winname[ICO_IVI_WINNAME_LENGTH];/* Window name                      */
     char        visible;                    /* visibility                           */
+    char        internal_propchange;        /* internal surface property change     */
     char        restrain_configure;         /* restrant configure event             */
-    char        res[1];                     /* (unused)                             */
     struct uifw_win_surface_animation
                 animation;                  /* window animation information         */
-    struct uifw_win_surface_anima_save  
+    struct uifw_win_surface_anima_save
                 org_animation;              /* save original wndow animation        */
     struct wl_list  client_link;            /* surface list of same client          */
     struct wl_list  surf_map;               /* surface map list                     */
@@ -194,6 +194,11 @@ struct uifw_win_surface {
 #define ICO_WINDOW_MGR_ANIMATION_OPCANCEL   9       /* animation cancel             */
 #define ICO_WINDOW_MGR_ANIMATION_OPHIDEPOS 11       /* change to hide with position */
 #define ICO_WINDOW_MGR_ANIMATION_OPSHOWPOS 12       /* change to show with position */
+
+/* Visible control at end of animation  */
+#define ICO_WINDOW_MGR_ANIMA_NOCONTROL_AT_END  0    /* no need show/hide at end of anima*/
+#define ICO_WINDOW_MGR_ANIMA_SHOW_AT_END       1    /* surface show at end of animation*/
+#define ICO_WINDOW_MGR_ANIMA_HIDE_AT_END       2    /* surface hide at end of animation*/
 
 /* Prototype for function               */
                                             /* find uifw_client table               */
