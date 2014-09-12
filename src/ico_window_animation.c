@@ -60,11 +60,6 @@
 #define ANIMA_SWING_TOBOTTOM   33           /* SwingIn top to bottom/SwingOut bottom to top */
 #define ANIMA_SWING_TOTOP      34           /* SwingIn bottom to top/SwingOut top to bottom */
 
-/* Visible control at end of animation  */
-#define ANIMA_NOCONTROL_AT_END  0           /* no need surface show/hide at end of animation*/
-#define ANIMA_SHOW_AT_END       1           /* surface show at end of animation     */
-#define ANIMA_HIDE_AT_END       2           /* surface hide at end of animation     */
-
 /* animation data               */
 struct animation_data   {
     struct animation_data   *next_free;     /* free data list                       */
@@ -184,7 +179,7 @@ ico_window_animation(const int op, void *data)
         return ICO_WINDOW_MGR_ANIMATION_RET_ANIMA;
     }
 
-    usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
+    usurf->animation.visible = ICO_WINDOW_MGR_ANIMA_NOCONTROL_AT_END;
 
     if (op == ICO_WINDOW_MGR_ANIMATION_OPCANCEL)    {
         /* cancel animation                     */
@@ -261,7 +256,7 @@ ico_window_animation(const int op, void *data)
             uifw_trace("ico_window_animation: hide(out) %s.%08x anima=%d",
                        usurf->uclient->appid, usurf->surfaceid, animaid);
             ret = ICO_WINDOW_MGR_ANIMATION_RET_ANIMANOCTL;
-            usurf->animation.visible = ANIMA_HIDE_AT_END;
+            usurf->animation.visible = ICO_WINDOW_MGR_ANIMA_HIDE_AT_END;
         }
         else if (op == ICO_WINDOW_MGR_ANIMATION_OPMOVE)    {
             usurf->animation.state = ICO_WINDOW_MGR_ANIMATION_STATE_MOVE;
@@ -483,10 +478,10 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         }
     }
     if (disp)   {
-        usurf->restrain_configure = 0;
         uifw_trace("animation_end: %08x vis=%d(%x)",
                    usurf->surfaceid, usurf->visible, usurf->animation.visible);
-        if ((usurf->animation.visible == ANIMA_HIDE_AT_END) &&
+        usurf->internal_propchange |= 0x10;
+        if ((usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
             usurf->visible = 0;
             ivi_layout_surfaceSetVisibility(usurf->ivisurf, 0);
@@ -496,7 +491,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
                 weston_view_geometry_dirty(ev);
             }
         }
-        if ((usurf->animation.visible == ANIMA_SHOW_AT_END) &&
+        if ((usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_SHOW_AT_END) &&
             (usurf->visible == 0))  {
             usurf->visible = 1;
             ivi_layout_surfaceSetVisibility(usurf->ivisurf, 1);
@@ -506,8 +501,10 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
                 weston_view_geometry_dirty(ev);
             }
         }
+        usurf->internal_propchange &= ~0x10;
+        usurf->restrain_configure = 0;
     }
-    usurf->animation.visible = ANIMA_NOCONTROL_AT_END;
+    usurf->animation.visible = ICO_WINDOW_MGR_ANIMA_NOCONTROL_AT_END;
     if (usurf->animation.next_anima != ICO_WINDOW_MGR_ANIMATION_NONE)    {
         switch(usurf->animation.type)   {
         case ICO_WINDOW_MGR_ANIMATION_OPHIDE:
@@ -639,15 +636,21 @@ animation_slide(struct weston_animation *animation,
                    usurf->surfaceid, par, x, y, usurf->x, usurf->y, (int)usurf->ivisurf);
     }
     if (ivi_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+        usurf->internal_propchange |= 0x20;
         if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
                                              prop.destWidth, prop.destHeight) == 0) {
             ivi_layout_commitChanges();
         }
+        usurf->internal_propchange &= ~0x20;
     }
     if (par >= 100) {
         /* end of animation     */
         animation_end(usurf, 1);
         uifw_trace("animation_slide: End of animation");
+    }
+    else    {
+        /* continue animation   */
+        weston_compositor_schedule_repaint(weston_ec);
     }
 }
 
@@ -1043,7 +1046,7 @@ animation_fade(struct weston_animation *animation,
         }
         if (ev->alpha < 0.0f)       ev->alpha = 0.0f;
         else if (ev->alpha > 1.0f)  ev->alpha = 1.0f;
-    
+
         if ((par < 8) || (par > 92))    {
             uifw_debug("animation_fade: %08x count=%d %d%% alpha=%1.2f anima=%d state=%d",
                        usurf->surfaceid, animation->frame_counter, par,
@@ -1142,7 +1145,7 @@ animation_zoom(struct weston_animation *animation,
             if (ev) {
                 wl_list_insert(&ev->geometry.transformation_list,
                                &animadata->transform.link);
-            }   
+            }
         }
         animadata->end_function = animation_zoom_end;
 
