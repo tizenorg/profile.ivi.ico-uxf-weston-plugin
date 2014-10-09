@@ -726,6 +726,7 @@ static void
 win_mgr_bind_client(struct wl_client *client, void *shell)
 {
     struct uifw_client  *uclient;
+    struct weston_seat  *seat;
     int     newclient;
     pid_t   pid;
     uid_t   uid;
@@ -755,6 +756,15 @@ win_mgr_bind_client(struct wl_client *client, void *shell)
         newclient = 1;
         uclient->destroy_listener.notify = win_mgr_destroy_client;
         wl_client_add_destroy_listener(client, &uclient->destroy_listener);
+
+        /* get client keyboard resource */
+        wl_list_for_each (seat, &_ico_win_mgr->compositor->seat_list, link)    {
+            if (seat->keyboard) {
+                uclient->res_keyboard =
+                    wl_resource_find_for_client(&seat->keyboard->resource_list, client);
+                if (uclient->res_keyboard)  break;
+            }
+        }
     }
     else    {
         newclient = 0;
@@ -2289,10 +2299,10 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                     uint32_t surfaceid, uint32_t layerid, int x, int y,
                     int width, int height, int visible)
 {
-    struct uifw_win_surface     *usurf;
-    struct ivi_layout_layer  *layout_layer;
-    int32_t                     position[2];
-    uint32_t                    dimension[2];
+    struct uifw_win_surface *usurf;
+    struct ivi_layout_layer *layout_layer;
+    int32_t                 position[2];
+    int32_t                 dimension[2];
 
     uifw_trace("uifw_layout_surface: Enter(surf=%08x,layer=%d,x/y=%d/%d,w/h=%d,%d,vis=%d)",
                surfaceid, layerid, x, y, width, height, visible);

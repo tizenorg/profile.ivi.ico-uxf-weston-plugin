@@ -428,8 +428,7 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
                        const char *target, int32_t code, int32_t value)
 {
     struct uifw_win_surface *usurf;         /* UIFW surface                 */
-    struct wl_resource      *cres;          /* event send client resource   */
-    struct wl_array dummy_array;            /* dummy array for wayland API  */
+    struct wl_array         dummy_array;    /* dummy array for wayland API  */
     uint32_t    ctime;                      /* current time(ms)             */
     uint32_t    serial;                     /* event serial number          */
     int         keyboard_active;            /* keyborad active surface flag */
@@ -446,8 +445,8 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
 
     if ((target == NULL) || (*target == 0) || (*target == ' ')) {
         /* send event to surface via weston */
-
         uifw_trace("ico_mgr_send_key_event: notify_key(%d,%d)", code, value);
+
         notify_key(pInputMgr->seat, ctime, code,
                    value ? WL_KEYBOARD_KEY_STATE_PRESSED :
                            WL_KEYBOARD_KEY_STATE_RELEASED, STATE_UPDATE_NONE);
@@ -463,10 +462,7 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
         }
 
         /* send event                   */
-        cres = wl_resource_find_for_client(
-                            &pInputMgr->seat->keyboard->resource_list,
-                            wl_resource_get_client(usurf->surface->resource));
-        if (cres)   {
+        if (usurf->uclient->res_keyboard)   {
             if (pInputMgr->seat->keyboard->focus == usurf->surface) {
                 keyboard_active = 1;
             }
@@ -476,18 +472,19 @@ ico_mgr_send_key_event(struct wl_client *client, struct wl_resource *resource,
             if (! keyboard_active)  {
                 wl_array_init(&dummy_array);
                 serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                wl_keyboard_send_enter(cres, serial,
+                wl_keyboard_send_enter(usurf->uclient->res_keyboard, serial,
                                        usurf->surface->resource, &dummy_array);
             }
             serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
             uifw_trace("ico_mgr_send_key_event: send Key (%d, %d) to %08x",
                        code, value, usurf->surfaceid);
-            wl_keyboard_send_key(cres, serial, ctime, code,
+            wl_keyboard_send_key(usurf->uclient->res_keyboard, serial, ctime, code,
                                  value ? WL_KEYBOARD_KEY_STATE_PRESSED :
                                          WL_KEYBOARD_KEY_STATE_RELEASED);
            if (! keyboard_active)  {
                 serial = wl_display_next_serial(pInputMgr->compositor->wl_display);
-                wl_keyboard_send_leave(cres, serial, usurf->surface->resource);
+                wl_keyboard_send_leave(usurf->uclient->res_keyboard,
+                                       serial, usurf->surface->resource);
             }
         }
         else    {
