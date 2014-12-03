@@ -209,7 +209,7 @@ static void ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf
                                               void *userdata);
                                             /* hook for property change of ivi-shell*/
 static void ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
-                                                struct ivi_layout_surface_properties *prop,
+                                                const struct ivi_layout_surface_properties *prop,
                                                 enum ivi_layout_notification_mask mask,
                                                 void *userdata);
                                             /* hook for animation                   */
@@ -1256,7 +1256,7 @@ ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf, void *user
 /*--------------------------------------------------------------------------*/
 static void
 ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
-                                    struct ivi_layout_surface_properties *prop,
+                                    const struct ivi_layout_surface_properties *prop,
                                     enum ivi_layout_notification_mask mask,
                                     void *userdata)
 {
