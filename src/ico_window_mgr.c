@@ -67,6 +67,8 @@
 #include "ico_window_mgr_private.h"
 #include "ico_window_mgr-server-protocol.h"
 
+extern WL_EXPORT struct ivi_layout_interface ivi_layout_interface;
+
 /* gl_surface_state (inport from weston-1.4.0/src/gl-renderer.c */
 enum buffer_type {
     BUFFER_TYPE_NULL,
