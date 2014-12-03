@@ -541,7 +541,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
             x = ICO_IVI_MAX_COORDINATE+1;
             y = ICO_IVI_MAX_COORDINATE+1;
         }
-        if (ivi_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+        if (ivi_layout_get_properties_of_surface(usurf->ivisurf, &prop) == 0)   {
             if ((prop.destX != x) || (prop.destY != y) ||
                 (prop.destWidth != (uint32_t)width) ||
                 (prop.destHeight != (uint32_t)height))  {
@@ -1487,7 +1487,7 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
     usurf->ivisurf = ivisurf;
     usurf->node_tbl = &_ico_node_table[0];  /* set default node table (display no=0)    */
 
-    if (ivi_layout_getPropertiesOfSurface(ivisurf, &prop) == 0)  {
+    if (ivi_layout_get_properties_of_surface(ivisurf, &prop) == 0)  {
         usurf->x = prop.destX;
         usurf->y = prop.destY;
         usurf->width = prop.destWidth;

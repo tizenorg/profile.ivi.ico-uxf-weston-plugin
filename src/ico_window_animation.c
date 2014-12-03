@@ -634,7 +634,7 @@ animation_slide(struct weston_animation *animation,
         uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d) %08x",
                    usurf->surfaceid, par, x, y, usurf->x, usurf->y, (int)usurf->ivisurf);
     }
-    if (ivi_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+    if (ivi_layout_get_properties_of_surface(usurf->ivisurf, &prop) == 0)   {
         usurf->internal_propchange |= 0x20;
         if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
                                              prop.destWidth, prop.destHeight) == 0) {
