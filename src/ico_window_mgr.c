@@ -542,9 +542,9 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
             y = ICO_IVI_MAX_COORDINATE+1;
         }
         if (ivi_layout_get_properties_of_surface(usurf->ivisurf, &prop) == 0)   {
-            if ((prop.destX != x) || (prop.destY != y) ||
-                (prop.destWidth != (uint32_t)width) ||
-                (prop.destHeight != (uint32_t)height))  {
+            if ((prop.dest_x != x) || (prop.dest_y != y) ||
+                (prop.dest_width != (uint32_t)width) ||
+                (prop.dest_height != (uint32_t)height))  {
                 if (ivi_layout_surfaceSetDestinationRectangle(
                                         usurf->ivisurf, x, y, width, height) == 0)  {
                     ivi_layout_commitChanges();
@@ -1285,29 +1285,29 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
             /* change position or size  */
             uifw_trace("ico_ivi_surfacePropertyNotification: %08x x/y=%d/%d->%d/%d "
                        "w/h=%d/%d->%d/%d(%d/%d)", id_surface, usurf->x, usurf->y,
-                       prop->destX, prop->destY, usurf->width, usurf->height,
-                       prop->destWidth, prop->destHeight,
-                       prop->sourceWidth, prop->sourceHeight);
-            if ((usurf->client_width == prop->sourceWidth) &&
-                (usurf->client_height == prop->sourceHeight))   {
+                       prop->dest_x, prop->dest_y, usurf->width, usurf->height,
+                       prop->dest_width, prop->dest_height,
+                       prop->source_width, prop->source_height);
+            if ((usurf->client_width == prop->source_width) &&
+                (usurf->client_height == prop->source_height))   {
                 newmask &= (~IVI_NOTIFICATION_SOURCE_RECT);
             }
             else    {
-                usurf->client_width = prop->sourceWidth;
-                usurf->client_height = prop->sourceHeight;
+                usurf->client_width = prop->source_width;
+                usurf->client_height = prop->source_height;
                 send_event ++;
             }
-            if ((usurf->x == prop->destX) && (usurf->y == prop->destY) &&
-                (usurf->width == prop->destWidth) && (usurf->height == prop->destHeight)) {
+            if ((usurf->x == prop->dest_x) && (usurf->y == prop->dest_y) &&
+                (usurf->width == prop->dest_width) && (usurf->height == prop->dest_height)) {
                 newmask &= (~(IVI_NOTIFICATION_DEST_RECT|
                               IVI_NOTIFICATION_POSITION|IVI_NOTIFICATION_DIMENSION));
             }
             else    {
                 send_event ++;
-                usurf->x = prop->destX;
-                usurf->y = prop->destY;
-                usurf->width = prop->destWidth;
-                usurf->height = prop->destHeight;
+                usurf->x = prop->dest_x;
+                usurf->y = prop->dest_y;
+                usurf->width = prop->dest_width;
+                usurf->height = prop->dest_height;
                 if ((usurf->width != usurf->configure_width) ||
                     (usurf->height != usurf->configure_height)) {
                     /* send configure to client(App)        */
@@ -1488,12 +1488,12 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
     usurf->node_tbl = &_ico_node_table[0];  /* set default node table (display no=0)    */
 
     if (ivi_layout_get_properties_of_surface(ivisurf, &prop) == 0)  {
-        usurf->x = prop.destX;
-        usurf->y = prop.destY;
-        usurf->width = prop.destWidth;
-        usurf->height = prop.destHeight;
-        usurf->client_width = prop.sourceWidth;
-        usurf->client_height = prop.sourceHeight;
+        usurf->x = prop.dest_x;
+        usurf->y = prop.dest_y;
+        usurf->width = prop.dest_width;
+        usurf->height = prop.dest_height;
+        usurf->client_width = prop.source_width;
+        usurf->client_height = prop.source_height;
         usurf->configure_width = usurf->client_width;
         usurf->configure_height = usurf->client_height;
     }

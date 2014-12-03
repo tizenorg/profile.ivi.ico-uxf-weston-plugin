@@ -637,7 +637,7 @@ animation_slide(struct weston_animation *animation,
     if (ivi_layout_get_properties_of_surface(usurf->ivisurf, &prop) == 0)   {
         usurf->internal_propchange |= 0x20;
         if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
-                                             prop.destWidth, prop.destHeight) == 0) {
+                                             prop.dest_width, prop.dest_height) == 0) {
             ivi_layout_commitChanges();
         }
         usurf->internal_propchange &= ~0x20;
