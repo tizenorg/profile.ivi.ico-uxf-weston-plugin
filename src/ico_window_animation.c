@@ -39,7 +39,6 @@
 #include <sys/stat.h>
 
 #include <weston/compositor.h>
-#include <weston/ivi-layout.h>
 #include <weston/ivi-layout-export.h>
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"

@@ -56,7 +56,7 @@
 #include <GLES2/gl2.h>
 
 #include <weston/compositor.h>
-#include <weston/ivi-layout.h>
+#include <weston/ivi-layout-private.h>
 #include <weston/ivi-layout-export.h>
 
 /* detail debug log */
