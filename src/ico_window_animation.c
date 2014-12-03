@@ -483,7 +483,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         if ((usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
             usurf->visible = 0;
-            ivi_layout_surfaceSetVisibility(usurf->ivisurf, 0);
+            ivi_layout_surface_set_visibility(usurf->ivisurf, 0);
             ivi_layout_commit_changes();
             weston_surface_damage(usurf->surface);
             if (ev) {
@@ -493,7 +493,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         if ((usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_SHOW_AT_END) &&
             (usurf->visible == 0))  {
             usurf->visible = 1;
-            ivi_layout_surfaceSetVisibility(usurf->ivisurf, 1);
+            ivi_layout_surface_set_visibility(usurf->ivisurf, 1);
             ivi_layout_commit_changes();
             weston_surface_damage(usurf->surface);
             if (ev) {

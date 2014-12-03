@@ -1415,7 +1415,7 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
                     usurf->visible = 1;
                     uifw_trace("ico_ivi_surfacePropertyNotification: Change to Visible");
                     usurf->internal_propchange |= 0x01;
-                    ivi_layout_surfaceSetVisibility(ivisurf, 1);
+                    ivi_layout_surface_set_visibility(ivisurf, 1);
                     ivi_layout_commit_changes();
                     usurf->internal_propchange &= ~0x01;
                 }
@@ -2358,7 +2358,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     }
     usurf->internal_propchange |= 0x02;
     if (visible >= 0)   {
-        if (ivi_layout_surfaceSetVisibility(usurf->ivisurf, visible) != 0)   {
+        if (ivi_layout_surface_set_visibility(usurf->ivisurf, visible) != 0)   {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set visibility",
                       usurf->surfaceid);
         }
