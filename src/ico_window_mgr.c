@@ -2324,7 +2324,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     }
 
     if ((x >= 0) && (y >= 0) && (width > 0) && (height > 0))    {
-        if (ivi_layout_surfaceSetSourceRectangle(usurf->ivisurf,
+        if (ivi_layout_surface_set_source_rectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
                       usurf->surfaceid);
@@ -2344,7 +2344,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
         }
     }
     else if ((width > 0) && (height > 0))   {
-        if (ivi_layout_surfaceSetSourceRectangle(usurf->ivisurf,
+        if (ivi_layout_surface_set_source_rectangle(usurf->ivisurf,
                                                     0, 0, width, height) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
                       usurf->surfaceid);
