@@ -1187,8 +1187,8 @@ ico_ivi_surfaceCreateNotification(struct ivi_layout_surface *ivisurf, void *user
     uifw_trace("ico_ivi_surfaceCreateNotification: Create %x", id_surface);
 
     /* set property notification    */
-    if (ivi_layout_surfaceAddNotification(ivisurf, ico_ivi_surfacePropertyNotification, NULL) != 0)  {
-        uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_surfaceAddNotification Error");
+    if (ivi_layout_surface_add_notification(ivisurf, ico_ivi_surfacePropertyNotification, NULL) != 0)  {
+        uifw_error("ico_ivi_surfaceCreateNotification: ivi_layout_surface_add_notification Error");
     }
     ev = ivi_layout_interface.get_weston_view(ivisurf);
     if (! ev)   {
