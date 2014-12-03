@@ -543,8 +543,8 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
         }
         if ((prop = ivi_layout_get_properties_of_surface(usurf->ivisurf)))   {
             if ((prop->dest_x != x) || (prop->dest_y != y) ||
-                (prop->dest_width != (uint32_t)width) ||
-                (prop->dest_height != (uint32_t)height))  {
+                (prop->dest_width != (int32_t)width) ||
+                (prop->dest_height != (int32_t)height))  {
                 if (ivi_layout_surface_set_destination_rectangle(
                                         usurf->ivisurf, x, y, width, height) == 0)  {
                     ivi_layout_commit_changes();
