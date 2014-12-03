@@ -3014,7 +3014,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     weston_compositor_add_touch_binding(ec, 0, win_mgr_touch_to_activate, NULL);
 
     /* set Notification function for GENIVI ivi-shell   */
-    if (ivi_layout_addNotificationCreateSurface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
+    if (ivi_layout_add_notification_create_surface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationCreateSurface Error");
     }
     if (ivi_layout_addNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
