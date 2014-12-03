@@ -2394,8 +2394,8 @@ win_mgr_destroy_surface(struct weston_surface *surface)
     uifw_trace("win_mgr_destroy_surface: Enter(%08x) %08x", (int)surface, usurf->surfaceid);
 
     /* remove notification listener */
-    if (ivi_layout_surfaceRemoveNotification(usurf->ivisurf) != 0)   {
-        uifw_warn("win_mgr_destroy_surface: ivi_layout_surfaceRemoveNotification(%08x)"
+    if (ivi_layout_surface_remove_notification(usurf->ivisurf) != 0)   {
+        uifw_warn("win_mgr_destroy_surface: ivi_layout_surface_remove_notification(%08x)"
                   " Error", usurf->surfaceid);
     }
 
