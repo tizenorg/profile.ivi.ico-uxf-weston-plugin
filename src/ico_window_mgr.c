@@ -2470,9 +2470,7 @@ win_mgr_surf_destroylistener(struct wl_listener *listener, void *data)
 
     if (usurf && usurf->surface && usurf->ivisurf)  {
         uifw_trace("win_mgr_surf_destroylistener: Enter(%08x)", usurf->surfaceid);
-        if (ivi_layout_surface_remove(usurf->ivisurf) != 0)   {
-            uifw_trace("win_mgr_surf_destroylistener: ivi_layout_surface_remove() Error");
-        }
+        ivi_layout_surface_remove(usurf->ivisurf);
         uifw_trace("win_mgr_surf_destroylistener: Leave");
     }
 }
