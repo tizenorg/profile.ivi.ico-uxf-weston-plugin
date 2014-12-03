@@ -508,7 +508,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
                                   int x, int y, int width, int height)
 {
     struct weston_surface *es = usurf->surface;
-    struct ivi_layout_surface_properties  prop;
+    const struct ivi_layout_surface_properties  *prop;
     int     buf_width, buf_height;
 
     if ((es == NULL) || (usurf->ivisurf == NULL))    {
@@ -541,10 +541,10 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
             x = ICO_IVI_MAX_COORDINATE+1;
             y = ICO_IVI_MAX_COORDINATE+1;
         }
-        if (ivi_layout_get_properties_of_surface(usurf->ivisurf, &prop) == 0)   {
-            if ((prop.dest_x != x) || (prop.dest_y != y) ||
-                (prop.dest_width != (uint32_t)width) ||
-                (prop.dest_height != (uint32_t)height))  {
+        if ((prop = ivi_layout_get_properties_of_surface(usurf->ivisurf)))   {
+            if ((prop->dest_x != x) || (prop->dest_y != y) ||
+                (prop->dest_width != (uint32_t)width) ||
+                (prop->dest_height != (uint32_t)height))  {
                 if (ivi_layout_surfaceSetDestinationRectangle(
                                         usurf->ivisurf, x, y, width, height) == 0)  {
                     ivi_layout_commitChanges();
@@ -1457,7 +1457,7 @@ static void
 win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
                          struct wl_client *client, struct ivi_layout_surface *ivisurf)
 {
-    struct ivi_layout_surface_properties  prop;
+    const struct ivi_layout_surface_properties  *prop;
     struct uifw_win_surface *usurf;
     struct uifw_win_surface *phash;
     struct uifw_win_surface *bhash;
@@ -1487,13 +1487,13 @@ win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
     usurf->ivisurf = ivisurf;
     usurf->node_tbl = &_ico_node_table[0];  /* set default node table (display no=0)    */
 
-    if (ivi_layout_get_properties_of_surface(ivisurf, &prop) == 0)  {
-        usurf->x = prop.dest_x;
-        usurf->y = prop.dest_y;
-        usurf->width = prop.dest_width;
-        usurf->height = prop.dest_height;
-        usurf->client_width = prop.source_width;
-        usurf->client_height = prop.source_height;
+    if ((prop = ivi_layout_get_properties_of_surface(ivisurf)))  {
+        usurf->x = prop->dest_x;
+        usurf->y = prop->dest_y;
+        usurf->width = prop->dest_width;
+        usurf->height = prop->dest_height;
+        usurf->client_width = prop->source_width;
+        usurf->client_height = prop->source_height;
         usurf->configure_width = usurf->client_width;
         usurf->configure_height = usurf->client_height;
     }

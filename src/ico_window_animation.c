@@ -553,7 +553,7 @@ animation_slide(struct weston_animation *animation,
 {
     struct uifw_win_surface *usurf;
     struct animation_data   *animadata;
-    struct ivi_layout_surface_properties  prop;
+    const struct ivi_layout_surface_properties  *prop;
     int         dwidth, dheight;
     int         par, x, y;
 
@@ -634,10 +634,10 @@ animation_slide(struct weston_animation *animation,
         uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d) %08x",
                    usurf->surfaceid, par, x, y, usurf->x, usurf->y, (int)usurf->ivisurf);
     }
-    if (ivi_layout_get_properties_of_surface(usurf->ivisurf, &prop) == 0)   {
+    if ((prop = ivi_layout_get_properties_of_surface(usurf->ivisurf)))   {
         usurf->internal_propchange |= 0x20;
         if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
-                                             prop.dest_width, prop.dest_height) == 0) {
+                                             prop->dest_width, prop->dest_height) == 0) {
             ivi_layout_commitChanges();
         }
         usurf->internal_propchange &= ~0x20;
