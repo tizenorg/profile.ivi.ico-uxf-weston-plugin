@@ -2306,7 +2306,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
         return;
     }
     if (layerid)    {
-        layout_layer = ivi_layout_getLayerFromId(layerid);
+        layout_layer = ivi_layout_get_layer_from_id(layerid);
         if (! layout_layer) {
             /* layer dose not exist                 */
             uifw_trace("uifw_layout_surface: Leave(layer=%d dose not exist)", layerid);
