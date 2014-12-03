@@ -2312,7 +2312,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
             uifw_trace("uifw_layout_surface: Leave(layer=%d dose not exist)", layerid);
             return;
         }
-        if (ivi_layout_layerAddSurface(layout_layer, usurf->ivisurf) == 0)   {
+        if (ivi_layout_layer_add_surface(layout_layer, usurf->ivisurf) == 0)   {
             if (ivi_layout_layerSetVisibility(layout_layer, 1) != 0) {
                 uifw_warn("uifw_layout_surface: layer(%d) visible Error", layerid);
             }
