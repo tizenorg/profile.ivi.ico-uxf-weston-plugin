@@ -1183,7 +1183,7 @@ ico_ivi_surfaceCreateNotification(struct ivi_layout_surface *ivisurf, void *user
     struct weston_surface   *es;
     struct wl_client        *client;
 
-    id_surface = ivi_layout_getIdOfSurface(ivisurf);
+    id_surface = ivi_layout_get_id_of_surface(ivisurf);
     uifw_trace("ico_ivi_surfaceCreateNotification: Create %x", id_surface);
 
     /* set property notification    */
@@ -1227,7 +1227,7 @@ ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf, void *user
     struct weston_surface   *es;
     struct uifw_win_surface *usurf;
 
-    id_surface = ivi_layout_getIdOfSurface(ivisurf);
+    id_surface = ivi_layout_get_id_of_surface(ivisurf);
     uifw_trace("ico_ivi_surfaceRemoveNotification: Remove %x", id_surface);
 
     usurf = ico_window_mgr_get_usurf(id_surface);
@@ -1271,7 +1271,7 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
 
     newmask = ((uint32_t)mask) & (~(IVI_NOTIFICATION_OPACITY|IVI_NOTIFICATION_ORIENTATION|
                                     IVI_NOTIFICATION_PIXELFORMAT));
-    id_surface = ivi_layout_getIdOfSurface(ivisurf);
+    id_surface = ivi_layout_get_id_of_surface(ivisurf);
     usurf = ico_window_mgr_get_usurf(id_surface);
 
     if ((usurf != NULL) && (newmask != 0) && (usurf->internal_propchange == 0)) {
