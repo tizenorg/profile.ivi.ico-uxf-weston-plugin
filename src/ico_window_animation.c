@@ -553,7 +553,7 @@ animation_slide(struct weston_animation *animation,
 {
     struct uifw_win_surface *usurf;
     struct animation_data   *animadata;
-    struct ivi_layout_SurfaceProperties  prop;
+    struct ivi_layout_surface_properties  prop;
     int         dwidth, dheight;
     int         par, x, y;
 

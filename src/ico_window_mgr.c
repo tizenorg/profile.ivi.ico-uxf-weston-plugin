@@ -207,7 +207,7 @@ static void ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf
                                               void *userdata);
                                             /* hook for property change of ivi-shell*/
 static void ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
-                                                struct ivi_layout_SurfaceProperties *prop,
+                                                struct ivi_layout_surface_properties *prop,
                                                 enum ivi_layout_notification_mask mask,
                                                 void *userdata);
                                             /* hook for animation                   */
@@ -506,7 +506,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
                                   int x, int y, int width, int height)
 {
     struct weston_surface *es = usurf->surface;
-    struct ivi_layout_SurfaceProperties  prop;
+    struct ivi_layout_surface_properties  prop;
     int     buf_width, buf_height;
 
     if ((es == NULL) || (usurf->ivisurf == NULL))    {
@@ -1254,7 +1254,7 @@ ico_ivi_surfaceRemoveNotification(struct ivi_layout_surface *ivisurf, void *user
 /*--------------------------------------------------------------------------*/
 static void
 ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
-                                    struct ivi_layout_SurfaceProperties *prop,
+                                    struct ivi_layout_surface_properties *prop,
                                     enum ivi_layout_notification_mask mask,
                                     void *userdata)
 {
@@ -1455,7 +1455,7 @@ static void
 win_mgr_register_surface(uint32_t id_surface, struct weston_surface *surface,
                          struct wl_client *client, struct ivi_layout_surface *ivisurf)
 {
-    struct ivi_layout_SurfaceProperties  prop;
+    struct ivi_layout_surface_properties  prop;
     struct uifw_win_surface *usurf;
     struct uifw_win_surface *phash;
     struct uifw_win_surface *bhash;
