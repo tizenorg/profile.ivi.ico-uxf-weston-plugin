@@ -2351,7 +2351,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
         }
         dimension[0] = width;
         dimension[1] = height;
-        if (ivi_layout_surfaceSetDimension(usurf->ivisurf, dimension) != 0)  {
+        if (ivi_layout_surface_set_dimension(usurf->ivisurf, dimension) != 0)  {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set destination size",
                       usurf->surfaceid);
         }
