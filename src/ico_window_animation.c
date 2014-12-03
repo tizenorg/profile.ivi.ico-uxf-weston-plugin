@@ -484,7 +484,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             (usurf->visible != 0))  {
             usurf->visible = 0;
             ivi_layout_surfaceSetVisibility(usurf->ivisurf, 0);
-            ivi_layout_commitChanges();
+            ivi_layout_commit_changes();
             weston_surface_damage(usurf->surface);
             if (ev) {
                 weston_view_geometry_dirty(ev);
@@ -494,7 +494,7 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
             (usurf->visible == 0))  {
             usurf->visible = 1;
             ivi_layout_surfaceSetVisibility(usurf->ivisurf, 1);
-            ivi_layout_commitChanges();
+            ivi_layout_commit_changes();
             weston_surface_damage(usurf->surface);
             if (ev) {
                 weston_view_geometry_dirty(ev);
@@ -638,7 +638,7 @@ animation_slide(struct weston_animation *animation,
         usurf->internal_propchange |= 0x20;
         if (ivi_layout_surface_set_destination_rectangle(usurf->ivisurf, x, y,
                                              prop->dest_width, prop->dest_height) == 0) {
-            ivi_layout_commitChanges();
+            ivi_layout_commit_changes();
         }
         usurf->internal_propchange &= ~0x20;
     }

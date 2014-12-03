@@ -547,7 +547,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
                 (prop->dest_height != (uint32_t)height))  {
                 if (ivi_layout_surface_set_destination_rectangle(
                                         usurf->ivisurf, x, y, width, height) == 0)  {
-                    ivi_layout_commitChanges();
+                    ivi_layout_commit_changes();
                 }
             }
         }
@@ -1416,7 +1416,7 @@ ico_ivi_surfacePropertyNotification(struct ivi_layout_surface *ivisurf,
                     uifw_trace("ico_ivi_surfacePropertyNotification: Change to Visible");
                     usurf->internal_propchange |= 0x01;
                     ivi_layout_surfaceSetVisibility(ivisurf, 1);
-                    ivi_layout_commitChanges();
+                    ivi_layout_commit_changes();
                     usurf->internal_propchange &= ~0x01;
                 }
             }
@@ -2363,7 +2363,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
                       usurf->surfaceid);
         }
     }
-    if (ivi_layout_commitChanges() != 0) {
+    if (ivi_layout_commit_changes() != 0) {
         uifw_warn("uifw_layout_surface: surface(%08x) commit Error", usurf->surfaceid);
     }
     usurf->internal_propchange &= ~0x02;
