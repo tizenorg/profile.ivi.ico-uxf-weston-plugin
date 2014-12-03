@@ -545,7 +545,7 @@ ico_window_mgr_set_weston_surface(struct uifw_win_surface *usurf,
             if ((prop->dest_x != x) || (prop->dest_y != y) ||
                 (prop->dest_width != (uint32_t)width) ||
                 (prop->dest_height != (uint32_t)height))  {
-                if (ivi_layout_surfaceSetDestinationRectangle(
+                if (ivi_layout_surface_set_destination_rectangle(
                                         usurf->ivisurf, x, y, width, height) == 0)  {
                     ivi_layout_commitChanges();
                 }
@@ -2329,7 +2329,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source",
                       usurf->surfaceid);
         }
-        if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf,
+        if (ivi_layout_surface_set_destination_rectangle(usurf->ivisurf,
                                                          x, y, width, height) != 0) {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set destination",
                       usurf->surfaceid);
