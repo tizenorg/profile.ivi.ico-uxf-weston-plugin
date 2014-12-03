@@ -2313,7 +2313,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
             return;
         }
         if (ivi_layout_layer_add_surface(layout_layer, usurf->ivisurf) == 0)   {
-            if (ivi_layout_layerSetVisibility(layout_layer, 1) != 0) {
+            if (ivi_layout_layer_set_visibility(layout_layer, 1) != 0) {
                 uifw_warn("uifw_layout_surface: layer(%d) visible Error", layerid);
             }
         }
