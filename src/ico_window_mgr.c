@@ -3017,7 +3017,7 @@ module_init(struct weston_compositor *ec, int *argc, char *argv[])
     if (ivi_layout_add_notification_create_surface(ico_ivi_surfaceCreateNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationCreateSurface Error");
     }
-    if (ivi_layout_addNotificationRemoveSurface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
+    if (ivi_layout_add_notification_remove_surface(ico_ivi_surfaceRemoveNotification, NULL) != 0)   {
         uifw_error("ico_window_mgr: ivi_layout_setNotificationRemoveSurface Error");
     }
 
