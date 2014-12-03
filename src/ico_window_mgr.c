@@ -2338,7 +2338,7 @@ uifw_layout_surface(struct wl_client *client, struct wl_resource *resource,
     else if ((x >= 0) && (y >= 0))  {
         position[0] = x;
         position[1] = y;
-        if (ivi_layout_surfaceSetPosition(usurf->ivisurf, position) != 0)    {
+        if (ivi_layout_surface_set_position(usurf->ivisurf, position) != 0)    {
             uifw_warn("uifw_layout_surface: surface(%08x) can not set source position",
                       usurf->surfaceid);
         }
