@@ -2,13 +2,13 @@
 
 Name:       ico-uxf-weston-plugin
 Summary:    Weston Plugins for IVI
-Version:    0.9.22
+Version:    0.9.23
 Release:    0
 Group:      Automotive/ICO Homescreen
 License:    MIT
 Source0:    %{name}-%{version}.tar.bz2
 
-BuildRequires: pkgconfig(weston) >= 1.5.0
+BuildRequires: pkgconfig(weston) >= 1.6.0
 BuildRequires: pkgconfig(pixman-1)
 BuildRequires: pkgconfig(evas)
 BuildRequires: pkgconfig(aul)
@@ -16,11 +16,11 @@ BuildRequires: pkgconfig(ecore)
 BuildRequires: pkgconfig(egl)
 BuildRequires: pkgconfig
 BuildRequires: mesa-devel
-BuildRequires: genivi-shell-devel >= 0.2.3
-BuildRequires: weston-ivi-shell-devel >= 0.1.7
-Requires: weston >= 1.5.0
-Requires: genivi-shell >= 0.2.3
-Requires: weston-ivi-shell >= 0.1.7
+BuildRequires: genivi-shell-devel >= 0.2.4
+BuildRequires: weston-ivi-shell-devel >= 0.1.8
+Requires: weston >= 1.6.0
+Requires: genivi-shell >= 0.2.4
+Requires: weston-ivi-shell >= 0.1.8
 Requires: weekeyboard
 Conflicts: weston-ivi-config
 Conflicts: weston-ivi-shell-config
