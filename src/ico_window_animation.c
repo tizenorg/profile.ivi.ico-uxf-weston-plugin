@@ -39,7 +39,6 @@
 #include <sys/stat.h>
 
 #include <weston/compositor.h>
-#include <weston/ivi-layout.h>
 #include <weston/ivi-layout-export.h>
 #include "ico_ivi_common_private.h"
 #include "ico_window_mgr_private.h"
@@ -484,8 +483,8 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         if ((usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_HIDE_AT_END) &&
             (usurf->visible != 0))  {
             usurf->visible = 0;
-            ivi_layout_surfaceSetVisibility(usurf->ivisurf, 0);
-            ivi_layout_commitChanges();
+            ivi_layout_surface_set_visibility(usurf->ivisurf, 0);
+            ivi_layout_commit_changes();
             weston_surface_damage(usurf->surface);
             if (ev) {
                 weston_view_geometry_dirty(ev);
@@ -494,8 +493,8 @@ animation_end(struct uifw_win_surface *usurf, const int disp)
         if ((usurf->animation.visible == ICO_WINDOW_MGR_ANIMA_SHOW_AT_END) &&
             (usurf->visible == 0))  {
             usurf->visible = 1;
-            ivi_layout_surfaceSetVisibility(usurf->ivisurf, 1);
-            ivi_layout_commitChanges();
+            ivi_layout_surface_set_visibility(usurf->ivisurf, 1);
+            ivi_layout_commit_changes();
             weston_surface_damage(usurf->surface);
             if (ev) {
                 weston_view_geometry_dirty(ev);
@@ -554,7 +553,7 @@ animation_slide(struct weston_animation *animation,
 {
     struct uifw_win_surface *usurf;
     struct animation_data   *animadata;
-    struct ivi_layout_SurfaceProperties  prop;
+    const struct ivi_layout_surface_properties  *prop;
     int         dwidth, dheight;
     int         par, x, y;
 
@@ -635,11 +634,11 @@ animation_slide(struct weston_animation *animation,
         uifw_debug("animation_slide: %08x %d%% %d/%d(target %d/%d) %08x",
                    usurf->surfaceid, par, x, y, usurf->x, usurf->y, (int)usurf->ivisurf);
     }
-    if (ivi_layout_getPropertiesOfSurface(usurf->ivisurf, &prop) == 0)   {
+    if ((prop = ivi_layout_get_properties_of_surface(usurf->ivisurf)))   {
         usurf->internal_propchange |= 0x20;
-        if (ivi_layout_surfaceSetDestinationRectangle(usurf->ivisurf, x, y,
-                                             prop.destWidth, prop.destHeight) == 0) {
-            ivi_layout_commitChanges();
+        if (ivi_layout_surface_set_destination_rectangle(usurf->ivisurf, x, y,
+                                             prop->dest_width, prop->dest_height) == 0) {
+            ivi_layout_commit_changes();
         }
         usurf->internal_propchange &= ~0x20;
     }
